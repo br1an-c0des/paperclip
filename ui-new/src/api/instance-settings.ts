@@ -5,12 +5,13 @@ import type {
   PatchInstanceExperimentalSettings,
   PatchInstanceGeneralSettings,
   PatchInstanceSettings,
+  WorktreeCleanupStatus,
 } from "@paperclipai/shared";
 import { api } from "./client";
 
 /*
  * The instance's experimental settings. ui-new reads them to follow the flags the server also
- * enforces, such as `enableIsolatedWorkspaces`, and App settings → General's Features card switches
+ * enforces, such as `enableManagedSandboxOnly`, and App settings → General's Features card switches
  * the ones someone may still want to change (decisions 12 and 32); the UI-only flags have no switch.
  * The general settings say whether run logs hide the username in home-directory paths; App settings
  * (src/settings/app/) changes them too: that setting, AI feedback sharing and backup retention.
@@ -25,6 +26,8 @@ export const instanceSettingsApi = {
    */
   updateExperimental: (patch: PatchInstanceExperimentalSettings) =>
     api.patch<InstanceExperimentalSettingsWithManaged>("/instance/settings/experimental", patch),
+  /** The worktree cleanup setting and what's in force (step 4b part 3). It saves with `updateExperimental({ worktreeCleanup })`. */
+  worktreeCleanup: () => api.get<WorktreeCleanupStatus>("/instance/settings/worktree-cleanup"),
   general: () => api.get<InstanceGeneralSettings>("/instance/settings/general"),
   /** Instance admins only. The server merges the patch's keys; `backupRetention` is replaced whole. */
   updateGeneral: (patch: PatchInstanceGeneralSettings) => api.patch<InstanceGeneralSettings>("/instance/settings/general", patch),

@@ -895,6 +895,9 @@ describe.each(["unchanged", "newer_active", "stale_idle"] as const)(
       });
       await db.insert(authUsers).values({ id: "responsible-user", name: "Fixture user", email: "responsible-user@example.test", createdAt: new Date(), updatedAt: new Date() }).onConflictDoNothing();
       await db.insert(companyMemberships).values({ companyId, principalType: "user", principalId: "responsible-user", status: "active", membershipRole: "member" });
+      // The checkout is this repository. Since step 4b part 3 a project with a git checkout gives each
+      // task its own worktree unless it chooses the shared checkout, and a worktree of the whole repo
+      // is slow to create and lands in the real checkout, so choose shared.
       await db
         .insert(projects)
         .values({
@@ -902,6 +905,7 @@ describe.each(["unchanged", "newer_active", "stale_idle"] as const)(
           companyId,
           name: "Recovery project",
           status: "active",
+          executionWorkspacePolicy: { enabled: false, defaultMode: "shared_workspace" },
         });
       await db.insert(projectWorkspaces).values({
         id: projectWorkspaceId,
@@ -1639,7 +1643,11 @@ describe("goal-less native task-session publication", () => {
       await db.insert(authUsers).values({ id: "pointer-user", name: "Pointer user", email: "pointer@example.test", createdAt: new Date(), updatedAt: new Date() }).onConflictDoNothing();
       await db.insert(companies).values({ id: companyId, name: "Native pointer", issuePrefix, status: "active", defaultResponsibleUserId: "pointer-user" });
       await db.insert(companyMemberships).values({ companyId, principalType: "user", principalId: "pointer-user", status: "active", membershipRole: "member" });
-      await db.insert(projects).values({ id: projectId, companyId, name: "Pointer project", status: "active" });
+      // The checkout is this repository. Since step 4b part 3 a project with a git checkout gives each
+      // task its own worktree unless it chooses the shared checkout, and a worktree of the whole repo
+      // is slow to create and lands in the real checkout, so choose shared.
+      await db.insert(projects).values({ id: projectId, companyId, name: "Pointer project", status: "active",
+        executionWorkspacePolicy: { enabled: false, defaultMode: "shared_workspace" } });
       await db.insert(projectWorkspaces).values({ id: projectWorkspaceId, companyId, projectId, name: "Pointer workspace", cwd: repoRoot, isPrimary: true });
       await db.insert(agents).values({ id: agentId, companyId, name: "Pointer agent", adapterType: "paperclip_runner", status: "active",
         // This scenario is per-turn publication: each run closes its session.

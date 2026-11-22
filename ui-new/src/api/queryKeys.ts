@@ -22,6 +22,7 @@ export const queryKeys = {
   instance: {
     experimentalSettings: ["instance", "experimental-settings"] as const,
     generalSettings: ["instance", "general-settings"] as const,
+    worktreeCleanup: ["instance", "worktree-cleanup"] as const,
   },
   companies: {
     /** Prefix for everything company-shaped. */

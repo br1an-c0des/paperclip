@@ -161,14 +161,6 @@ export function parseProjectExecutionWorkspacePolicy(raw: unknown): ProjectExecu
   };
 }
 
-export function gateProjectExecutionWorkspacePolicy(
-  projectPolicy: ProjectExecutionWorkspacePolicy | null,
-  isolatedWorkspacesEnabled: boolean,
-): ProjectExecutionWorkspacePolicy | null {
-  if (!isolatedWorkspacesEnabled) return null;
-  return projectPolicy;
-}
-
 /**
  * Operator default: a project with a configured workspace and no policy of its
  * own runs its tasks in an isolated per-task worktree.
@@ -192,10 +184,12 @@ export function gateProjectExecutionWorkspacePolicy(
  *   combination no caller expects. Substituting a real policy makes
  *   `projectHasPolicy` true, so mode and strategy stay coherent.
  *
- * A stored project policy always wins, including one that is explicitly
- * disabled: `parseProjectExecutionWorkspacePolicy` returns `enabled: false`
- * for a blob that never opted in, and that is a tenant decision to stay on the
- * shared checkout, not an absent one to fill in.
+ * Only an explicit choice keeps a stored policy off the default (step 4b part 3,
+ * `projectPolicyChoosesCheckoutMode`). A stored blob nobody chose — one written
+ * as a side effect of picking workspace storage at creation, of an
+ * authorization policy, or of an old UI's bare enable toggle — gets the
+ * default laid over it, keeping its other fields (concurrency, branch
+ * template, setup commands, storage plugin).
  */
 export function applyDefaultIsolatedExecutionWorkspacePolicy(input: {
   projectPolicy: ProjectExecutionWorkspacePolicy | null;
@@ -204,8 +198,28 @@ export function applyDefaultIsolatedExecutionWorkspacePolicy(input: {
 }): ProjectExecutionWorkspacePolicy | null {
   if (!input.defaultIsolatedWorkspacesEnabled) return input.projectPolicy;
   if (!input.hasProjectWorkspace) return input.projectPolicy;
-  if (input.projectPolicy) return input.projectPolicy;
-  return { enabled: true, defaultMode: "isolated_workspace" };
+  if (!input.projectPolicy) return { enabled: true, defaultMode: "isolated_workspace" };
+  if (projectPolicyChoosesCheckoutMode(input.projectPolicy)) return input.projectPolicy;
+  return { ...input.projectPolicy, enabled: true, defaultMode: "isolated_workspace" };
+}
+
+/**
+ * Whether a stored project policy records a choice about where new tasks work, so the worktree
+ * default leaves it alone. The mark of a choice is a stored `defaultMode`: both UIs show the "new
+ * tasks get their own checkout" control only once task checkouts are on, and ui-new writes
+ * `defaultMode` on every save of its Task checkouts card, turning checkouts off included. A stored
+ * strategy other than `git_worktree` is a choice too.
+ *
+ * What this can't tell apart: an `{ enabled: false }` written by the old UI's "Enable isolated task
+ * checkouts" switch, turned off without touching the default-mode switch, looks the same as the
+ * `{ enabled: false, storageProviderPluginId: null }` ui-new writes when a project is created with
+ * Core storage. Both read as nobody's choice and get the default; turning the project's switch off
+ * again records the choice.
+ */
+export function projectPolicyChoosesCheckoutMode(policy: ProjectExecutionWorkspacePolicy): boolean {
+  if (policy.defaultMode) return true;
+  const strategyType = policy.workspaceStrategy?.type;
+  return Boolean(strategyType && strategyType !== "git_worktree");
 }
 
 type ParseIssueExecutionWorkspaceSettingsOptions = {
@@ -484,14 +498,6 @@ export function buildExecutionWorkspaceAdapterConfig(input: {
   }
 
   return { ...nextConfig, ...input.adapterConfigOverrides };
-}
-
-export function taskWorkspaceRuntimeSelectionEnabled(input: {
-  legacyUiEnabled: boolean;
-  hasTypedSelection: boolean;
-  hasBinding: boolean;
-}): boolean {
-  return input.legacyUiEnabled || input.hasTypedSelection || input.hasBinding;
 }
 
 export function canApplyTaskWorkspaceSelectionAtAdmission(input: {

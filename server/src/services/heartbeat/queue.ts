@@ -3326,9 +3326,6 @@ export function createHeartbeatQueue(db: Db, dependencies: HeartbeatQueueDepende
     if (projectId && !readNonEmptyString(enrichedContextSnapshot.projectId)) {
       enrichedContextSnapshot.projectId = projectId;
     }
-    const isolatedWorkspacesEnabled = issueId
-      ? (await instanceSettings.getExperimental()).enableIsolatedWorkspaces
-      : false;
     let operatorResponsibleUserId: string | null = opts.manualUserWake ? opts.requestedByActorId! : null;
     let queuedResponsibleUserIdPromise: Promise<string> | null = null;
     const resolveQueuedResponsibleUserId = () => {
@@ -4555,8 +4552,8 @@ export function createHeartbeatQueue(db: Db, dependencies: HeartbeatQueueDepende
             return { kind: "skipped" as const };
           }
 
+          // Isolated workspaces are always available (step 4b part 3); this runs for every issue wake.
           if (
-            isolatedWorkspacesEnabled &&
             !activeExecutionRun &&
             (issue.status !== "done" || Boolean(opts.queuedCommentInterruptId)) &&
             issue.status !== "cancelled"

@@ -44,7 +44,11 @@ async function workspaceIssueWithinLowTrustBoundary(input: {
 export async function assertLowTrustWorkspaceIsolation(input: {
   db?: Db;
   resolution: TrustPresetResolution;
-  isolatedWorkspacesEnabled: boolean;
+  /**
+   * Ignored: isolated workspaces are always available (step 4b part 3), so the refusal it drove
+   * (`low_trust_isolation_unavailable`) is gone. Kept until `heartbeat/workspaces.ts` stops passing it.
+   */
+  isolatedWorkspacesEnabled?: boolean;
   effectiveExecutionWorkspaceMode: string | null | undefined;
   selectedEnvironmentDriver: string | null | undefined;
   issue: { companyId: string; id?: string | null; projectId?: string | null } | null;
@@ -57,11 +61,6 @@ export async function assertLowTrustWorkspaceIsolation(input: {
   }
   if (input.resolution.kind !== "low_trust_review") return;
 
-  if (!input.isolatedWorkspacesEnabled) {
-    throw unprocessable("Low-trust execution requires isolated workspaces to be enabled.", {
-      code: "low_trust_isolation_unavailable",
-    });
-  }
   if (input.effectiveExecutionWorkspaceMode !== "isolated_workspace") {
     throw unprocessable("Low-trust execution requires an isolated execution workspace.", {
       code: "low_trust_requires_isolated_workspace",

@@ -132,6 +132,8 @@ export function TaskBranch(props: { task: Issue; workspaceId: string }) {
           )}
         </Match>
       </Switch>
+      {/* Why the worktree cleanup kept this finished task's worktree; the server sends it only while cleanup is on. */}
+      <Show when={readiness.data?.worktreeKept}>{(kept) => <p class="tsec-muted tb-kept">Worktree kept: {kept().label}</p>}</Show>
 
       <Show when={divergence()}>
         {(found) => (

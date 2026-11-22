@@ -93,6 +93,36 @@ describe("instance settings service", () => {
     const disabled = applyExperimentalSettingsPatch(enabled, { enableChatConnectors: false });
     expect(disabled).toMatchObject({ enableApps: true, enableChatConnectors: false });
   });
+  it("reads the retired worktree switches as on, ignoring stored and managed off values (step 4b part 3)", () => {
+    for (const stored of [undefined, {}, { enableIsolatedWorkspaces: false, enableIsolatedWorkspacesByDefault: false }, { enableCases: "invalid" }]) {
+      expect(normalizeExperimentalSettings(stored)).toMatchObject({ enableIsolatedWorkspaces: true, enableIsolatedWorkspacesByDefault: true });
+    }
+    expect(applyExperimentalSettingsPatch({}, { enableIsolatedWorkspaces: false })).toMatchObject({ enableIsolatedWorkspaces: true });
+    const config: ManagedInstanceConfig = {
+      v: 1, mode: "cloud", catalogVersion: "test", plugins: { autoInstall: [] }, environments: [], pluginEnvironments: [],
+      features: { enableIsolatedWorkspaces: false, enableIsolatedWorkspacesByDefault: false },
+    } as ManagedInstanceConfig;
+    expect(applyManagedExperimentalOverlay(normalizeExperimentalSettings({}), config).experimental)
+      .toMatchObject({ enableIsolatedWorkspaces: true, enableIsolatedWorkspacesByDefault: true });
+  });
+  it("keeps the worktree cleanup mode absent until saved, and clears it with null", () => {
+    expect("worktreeCleanup" in normalizeExperimentalSettings({})).toBe(false);
+    const saved = applyExperimentalSettingsPatch({}, { worktreeCleanup: "strict" });
+    expect(saved.worktreeCleanup).toBe("strict");
+    expect(applyExperimentalSettingsPatch(JSON.parse(JSON.stringify(saved)), { enableCases: true }).worktreeCleanup).toBe("strict");
+    expect("worktreeCleanup" in applyExperimentalSettingsPatch(saved, { worktreeCleanup: null })).toBe(false);
+    expect(normalizeExperimentalSettings({ worktreeCleanup: "bogus" }).worktreeCleanup).toBeUndefined();
+  });
+  it("keeps the worktree cleanup values next to the level, absent until saved", () => {
+    const empty = normalizeExperimentalSettings({});
+    for (const key of ["worktreeCleanupWaitDays", "worktreeCleanupRemoveBuildOutput", "worktreeRestorePointAfterDays", "worktreeRestorePointIdleDays"])
+      expect(key in empty).toBe(false);
+    const saved = applyExperimentalSettingsPatch({}, { worktreeCleanup: "merged", worktreeCleanupWaitDays: 0, worktreeCleanupRemoveBuildOutput: false,
+      worktreeRestorePointAfterDays: 5, worktreeRestorePointIdleDays: 0 });
+    expect(normalizeExperimentalSettings(JSON.parse(JSON.stringify(saved)))).toMatchObject({ worktreeCleanup: "merged",
+      worktreeCleanupWaitDays: 0, worktreeCleanupRemoveBuildOutput: false, worktreeRestorePointAfterDays: 5, worktreeRestorePointIdleDays: 0 });
+    expect("worktreeCleanupWaitDays" in applyExperimentalSettingsPatch(saved, { worktreeCleanupWaitDays: null })).toBe(false);
+  });
   it("keeps GitHub review bots independent across legacy normalization and persistence", () => {
     expect(normalizeExperimentalSettings({ enableChatConnectors: true })).toMatchObject({ enableChatConnectors: true, enableGitHubReviewBots: false });
     const saved = applyExperimentalSettingsPatch({}, { enableGitHubReviewBots: true });
@@ -123,7 +153,7 @@ describe("instance settings service", () => {
       enableAiConnectionRouters: false,
       enableManagedSandboxOnly: false,
       enableIsolatedWorkspaces: true,
-      enableIsolatedWorkspacesByDefault: false,
+      enableIsolatedWorkspacesByDefault: true, // retired: always on (step 4b part 3)
       enableStreamlinedLeftNavigation: true,
       enableStreamlinedUi: true,
       enableApps: true,

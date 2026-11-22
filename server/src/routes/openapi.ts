@@ -7603,6 +7603,15 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
+  path: "/api/instance/settings/worktree-cleanup",
+  tags: ["instance"],
+  summary: "Get the worktree cleanup setting and what is in force",
+  description: "What the terminal workspace reaper does to finished tasks' git worktrees. mode is off (the default once saved: no archive, compaction or expiration of task worktrees; closing one by hand still works), merged (archive a worktree whose work is merged into its base and that is clean), strict (also remove one the remote can rebuild exactly) or restore_points (also remove one with unpushed or uncommitted work, after saving an encrypted restore point). values holds the wait after a task closes (waitDays, for the archive and expiration), whether dependencies and build output are removed (removeBuildOutput), and the restore point days (restorePointAfterDays, restorePointIdleDays; 0 never). saved is null until someone chooses; the reaper then keeps its environment-driven rules (PAPERCLIP_WORKSPACE_REAPER_COOLDOWN_DAYS, PAPERCLIP_WORKSPACE_COMPACTION_*, PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED, PAPERCLIP_GIT_RESTORE_POINTS_ENABLED and the restore point day variables). restorePoints.available says whether restore points can work on this instance. Other workspaces keep the environment's rules. Change it with PATCH /api/instance/settings/experimental: worktreeCleanup, worktreeCleanupWaitDays, worktreeCleanupRemoveBuildOutput, worktreeRestorePointAfterDays and worktreeRestorePointIdleDays.",
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
   path: "/api/instance/task-drain",
   tags: ["instance"],
   summary:

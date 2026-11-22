@@ -76,7 +76,11 @@ describe("P6-32 legacy finalization regression", () => {
     await db.insert(companyMemberships).values({
       companyId, principalType: "user", principalId: "responsible-user", status: "active", membershipRole: "member",
     });
-    await db.insert(projects).values({ id: projectId, companyId, name: "Legacy project", status: "active" });
+    // The checkout is this repository. Since step 4b part 3 a project with a git checkout gives each
+    // task its own worktree unless it chooses the shared checkout, and a worktree of the whole repo
+    // is slow to create (this test timed out) and lands in the real checkout, so choose shared.
+    await db.insert(projects).values({ id: projectId, companyId, name: "Legacy project", status: "active",
+      executionWorkspacePolicy: { enabled: false, defaultMode: "shared_workspace" } });
     await db.insert(projectWorkspaces).values({
       id: projectWorkspaceId,
       companyId,

@@ -555,7 +555,6 @@ export function githubChatManagementService(db: Db, fetchImpl = fetch) {
           ? await environments.listBoundCompanyIds(environment.id)
           : [];
         const sandboxOk =
-          experimental.enableIsolatedWorkspaces &&
           environment?.driver === "sandbox" &&
           environment.status === "active" &&
           (!owners.length || owners.includes(bot.companyId));
@@ -565,7 +564,7 @@ export function githubChatManagementService(db: Db, fetchImpl = fetch) {
           ok: !!sandboxOk,
           detail: sandboxOk
             ? "An active sandbox environment is selected. Each task receives its own restricted trust boundary."
-            : "Enable isolated workspaces and select an active sandbox environment for this agent before running low-trust or guest tasks.",
+            : "Select an active sandbox environment for this agent before running low-trust or guest tasks.",
         });
       }
       const entries = await db

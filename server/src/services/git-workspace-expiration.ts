@@ -166,7 +166,7 @@ export async function gitWorkspaceLastActivityAt(db: Db | Tx, workspace: Workspa
 }
 
 export async function isGitWorkspaceExpirationEligible(tx: Tx, workspace: Workspace, now: Date, idleCutoff?: Date,
-  options: { closedSiblingsAllowed?: boolean } = {}) {
+  options: { closedSiblingsAllowed?: boolean; terminalDelayMs?: number } = {}) {
   if (workspace.metadata?.reopenPendingConsumption === true || workspace.metadata?.remoteWorkspaceMigration != null) return false;
   const siblingBlocks = options.closedSiblingsAllowed
     ? sql`AND (other.status NOT IN ('archived', 'cleanup_failed') OR other.closed_at IS NULL
@@ -179,7 +179,7 @@ export async function isGitWorkspaceExpirationEligible(tx: Tx, workspace: Worksp
       NOT EXISTS (SELECT 1 FROM ${issues} WHERE ${issues.companyId} = ${workspace.companyId}
         AND ${issues.id} IN (SELECT id FROM tree) AND ${issueUsesWorkspace(workspace)}
         AND (${issues.status} NOT IN ('done', 'cancelled')
-          OR coalesce(CASE WHEN ${issues.status} = 'done' THEN ${issues.completedAt} ELSE ${issues.cancelledAt} END, ${issues.updatedAt}) > ${new Date(now.getTime() - DAY_MS).toISOString()}::timestamptz))
+          OR coalesce(CASE WHEN ${issues.status} = 'done' THEN ${issues.completedAt} ELSE ${issues.cancelledAt} END, ${issues.updatedAt}) > ${new Date(now.getTime() - Math.max(0, options.terminalDelayMs ?? DAY_MS)).toISOString()}::timestamptz))
       AND NOT EXISTS (SELECT 1 FROM ${issues} WHERE company_id = ${workspace.companyId}
         AND execution_workspace_id = ${workspace.id} AND status NOT IN ('done', 'cancelled'))`;
   const recoveryActionBlocks = idleCutoff ? sql`true` : sql`(cause = 'native_workspace_finalization_owner_unverified'
@@ -293,6 +293,8 @@ export async function expireReconstructableGitWorkspace(db: Db, snapshot: Worksp
   beforeDelete?: (workspace: Workspace) => Promise<void>;
   restorePoint?: GitRestorePointExpirationOptions;
   idleCutoff?: Date;
+  /** How long the tree must have been closed: upstream's fixed 1 day unless the worktree cleanup setting gives a wait. */
+  terminalDelayMs?: number;
 }): Promise<GitExpirationResult> {
   const result: GitExpirationResult = { candidate: false, expired: false, reclaimedBytes: 0,
     candidateBytes: 0, baseExpired: false, skipReason: null, restorePoint: false };
@@ -308,7 +310,7 @@ export async function expireReconstructableGitWorkspace(db: Db, snapshot: Worksp
         if (!acquired[0]?.locked) throw new Error("lifecycle_busy");
         let workspace = (await db.select().from(executionWorkspaces).where(and(eq(executionWorkspaces.id, snapshot.id), eq(executionWorkspaces.companyId, snapshot.companyId))))[0];
         if (!workspace || workspace.updatedAt.getTime() !== snapshot.updatedAt.getTime()) throw new Error("workspace_changed");
-        if (!await isGitWorkspaceExpirationEligible(tx, workspace, options.now, options.idleCutoff)) throw new Error("live_or_unresolved_consumer");
+        if (!await isGitWorkspaceExpirationEligible(tx, workspace, options.now, options.idleCutoff, { terminalDelayMs: options.terminalDelayMs })) throw new Error("live_or_unresolved_consumer");
         let state = ["active", "idle", "in_review"].includes(workspace.status) ? null : readGitCacheExpiration(workspace);
         // A restored active workspace starts a new expiration cycle and records its new HEAD.
         if (!hasPendingGitExpiration(workspace) && !["active", "idle", "in_review"].includes(workspace.status)) throw new Error("not_expirable");
@@ -413,7 +415,7 @@ export async function expireReconstructableGitWorkspace(db: Db, snapshot: Worksp
         await recoverGitCacheExpirationLocks(workspace!);
         const lockLocations = await gitCacheExpirationLockLocations(workspace!);
         await options.beforeDelete?.(workspace!);
-        if (!await isGitWorkspaceExpirationEligible(tx, workspace, options.now, options.idleCutoff)) throw new Error("live_or_unresolved_consumer");
+        if (!await isGitWorkspaceExpirationEligible(tx, workspace, options.now, options.idleCutoff, { terminalDelayMs: options.terminalDelayMs })) throw new Error("live_or_unresolved_consumer");
         if (!state.workspaceRemoved && present) {
           const locks = [await acquireGitExpirationLocks(lockLocations.filter(location => location.checkout === null), state.lockToken)];
           try {
@@ -476,7 +478,7 @@ export async function expireReconstructableGitWorkspace(db: Db, snapshot: Worksp
           try {
             if ((!state.baseTrash || !await exists(state.baseTrash)) && await exists(recipe.sourcePath)) {
               const bytes = await inspectBase(db, workspace!, options.signal);
-              if (!await isGitWorkspaceExpirationEligible(tx, workspace!, options.now, options.idleCutoff)) throw new Error("live_or_unresolved_consumer");
+              if (!await isGitWorkspaceExpirationEligible(tx, workspace!, options.now, options.idleCutoff, { terminalDelayMs: options.terminalDelayMs })) throw new Error("live_or_unresolved_consumer");
               const trash = path.join(path.dirname(recipe.sourcePath), `.expired-git-base-${snapshot.id}-${state.generation}`);
               if (await exists(trash)) throw new Error("unknown_base_trash");
               state.baseTrash = trash;

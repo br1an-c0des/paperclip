@@ -10,9 +10,11 @@ let access: Record<string, unknown> = { isInstanceAdmin: false, companyIds: [], 
 
 vi.mock("@/lib/company", () => ({ useCompany: () => () => ({ id: "co1", issuePrefix: "TES" }) }));
 vi.mock("@/api/access", () => ({ accessApi: { currentBoardAccess: vi.fn(async () => access) } }));
+let worktreeKept: Record<string, unknown> | undefined;
 vi.mock("@/api/workspaces", () => ({
   workspacesApi: {
     closeReadiness: vi.fn(async () => ({
+      ...(worktreeKept ? { worktreeKept } : {}),
       git: { repoRoot: "/r", workspacePath: "/r/w", branchName: "pap/TES-9-follow-up", baseRef: "main", headSha: "1234567890abc", hasDirtyTrackedFiles: true, hasUntrackedFiles: false, dirtyEntryCount: 2, untrackedEntryCount: 0, aheadCount: 3, behindCount: 0, isMergedIntoBase: false, createdByRuntime: true },
     })),
     reconcileBranch: (id: string, input: unknown) => reconcileBranch(id, input),
@@ -53,6 +55,7 @@ function mount(issue: Issue) {
 describe("TaskBranch", () => {
   beforeEach(() => {
     reconcileBranch.mockClear();
+    worktreeKept = undefined;
     access = { isInstanceAdmin: false, companyIds: [], memberships: [{ companyId: "co1", status: "active", membershipRole: "viewer" }] };
   });
 
@@ -61,6 +64,18 @@ describe("TaskBranch", () => {
     expect(await screen.findByText("3 ahead, 0 behind main")).toBeTruthy();
     expect(screen.getByText("2 uncommitted changes")).toBeTruthy();
     expect(screen.queryByText("The branch is out of step")).toBeNull();
+  });
+
+  it("says why the cleanup kept a finished task's worktree, when the server sends it (step 4b part 3)", async () => {
+    worktreeKept = { reason: "upstream_commit_unverified", label: "branch not pushed", at: "2026-11-21T00:00:00.000Z", mode: "strict" };
+    mount({ id: "t1", activeRecoveryAction: null } as unknown as Issue);
+    expect(await screen.findByText("Worktree kept: branch not pushed")).toBeTruthy();
+  });
+
+  it("shows no kept line when the server sends none, as with the cleanup off", async () => {
+    mount({ id: "t1", activeRecoveryAction: null } as unknown as Issue);
+    expect(await screen.findByText("3 ahead, 0 behind main")).toBeTruthy();
+    expect(screen.queryByText(/Worktree kept/)).toBeNull();
   });
 
   it("reconciles a forward-only divergence after confirming, on the workspace that diverged", async () => {

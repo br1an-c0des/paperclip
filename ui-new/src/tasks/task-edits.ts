@@ -155,9 +155,15 @@ export function workspaceEdit(choice: WorkspaceChoice, workspace?: Pick<Executio
   };
 }
 
-/** The workspace picker shows when the instance and the task's project both have workspaces on. */
-export function workspacePickerAvailable(project: Pick<Project, "executionWorkspacePolicy"> | null | undefined, isolatedWorkspacesEnabled: boolean) {
-  return isolatedWorkspacesEnabled && project?.executionWorkspacePolicy?.enabled === true;
+/**
+ * The workspace picker shows when the task's project lets tasks have their own checkout, by its own
+ * policy or the worktree default (step 4b part 3, `effectiveExecutionWorkspacePolicy`).
+ */
+export function workspacePickerAvailable(
+  project: (Pick<Project, "executionWorkspacePolicy"> & Partial<Pick<Project, "effectiveExecutionWorkspacePolicy">>) | null | undefined,
+  isolatedWorkspacesEnabled: boolean,
+) {
+  return isolatedWorkspacesEnabled && (project?.effectiveExecutionWorkspacePolicy ?? project?.executionWorkspacePolicy)?.enabled === true;
 }
 
 // --- Header actions ------------------------------------------------------------------------------
