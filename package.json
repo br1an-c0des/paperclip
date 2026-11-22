@@ -22,7 +22,7 @@
     "test:quick": "node scripts/test.mjs --tier quick",
     "test:optin": "node scripts/test.mjs --tier optin",
     "test:all": "node scripts/test.mjs --tier all",
-    "test:runner": "node --test scripts/__tests__/test-runner.test.mjs",
+    "test:runner": "node --test scripts/__tests__/test-runner.test.mjs scripts/__tests__/pre-push.test.mjs",
     "hooks:install": "git config core.hooksPath .githooks",
     "test:watch": "pnpm run preflight:workspace-links && vitest",
     "test:run": "pnpm run preflight:workspace-links && node scripts/run-vitest-stable.mjs",
