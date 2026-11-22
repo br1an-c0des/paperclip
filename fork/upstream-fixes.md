@@ -113,6 +113,8 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 76 | [Record and preview a run's full environment key list](#76-record-and-preview-a-runs-full-environment-key-list) | candidate | | | 2026-11-22 | | |
 | 77 | [Find the package test that failed once in a local `test:quick`](#77-find-the-package-test-that-failed-once-in-a-local-testquick) | candidate | | | 2026-11-22 | | |
 | 78 | [Tell the agent when its permission request is denied](#78-tell-the-agent-when-its-permission-request-is-denied) | candidate | | | 2026-11-22 | | |
+| 79 | [Make the run preview's "writes no files" test ignore other files' temp folders](#79-make-the-run-previews-writes-no-files-test-ignore-other-files-temp-folders) | candidate | | | 2026-11-22 | | |
+| 80 | [Give `nested-clone-migration`'s expire-and-restore test room on a loaded CI runner](#80-give-nested-clone-migrations-expire-and-restore-test-room-on-a-loaded-ci-runner) | candidate | | | 2026-11-22 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1198,6 +1200,8 @@ Found 2026-11-20 in CI on `feat/step-4b` (run 44797032206, shard 5).
 - **Since then:** failed again 2026-11-22 on `ci/workflow-jobs` (run 44978484878, shard 5, same
   assertion at line 805), on a branch that changes only the CI workflow; the failed job was
   re-run. Twice now, both times in shard 5: under the green-push guide's rule it gets fixed next.
+  A third time 2026-11-22 on `ci/hook-lock-and-quick-names` (run 45048605767, shard 4, the new
+  shard weights having moved the file), on a branch without the fix; the failed job was re-run.
 - **Likely fix:** find what the test races against (the recorded start time versus the probe), and
   make it deterministic.
 - **Fork workaround:** re-run the failed CI job.
@@ -1331,3 +1335,31 @@ Found 2026-11-22 while evaluating step 4b part 4 (live sessions on the CLI).
 - **Likely fix:** on reject of a `permission_request`, post the same kind of task comment as
   approve ("Denied: <tool>, <note>"), or wake the requesting agent with the decision when there's
   no task.
+
+### 79. Make the run preview's "writes no files" test ignore other files' temp folders
+
+Reported 2026-11-22 by the CI/DevOps session: CI run 45050025607 (`fix/fresh-continuation-recycled-pid`,
+based on `main` at `804b1ccf59`), server (isolated) shard 6/10. Added in step 4b part 2.
+
+- **Problem:** `server/src/__tests__/run-preview.test.ts`, "writes no files, mints no tokens and
+  writes nothing to the database", lists the shared `tmpdir()` for `paperclip-claude-home-*` and
+  `paperclip-ai-*` folders before and after the preview (`tempHomes`, :122-126; compared at :381).
+  Other test files in the same shard run at the same time and create and remove their own
+  `paperclip-ai-credential-*` folders there, so the two listings differ (`itW7Zd` against `slnQXT`)
+  without the preview writing anything.
+- **Likely fix:** give the test a private temp folder (point `TMPDIR` at a fresh folder for the
+  preview call, so `tmpdir()` resolves there) and compare that, or compare only names that appear
+  after and not before and check none is the preview's. The file's earlier failure (run
+  44984434117, shard 10) was a different cause, `invalid reference: HEAD`, fixed before the merge.
+
+### 80. Give `nested-clone-migration`'s expire-and-restore test room on a loaded CI runner
+
+Reported 2026-11-22 by the CI/DevOps session: CI run 45050025607, server (shared) shard 7/10.
+The test is upstream's, not step 4b's (last changed in `d23dd19750`, upstream #17505).
+
+- **Problem:** `server/src/__tests__/nested-clone-migration.test.ts`, "expires and restores a
+  converted checkout and protects its unpushed work" (:467), timed out at the 15 s test timeout
+  (`server/vitest.config.ts:174`) on a 2-worker CI runner under load. It does several real git
+  clones, commits and an expire-and-restore cycle in one test.
+- **Likely fix:** a longer timeout for this test (its own `it(..., 45_000)`), or split the
+  expire and restore halves. Check `node scripts/ci-flakes.mjs` first for how often it fails.
