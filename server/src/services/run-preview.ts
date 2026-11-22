@@ -1,7 +1,8 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   environments,
   instanceSettings,
+  projectWorkspaces,
   projects,
   toolConnections,
   type Db,
@@ -42,6 +43,7 @@ import {
 } from "./heartbeat/run-preparation.js";
 import { resolveRunGitHub } from "./heartbeat/sealed-run-github.js";
 import { previewProjectCheckout, stripWorkspaceRuntimeFromExecutionRunConfig } from "./heartbeat/workspaces.js";
+import { previewTaskWorktree, type PreviewedTaskWorktree } from "./run-preview-worktree.js";
 
 /**
  * What an agent's runs get, before any run (fork/step-4b-parts-2-3.md, part 2): the next sealed
@@ -136,6 +138,20 @@ function asRunWouldMount(entries: PaperclipSkillEntry[]): PaperclipSkillEntry[] 
 
 export function runPreviewService(db: Db) {
   const companySkills = companySkillService(db);
+
+  /** Whether any of the project's workspaces has a repo URL (the heartbeat's `hasGitSource`). */
+  async function projectHasGitSource(companyId: string, projectId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: projectWorkspaces.id })
+      .from(projectWorkspaces)
+      .where(and(
+        eq(projectWorkspaces.companyId, companyId),
+        eq(projectWorkspaces.projectId, projectId),
+        sql`nullif(btrim(${projectWorkspaces.repoUrl}), '') is not null`,
+      ))
+      .limit(1);
+    return Boolean(row);
+  }
 
   /** The environment a run would use: the agent's default, else the instance's, else local. */
   async function environmentForRun(agent: AgentRow) {
@@ -243,10 +259,27 @@ export function runPreviewService(db: Db) {
       : null;
     if (input.projectId && !project) throw notFound("Project not found");
     const checkout = project ? await previewProjectCheckout(db, { companyId: agent.companyId, projectId: project.id }) : null;
+    // A git checkout gives each task its own worktree unless the project chose the shared
+    // checkout (step 4b part 3); the run makes it, the preview only works out where and from what.
+    let taskWorktree: PreviewedTaskWorktree | null = null;
+    if (project && checkout?.kind === "local") {
+      try {
+        taskWorktree = await previewTaskWorktree(db, {
+          companyId: agent.companyId,
+          agentConfig: adapterConfig,
+          projectPolicy: project.executionWorkspacePolicy,
+          checkoutPath: checkout.path,
+          workspace: { cwd: checkout.workspace.cwd, repoUrl: checkout.workspace.repoUrl, repoRef: checkout.workspace.repoRef },
+          hasGitSource: await projectHasGitSource(agent.companyId, project.id),
+        });
+      } catch (error) {
+        blockers.push(blockerFromError(error, "workspace_unavailable"));
+      }
+    }
     const previewCheckout: ClaudeRunPreviewCheckout | null = !checkout
       ? null
       : checkout.kind === "local"
-        ? { kind: "local", path: checkout.path }
+        ? { kind: "local", path: checkout.path, ...(taskWorktree ? { worktree: taskWorktree.worktree } : {}) }
         : checkout.kind === "not_cloned"
           ? { kind: "not_cloned", repoUrl: checkout.repoUrl }
           : { kind: "none" };
@@ -353,14 +386,15 @@ export function runPreviewService(db: Db) {
     const workspace = checkout && checkout.kind !== "none" ? checkout.workspace : null;
     const context: Record<string, unknown> = {
       paperclipWorkspace: {
-        cwd: checkout?.kind === "local" ? checkout.path : agentHome,
+        cwd: taskWorktree?.path ?? (checkout?.kind === "local" ? checkout.path : agentHome),
         source: checkout?.kind === "local" ? "project_primary" : "agent_home",
+        ...(taskWorktree ? { strategy: "git_worktree" } : {}),
         projectId: workspaceProjectId,
         workspaceId: workspace?.id ?? null,
         repoUrl: workspace?.repoUrl ?? null,
         repoRef: workspace?.repoRef ?? null,
-        branchName: null,
-        worktreePath: null,
+        branchName: taskWorktree?.branchName ?? null,
+        worktreePath: taskWorktree?.path ?? null,
         agentHome,
         agentsReadClaudeMd: switches?.agentsReadClaudeMd ?? null,
         agentsUseRepoSkills: switches?.agentsUseRepoSkills ?? null,
@@ -383,17 +417,23 @@ export function runPreviewService(db: Db) {
       runtimeMcp: createAdapterRuntimeMcpAccess(servers),
       runTokenAvailable,
       executionTarget: null,
+      // A task worktree's files come from its base commit, read with git; no folder is made.
+      repoView: taskWorktree?.repoView ?? null,
     });
     if (!preview.supported) return preview;
 
-    // A repo that isn't cloned yet: the run clones it first and reads it then; the preview
-    // doesn't clone, so it says so (a switch that's off still reads off).
+    // A repo that isn't cloned yet, or a worktree base that isn't fetched yet: the run gets it
+    // first and reads the repo then; the preview doesn't, so it says so (a switch that's off
+    // still reads off).
     let manifest: ClaudeRunPreviewManifest = preview.manifest;
-    if (checkout?.kind === "not_cloned") {
+    const notYet = checkout?.kind === "not_cloned" ? "not_cloned" as const
+      : taskWorktree && !taskWorktree.worktree.baseRef ? "base_not_fetched" as const
+        : null;
+    if (notYet) {
       manifest = {
         ...manifest,
-        claudeMd: switches?.agentsReadClaudeMd === false ? manifest.claudeMd : { enabled: false, reason: "not_cloned" },
-        repoSkills: switches?.agentsUseRepoSkills === false ? manifest.repoSkills : { enabled: false, reason: "not_cloned" },
+        claudeMd: switches?.agentsReadClaudeMd === false ? manifest.claudeMd : { enabled: false, reason: notYet },
+        repoSkills: switches?.agentsUseRepoSkills === false ? manifest.repoSkills : { enabled: false, reason: notYet },
       };
     }
     return {

@@ -89,6 +89,38 @@ test("the Runtime section shows what runs get, for no project and for a project"
   expect(api.writes).toEqual([]);
 });
 
+test("a project whose tasks get their own worktree shows where, and reads the repo from its commit", async ({ page, api }) => {
+  runtimeReads(api);
+  const project = PROJECTS[0]!;
+  const worktrees = "/home/m7/site/.paperclip/worktrees";
+  api.get("/agents/:agentId/run-preview", ({ query }): ClaudeRunPreview => {
+    if (!query.get("projectId")) return { supported: true, project: null, manifest, blockers: [] };
+    return {
+      supported: true,
+      project: { id: project.id, name: project.name, checkout: { kind: "local", path: "/home/m7/site", worktree: { dir: worktrees, baseRef: "origin/main" } } },
+      manifest: {
+        ...manifest,
+        claudeMd: { enabled: true, path: `${worktrees}/<task branch>/CLAUDE.md` },
+        repoSkills: { enabled: true, dir: `${worktrees}/<task branch>/.claude/skills`, count: 2 },
+      },
+      blockers: [],
+    };
+  });
+
+  await page.goto("/MSE/agents/m7-test-builder/runtime");
+  const card = page.locator("section.rp");
+  await expect(card.getByText("No project selected")).toHaveCount(2);
+  await card.getByLabel("For tasks in").selectOption(project.id);
+  await expect(card.getByText("From origin/main, in")).toBeVisible();
+  await expect(card.getByText(worktrees, { exact: true })).toBeVisible();
+  await expect(card.getByText(`${worktrees}/<task branch>/CLAUDE.md`)).toBeVisible();
+  await expect(card.getByText("2 skills from")).toBeVisible();
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  expect(api.writes).toEqual([]);
+});
+
 test("an agent whose runs aren't sealed says why instead", async ({ page, api }) => {
   runtimeReads(api);
   api.get("/agents/:agentId/run-preview", (): ClaudeRunPreview => ({ supported: false, reason: "runner" }));

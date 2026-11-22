@@ -96,19 +96,42 @@ export function isClaudeRunManifest(value: unknown): value is ClaudeRunManifest 
 }
 
 /**
- * Why the preview can't read the repo's `CLAUDE.md` or skills yet: the project's primary
- * workspace has a repo URL but no local checkout, and the preview doesn't clone. A run clones
- * it first, then reads them from the clone.
+ * Why the preview can't read the repo's `CLAUDE.md` or skills yet:
+ * - `not_cloned`: the project's primary workspace has a repo URL but no local checkout, and the
+ *   preview doesn't clone. A run clones it first, then reads them from the clone.
+ * - `base_not_fetched`: tasks get their own worktree, and the branch it would start from isn't
+ *   in the checkout yet. The preview doesn't fetch; a run fetches it, then makes the worktree.
  */
-export type ClaudeRunPreviewRepoSkipReason = "not_cloned";
+export type ClaudeRunPreviewRepoSkipReason = "not_cloned" | "base_not_fetched";
+
+/**
+ * Stands in for the task's branch in the paths of a task worktree that doesn't exist yet
+ * (`<checkout>/.paperclip/worktrees/<task branch>/CLAUDE.md`): the branch is named after the task
+ * (`{{issue.identifier}}-{{slug}}` by default), which a preview has none of.
+ */
+export const CLAUDE_RUN_PREVIEW_TASK_BRANCH = "<task branch>";
+
+/**
+ * Where tasks in the project work (step 4b part 3): each in its own git worktree of the
+ * checkout, made at the task's first run under `dir` from `baseRef`. `baseRef` is the branch or
+ * commit as the preview resolved it without fetching (a run fetches a remote branch first), or
+ * null when the run would have to fetch it before it could start. The preview reads `CLAUDE.md`
+ * and the repo's skills from that commit, not from the checkout's working files, since a new
+ * worktree holds only what's committed there; their paths use `CLAUDE_RUN_PREVIEW_TASK_BRANCH`.
+ */
+export interface ClaudeRunPreviewTaskWorktree {
+  dir: string;
+  baseRef: string | null;
+}
 
 /**
  * Where the preview read the repo's `CLAUDE.md` and skills from: the project's primary
- * workspace's checkout (`local`), nothing yet (`not_cloned`: a repo URL and no checkout), or no
- * workspace at all (`none`: runs work in the agent's own folder).
+ * workspace's checkout (`local`; with `worktree` when tasks each get their own worktree of it,
+ * else they work in the checkout itself), nothing yet (`not_cloned`: a repo URL and no
+ * checkout), or no workspace at all (`none`: runs work in the agent's own folder).
  */
 export type ClaudeRunPreviewCheckout =
-  | { kind: "local"; path: string }
+  | { kind: "local"; path: string; worktree?: ClaudeRunPreviewTaskWorktree }
   | { kind: "not_cloned"; repoUrl: string }
   | { kind: "none" };
 
@@ -116,7 +139,8 @@ export type ClaudeRunPreviewCheckout =
  * The manifest as the next fresh run on a task would get it. Left out: `session` (it depends on
  * the task: each new task starts fresh, later wakes on it resume) and `setAside` (what a run
  * moves out of the config folder is known only when it moves it). `claudeMd` and `repoSkills`
- * can also read `not_cloned`. `credential` is null when the run would have none (a
+ * can also read `not_cloned` or `base_not_fetched`, and in a task worktree their paths hold
+ * `CLAUDE_RUN_PREVIEW_TASK_BRANCH`. `credential` is null when the run would have none (a
  * `claude_credential_missing` blocker says so). `envKeys` are the names from the agent's
  * settings and Paperclip's own; a run adds launch-time ones on top: its wake's and task's
  * (`PAPERCLIP_TASK_ID` and the like), its workspace and scratch folders, the managed git/gh

@@ -41,6 +41,8 @@ export async function resolveClaudeMdLoad(input: {
   agentsReadClaudeMd: boolean | null;
   /** findRepoRoot(cwd) */
   repoRoot: string | null;
+  /** Whether `<repoRoot>/CLAUDE.md` is a file, when the folder isn't there to look at (a preview of a task worktree). */
+  hasFile?: boolean;
 }): Promise<{ load: ClaudeMdLoad; addDir: string | null }> {
   if (!input.projectId) return { load: { enabled: false, reason: "no_project" }, addDir: null };
   if (input.agentsReadClaudeMd === false) {
@@ -48,6 +50,6 @@ export async function resolveClaudeMdLoad(input: {
   }
   if (!input.repoRoot) return { load: { enabled: false, reason: "not_in_repo" }, addDir: null };
   const claudeMdPath = path.join(input.repoRoot, "CLAUDE.md");
-  if (!(await isFile(claudeMdPath))) return { load: { enabled: false, reason: "no_file" }, addDir: null };
+  if (!(input.hasFile ?? (await isFile(claudeMdPath)))) return { load: { enabled: false, reason: "no_file" }, addDir: null };
   return { load: { enabled: true, path: claudeMdPath }, addDir: input.repoRoot };
 }

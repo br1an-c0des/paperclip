@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -13,7 +13,7 @@ import {
   previewClaudeRun,
   sessionCodec as claudeSessionCodec,
 } from "@paperclipai/adapter-claude-local/server";
-import type { ClaudeRunManifest, ClaudeRunPreview } from "@paperclipai/shared";
+import { CLAUDE_RUN_PREVIEW_TASK_BRANCH, type ClaudeRunManifest, type ClaudeRunPreview } from "@paperclipai/shared";
 import { heartbeatService } from "../services/heartbeat.js";
 import { runPreviewService } from "../services/run-preview.js";
 import { companySkillService } from "../services/company-skills.js";
@@ -23,6 +23,8 @@ import { drainHeartbeatRunsToQuiescence } from "./helpers/drain-heartbeat-runs.j
 // Step 4b part 2 (fork/step-4b-parts-2-3.md): GET /api/agents/:id/run-preview's service. The
 // preview of an agent's next run equals what a real run of the same agent gets (the real
 // claude_local adapter, with a fake `claude`), and reading it starts, writes and mints nothing.
+// Step 4b part 3 made a task worktree the default for a project whose checkout is a git
+// repository; the preview reads that worktree's CLAUDE.md and skills from its base commit.
 
 const captured = vi.hoisted(() => ({ manifest: null as Record<string, unknown> | null }));
 const minted = vi.hoisted(() => ({ runTokens: 0, runtimeToolTokens: 0 }));
@@ -158,20 +160,40 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     if (root) await rm(root, { recursive: true, force: true });
   });
 
+  const git = (cwd: string, ...args: string[]) => promisify(execFile)("git", [
+    "-C", cwd, "-c", "user.name=M7 test", "-c", "user.email=m7@example.test", "-c", "commit.gpgsign=false", ...args,
+  ]);
+
+  /**
+   * A repo whose commit holds CLAUDE.md and the `release` skill, and whose working files also
+   * hold an uncommitted `draft` skill: a task worktree gets only the first, the checkout both.
+   */
   async function makeRepo(name: string): Promise<string> {
     const repo = path.join(root, name);
     await mkdir(path.join(repo, ".claude", "skills", "release"), { recursive: true });
     await writeFile(path.join(repo, "CLAUDE.md"), "# Repo rules\n", "utf8");
     await writeFile(path.join(repo, ".claude", "skills", "release", "SKILL.md"), "---\nname: release\n---\n", "utf8");
-    await promisify(execFile)("git", ["init", "-q", repo]);
+    await promisify(execFile)("git", ["init", "-q", "-b", "main", repo]);
+    await git(repo, "add", "-A");
+    await git(repo, "commit", "-q", "-m", "M7 test initial commit");
+    await mkdir(path.join(repo, ".claude", "skills", "draft"), { recursive: true });
+    await writeFile(path.join(repo, ".claude", "skills", "draft", "SKILL.md"), "---\nname: draft\n---\n", "utf8");
     return repo;
   }
+
+  /** A project that chose the shared checkout (ui-new's Task checkouts card, turned off). */
+  const SHARED_CHECKOUT = { enabled: false, defaultMode: "shared_workspace" };
 
   async function seed(input: {
     adapterType?: string;
     adapterConfig?: Record<string, unknown>;
     env?: Record<string, unknown>;
-    project?: { agentsReadClaudeMd?: boolean; agentsUseRepoSkills?: boolean; workspace?: { cwd?: string | null; repoUrl?: string | null } };
+    project?: {
+      agentsReadClaudeMd?: boolean;
+      agentsUseRepoSkills?: boolean;
+      executionWorkspacePolicy?: Record<string, unknown>;
+      workspace?: { cwd?: string | null; repoUrl?: string | null };
+    };
   } = {}) {
     const companyId = randomUUID(), userId = randomUUID(), agentId = randomUUID();
     await db.insert(authUsers).values({ id: userId, name: "Owner", email: `${userId}@example.test`, createdAt: new Date(), updatedAt: new Date() });
@@ -192,18 +214,20 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     });
     let projectId: string | null = null;
     let projectWorkspaceId: string | null = null;
+    let repo: string | null = null;
     if (input.project) {
       projectId = randomUUID();
       const { workspace, ...switches } = input.project;
       await db.insert(projects).values({ id: projectId, companyId, name: "M7 test repo project", status: "in_progress", ...switches });
       projectWorkspaceId = randomUUID();
+      repo = workspace?.cwd === undefined ? await makeRepo(`repo-${projectId}`) : workspace.cwd;
       await db.insert(projectWorkspaces).values({
         id: projectWorkspaceId, companyId, projectId, name: "Primary", isPrimary: true,
-        cwd: workspace?.cwd === undefined ? await makeRepo(`repo-${projectId}`) : workspace.cwd,
+        cwd: repo,
         repoUrl: workspace?.repoUrl ?? null,
       });
     }
-    return { companyId, userId, agentId, projectId, projectWorkspaceId };
+    return { companyId, userId, agentId, projectId, projectWorkspaceId, repo };
   }
 
   async function readAgent(agentId: string) {
@@ -234,6 +258,18 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     });
   }
 
+  /**
+   * A worktree run's manifest with its worktree folder (`<dir>/<the task's branch>`) written as the
+   * preview writes it, `<dir>/<task branch>`: the branch is named after the task.
+   */
+  function withPreviewWorktreePath(ran: ClaudeRunManifest, worktreeDir: string): ClaudeRunManifest {
+    expect(ran.claudeMd.enabled).toBe(true);
+    if (!ran.claudeMd.enabled) return ran;
+    const worktree = path.dirname(ran.claudeMd.path);
+    expect(path.dirname(worktree)).toBe(worktreeDir);
+    return JSON.parse(JSON.stringify(ran).split(worktree).join(path.join(worktreeDir, CLAUDE_RUN_PREVIEW_TASK_BRANCH)));
+  }
+
   function expectPreviewMatchesRun(previewed: ClaudeRunPreview, ran: ClaudeRunManifest) {
     expect(previewed.supported).toBe(true);
     if (!previewed.supported) return;
@@ -256,27 +292,63 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     expect(ran.claudeMd).toEqual({ enabled: false, reason: "no_project" });
   }, 90_000);
 
-  it("matches a real run on a task in a project with both switches on", async () => {
+  it("matches a real run on a task in a project on the default: the task's own worktree", async () => {
     const seeded = await seed({ project: {} });
     // The run first: it brings the company's skill library up to date, which a preview reads as is.
     const ran = await runTask(seeded);
     const previewed = await preview(seeded);
-    expectPreviewMatchesRun(previewed, ran);
-    expect(ran.claudeMd.enabled).toBe(true);
-    expect(ran.repoSkills).toMatchObject({ enabled: true, count: 1 });
-    expect(ran.skills.some((skill) => skill.origin === "repo" && skill.name === "release")).toBe(true);
-    expect(previewed.supported && previewed.project).toMatchObject({ id: seeded.projectId, checkout: { kind: "local" } });
+    const worktreeDir = path.join(seeded.repo!, ".paperclip", "worktrees");
+    expect(previewed.supported && previewed.project).toMatchObject({
+      id: seeded.projectId,
+      checkout: { kind: "local", path: seeded.repo, worktree: { dir: worktreeDir, baseRef: "main" } },
+    });
+    expectPreviewMatchesRun(previewed, withPreviewWorktreePath(ran, worktreeDir));
+    // The worktree holds the commit: CLAUDE.md and `release`, not the checkout's uncommitted `draft`.
+    expect(ran.claudeMd).toEqual({ enabled: true, path: path.join(worktreeDir, "m7-test-task", "CLAUDE.md") });
+    expect(ran.repoSkills).toEqual({ enabled: true, dir: path.join(worktreeDir, "m7-test-task", ".claude", "skills"), count: 1 });
+    expect(ran.skills.filter((skill) => skill.origin === "repo").map((skill) => skill.name)).toEqual(["release"]);
   }, 90_000);
 
-  it("matches a real run on a task in a project with both switches off", async () => {
-    const seeded = await seed({ project: { agentsReadClaudeMd: false, agentsUseRepoSkills: false } });
-    // The run first: it brings the company's skill library up to date, which a preview reads as is.
+  it("matches a real run on a task in a project that chose the shared checkout", async () => {
+    const seeded = await seed({ project: { executionWorkspacePolicy: SHARED_CHECKOUT } });
     const ran = await runTask(seeded);
     const previewed = await preview(seeded);
     expectPreviewMatchesRun(previewed, ran);
+    expect(previewed.supported && previewed.project?.checkout).toEqual({ kind: "local", path: seeded.repo });
+    // The checkout's working files, uncommitted `draft` included.
+    expect(ran.claudeMd).toEqual({ enabled: true, path: path.join(seeded.repo!, "CLAUDE.md") });
+    expect(ran.repoSkills).toMatchObject({ enabled: true, count: 2 });
+    expect(ran.skills.filter((skill) => skill.origin === "repo").map((skill) => skill.name)).toEqual(["draft", "release"]);
+  }, 90_000);
+
+  it("matches a real run in a task worktree with the project's CLAUDE.md and skills switches off", async () => {
+    const seeded = await seed({ project: { agentsReadClaudeMd: false, agentsUseRepoSkills: false } });
+    const ran = await runTask(seeded);
+    const previewed = await preview(seeded);
+    expectPreviewMatchesRun(previewed, ran);
+    expect(previewed.supported && previewed.project?.checkout).toMatchObject({ kind: "local", worktree: { baseRef: "main" } });
     expect(ran.claudeMd).toEqual({ enabled: false, reason: "project_switch_off" });
     expect(ran.repoSkills).toEqual({ enabled: false, reason: "project_switch_off" });
   }, 90_000);
+
+  it("says a task worktree's base isn't fetched yet rather than fetching it", async () => {
+    const seeded = await seed({ project: { executionWorkspacePolicy: {
+      enabled: true, defaultMode: "isolated_workspace", workspaceStrategy: { type: "git_worktree", baseRef: "origin/m7-not-fetched" },
+    } } });
+    await git(seeded.repo!, "remote", "add", "origin", "https://example.test/m7/not-fetched.git");
+    const repoBefore = await listTree(seeded.repo!);
+    const previewed = await preview(seeded);
+    expect(previewed.supported).toBe(true);
+    if (!previewed.supported) return;
+    expect(previewed.project?.checkout).toEqual({
+      kind: "local", path: seeded.repo, worktree: { dir: path.join(seeded.repo!, ".paperclip", "worktrees"), baseRef: null },
+    });
+    expect(previewed.manifest.claudeMd).toEqual({ enabled: false, reason: "base_not_fetched" });
+    expect(previewed.manifest.repoSkills).toEqual({ enabled: false, reason: "base_not_fetched" });
+    // Not the checkout's working files either.
+    expect(previewed.manifest.skills.filter((skill) => skill.origin === "repo")).toEqual([]);
+    expect(await listTree(seeded.repo!)).toEqual(repoBefore);
+  }, 60_000);
 
   it("writes no files, mints no tokens and writes nothing to the database", async () => {
     const seeded = await seed({ project: {} });
@@ -284,6 +356,9 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     await companySkillService(db).listRuntimeSkillEntries(seeded.companyId);
     const instanceRoot = path.join(root, "home");
     const filesBefore = await listTree(instanceRoot);
+    // The repo too, `.git` included: no worktree, no `.paperclip` folder, no exclude line.
+    const repoBefore = await listTree(seeded.repo!);
+    const excludeBefore = await readFile(path.join(seeded.repo!, ".git", "info", "exclude"), "utf8").catch(() => null);
     const homesBefore = await tempHomes();
     const tokensBefore = { ...minted };
     const [{ xmax: xmaxBefore }] = (await db.execute(sql`select pg_snapshot_xmax(pg_current_snapshot())::text as xmax`)) as unknown as Array<{ xmax: string }>;
@@ -291,6 +366,7 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     const previewed = await preview(seeded);
     expect(previewed.supported).toBe(true);
     if (previewed.supported) {
+      expect(previewed.project?.checkout).toMatchObject({ kind: "local", worktree: { baseRef: "main" } });
       expect(previewed.manifest.claudeMd.enabled).toBe(true);
       expect(previewed.manifest.skills.length).toBeGreaterThan(1);
     }
@@ -299,6 +375,9 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     // No transaction id was handed out: nothing was inserted, updated or deleted.
     expect(xmaxAfter).toBe(xmaxBefore);
     expect(await listTree(instanceRoot)).toEqual(filesBefore);
+    expect(await listTree(seeded.repo!)).toEqual(repoBefore);
+    expect(repoBefore).not.toContain(".paperclip");
+    expect(await readFile(path.join(seeded.repo!, ".git", "info", "exclude"), "utf8").catch(() => null)).toBe(excludeBefore);
     expect(await tempHomes()).toEqual(homesBefore);
     expect(minted).toEqual(tokensBefore);
 

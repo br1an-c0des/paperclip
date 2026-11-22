@@ -164,6 +164,24 @@ describe("previewClaudeRun", () => {
     expect(ran.repoSkills).toEqual({ enabled: false, reason: "project_switch_off" });
   });
 
+  it("reads the repo from a repo view instead of the folder, for a worktree that isn't made yet", async () => {
+    const worktree = path.join(repo, ".paperclip", "worktrees", "<task branch>");
+    const input = inputs({ context: { paperclipWorkspace: { ...workspace("project-1").paperclipWorkspace, cwd: worktree } } });
+    const preview = await previewClaudeRun(previewContext(input, {
+      // What the base commit holds: no CLAUDE.md, two skills (not the checkout's `release`).
+      repoView: { root: worktree, claudeMd: false, skillNames: ["ship", "deploy"] },
+    }));
+    expect(preview.supported).toBe(true);
+    if (!preview.supported) return;
+    expect(preview.manifest.claudeMd).toEqual({ enabled: false, reason: "no_file" });
+    expect(preview.manifest.repoSkills).toEqual({ enabled: true, dir: path.join(worktree, ".claude", "skills"), count: 2 });
+    expect(preview.manifest.skills.filter((skill) => skill.origin === "repo").map((skill) => skill.name)).toEqual(["deploy", "ship"]);
+    const withFile = await previewClaudeRun(previewContext(input, { repoView: { root: worktree, claudeMd: true, skillNames: [] } }));
+    expect(withFile.supported && withFile.manifest.claudeMd).toEqual({ enabled: true, path: path.join(worktree, "CLAUDE.md") });
+    expect(withFile.supported && withFile.manifest.repoSkills).toEqual({ enabled: false, reason: "no_skills" });
+    expect(await fs.readdir(repo)).toEqual(expect.not.arrayContaining([".paperclip"]));
+  });
+
   it("makes no config folder, plugin folder, MCP config, prompt bundle or temporary HOME", async () => {
     const tempBefore = (await fs.readdir(os.tmpdir())).filter((name) => name.startsWith("paperclip-claude-home-"));
     const preview = await previewClaudeRun(previewContext(inputs({ context: workspace("project-1") })));

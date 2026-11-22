@@ -57,6 +57,7 @@ export async function previewClaudeRun(ctx: AdapterRunPreviewContext): Promise<A
     cwd,
     env,
     credential: credential ?? NO_CREDENTIAL,
+    repoView: ctx.repoView,
   });
   const skills = await planClaudeRunSkillsAndInstructions({ config, moduleDir: __moduleDir });
   const sealedRun = plannedSealedClaudeRun(plan, agent.id);

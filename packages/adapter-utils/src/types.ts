@@ -526,6 +526,22 @@ export interface AdapterRunPreviewContext {
   /** Whether the run would get a Paperclip run token (`authToken`); none is minted for a preview. */
   runTokenAvailable: boolean;
   executionTarget?: AdapterExecutionTarget | null;
+  /**
+   * The checkout the run would read the repo's `CLAUDE.md` and skills from, when it doesn't
+   * exist yet: a task worktree the run makes from a base commit. `root` is where it will be;
+   * `claudeMd` and `skillNames` say what that commit holds. Without it the adapter reads the
+   * checkout at the workspace's `cwd`.
+   */
+  repoView?: AdapterRunPreviewRepoView | null;
+}
+
+/** A repo checkout as it will be, read from git rather than from its (not yet made) folder. */
+export interface AdapterRunPreviewRepoView {
+  root: string;
+  /** Whether `<root>/CLAUDE.md` will be a file. */
+  claudeMd: boolean;
+  /** The names of `<root>/.claude/skills/<name>/SKILL.md`. */
+  skillNames: string[];
 }
 
 /** What the adapter's next run would get, planned without starting, writing or minting anything. */

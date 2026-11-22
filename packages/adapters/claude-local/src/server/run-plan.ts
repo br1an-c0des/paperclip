@@ -2,7 +2,7 @@ import { isOpenRouterUrl, openRouterClaudeHeaders } from "@paperclipai/shared/op
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { AdapterExecutionContext, AdapterRuntimeMcpServer } from "@paperclipai/adapter-utils";
+import type { AdapterExecutionContext, AdapterRunPreviewRepoView, AdapterRuntimeMcpServer } from "@paperclipai/adapter-utils";
 import type { ClaudeMdLoad, ClaudeRepoSkillsLoad, ClaudeRunCredential, ClaudeRunPreviewBlocker } from "@paperclipai/shared";
 import {
   adapterExecutionTargetIsRemote,
@@ -311,8 +311,10 @@ export async function planSealedClaudeRun(input: {
   cwd: string;
   env: Record<string, string>;
   credential: ClaudeRunCredential;
+  /** A preview of a checkout that doesn't exist yet: read the repo from this instead of `cwd`. */
+  repoView?: AdapterRunPreviewRepoView | null;
 }): Promise<SealedClaudeRunPlan> {
-  const { runId, agent, config, configEnv, workspaceContext, cwd, env, credential } = input;
+  const { runId, agent, config, configEnv, workspaceContext, cwd, env, credential, repoView } = input;
   const managedConnection = Boolean(config.managedAiConnection);
   // A managed connection brings its own temporary HOME; anything else gets Paperclip's, so the
   // server user's home never reaches a run. A managed connection without one gets it too.
@@ -333,17 +335,19 @@ export async function planSealedClaudeRun(input: {
 
   // The repo's root CLAUDE.md and its skills, from the run's own checkout, when its project
   // allows them.
-  const repoRoot = await findRepoRoot(cwd);
+  const repoRoot = repoView ? repoView.root : await findRepoRoot(cwd);
   const projectId = asString(workspaceContext.projectId, "").trim() || null;
   const claudeMd = await resolveClaudeMdLoad({
     projectId,
     agentsReadClaudeMd: readOptionalBoolean(workspaceContext.agentsReadClaudeMd),
     repoRoot,
+    hasFile: repoView?.claudeMd,
   });
   const repoSkills = await resolveRepoSkills({
     projectId,
     agentsUseRepoSkills: readOptionalBoolean(workspaceContext.agentsUseRepoSkills),
     repoRoot,
+    skillNames: repoView?.skillNames,
   });
   const runPluginsDir = repoSkills.load.enabled && repoRoot
     ? resolveRunPluginsDir(process.env, agent.companyId, agent.id, runId)

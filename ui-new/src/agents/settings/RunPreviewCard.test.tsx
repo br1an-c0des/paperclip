@@ -58,6 +58,21 @@ const app: ClaudeRunPreview = {
   blockers: [],
 };
 
+const site: ClaudeRunPreview = {
+  supported: true,
+  project: {
+    id: "p1",
+    name: "Site",
+    checkout: { kind: "local", path: "/work/site", worktree: { dir: "/work/site/.paperclip/worktrees", baseRef: "main" } },
+  },
+  manifest: {
+    ...manifest,
+    claudeMd: { enabled: true, path: "/work/site/.paperclip/worktrees/<task branch>/CLAUDE.md" },
+    repoSkills: { enabled: true, dir: "/work/site/.paperclip/worktrees/<task branch>/.claude/skills", count: 1 },
+  },
+  blockers: [],
+};
+
 function mount(props: { dirty?: boolean } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(() => (
@@ -108,6 +123,18 @@ describe("What runs get", () => {
     expect(row("Repo skills")).toBe("Not cloned yet: read on the first run");
     expect(row("Repository")).toBe("Not cloned yet, from https://github.com/acme/app");
     expect(localStorage.getItem(projectKey("a1"))).toBe("p2");
+  });
+
+  it("shows a project whose tasks get their own worktree", async () => {
+    api.runPreview.mockImplementation((_id: string, projectId: string | null) => Promise.resolve(projectId === "p1" ? site : noProject));
+    mount();
+    await screen.findByText("Claude subscription · connection Claude Max");
+    expect(row("Task worktrees")).toBeNull();
+    fireEvent.change(screen.getByLabelText("For tasks in"), { target: { value: "p1" } });
+    await waitFor(() => expect(row("Task worktrees")).toBe("From main, in /work/site/.paperclip/worktrees"));
+    expect(row("Repository")).toBe("/work/site");
+    expect(row("CLAUDE.md")).toBe("/work/site/.paperclip/worktrees/<task branch>/CLAUDE.md");
+    expect(row("Repo skills")).toBe("1 skill from /work/site/.paperclip/worktrees/<task branch>/.claude/skills");
   });
 
   it("starts from the remembered project, and drops one that's gone", async () => {
