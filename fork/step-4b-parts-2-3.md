@@ -234,8 +234,10 @@ output; on by default). The user chose one setting for all three rules on task w
 
 With a level on: "Wait after a task closes" (days, default 1), "Remove dependencies and build
 output from finished worktrees" (default on), and at the restore-point level the save delay (3
-days) and idle delay (7 days). An instance that never saved the setting keeps the environment's
-behaviour. Non-worktree workspaces and project-less task folders keep upstream's rules (the latter
+days) and idle delay (7 days). An instance that never saved the setting is Off: the reaper's
+environment variables no longer decide anything for task worktrees (corrected 2026-11-21; an
+earlier draft fell back to them, which left upstream's archive and compaction running on an unsaved
+instance). Non-worktree workspaces and project-less task folders keep upstream's rules (the latter
 belong to build plan 3.20). This supersedes the three-value setting above.
 
 The checks that refused when isolated workspaces were off (`email-channels.ts`,
@@ -258,7 +260,7 @@ switches outside the Runner are removed as dead code; the rest of those gates st
     task without a project, a non-git checkout and an already-bound task are unchanged;
   - the exclude line is added once, only for a parent inside the repo;
   - the setting: `off` runs no expiration; `strict` and `restore_points` run upstream's sweep for
-    real (not dry run); an unsaved setting falls back to the env variables; the sweep picks up a
+    real (not dry run); an unsaved setting is Off even with the env variables set; the sweep picks up a
     change without a restart; `restore_points` reads unavailable without its prerequisites;
   - a skipped worktree's reason is recorded and shown on the task, and nothing shows with the
     sweep off;
