@@ -34,7 +34,7 @@ import { environmentService } from "../services/environments.js";
 import { assertEnvironmentSelectionForCompany } from "./environment-selection.js";
 import { assertBoard, assertBoardOrgAccess, getActorInfo } from "./authz.js";
 import { loadConfig } from "../config.js";
-import { restorePointAvailability, worktreeCleanupStatus, type WorktreeCleanupConfig } from "../services/worktree-cleanup.js";
+import { restorePointAvailability, savedWorktreeCleanup, worktreeCleanupStatus, type WorktreeCleanupConfig } from "../services/worktree-cleanup.js";
 
 function sameJsonValue(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -266,10 +266,10 @@ export function instanceSettingsRoutes(
   });
 
   // Step 4b part 3: the worktree cleanup setting with what's in force (the environment fallback,
-  // restore points' prerequisites, the day counts). It saves through PATCH .../experimental.
+  // restore points' prerequisites, the wait, compaction and restore point values). It saves through PATCH .../experimental.
   router.get("/instance/settings/worktree-cleanup", async (req, res) => {
     assertBoardOrgAccess(req);
-    res.json(worktreeCleanupStatus((await svc.getExperimental()).worktreeCleanup ?? null, readCleanupConfig()));
+    res.json(worktreeCleanupStatus(savedWorktreeCleanup(await svc.getExperimental()), readCleanupConfig()));
   });
 
   router.patch(

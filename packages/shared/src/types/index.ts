@@ -156,6 +156,7 @@ export type {
   BackupRetentionPolicy,
   WorktreeCleanupMode,
   WorktreeCleanupStatus,
+  WorktreeCleanupValues,
 } from "./instance.js";
 export type {
   SmokeLabServiceStatus,
@@ -179,6 +180,7 @@ export {
   DEFAULT_BACKUP_RETENTION,
   PAPERCLIP_CLOUD_MANAGED_BY,
   WORKTREE_CLEANUP_MODES,
+  WORKTREE_CLEANUP_DEFAULTS,
 } from "./instance.js";
 export {
   TRUST_PRESETS,

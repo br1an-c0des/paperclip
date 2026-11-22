@@ -113,6 +113,16 @@ describe("instance settings service", () => {
     expect("worktreeCleanup" in applyExperimentalSettingsPatch(saved, { worktreeCleanup: null })).toBe(false);
     expect(normalizeExperimentalSettings({ worktreeCleanup: "bogus" }).worktreeCleanup).toBeUndefined();
   });
+  it("keeps the worktree cleanup values next to the level, absent until saved", () => {
+    const empty = normalizeExperimentalSettings({});
+    for (const key of ["worktreeCleanupWaitDays", "worktreeCleanupRemoveBuildOutput", "worktreeRestorePointAfterDays", "worktreeRestorePointIdleDays"])
+      expect(key in empty).toBe(false);
+    const saved = applyExperimentalSettingsPatch({}, { worktreeCleanup: "merged", worktreeCleanupWaitDays: 0, worktreeCleanupRemoveBuildOutput: false,
+      worktreeRestorePointAfterDays: 5, worktreeRestorePointIdleDays: 0 });
+    expect(normalizeExperimentalSettings(JSON.parse(JSON.stringify(saved)))).toMatchObject({ worktreeCleanup: "merged",
+      worktreeCleanupWaitDays: 0, worktreeCleanupRemoveBuildOutput: false, worktreeRestorePointAfterDays: 5, worktreeRestorePointIdleDays: 0 });
+    expect("worktreeCleanupWaitDays" in applyExperimentalSettingsPatch(saved, { worktreeCleanupWaitDays: null })).toBe(false);
+  });
   it("keeps GitHub review bots independent across legacy normalization and persistence", () => {
     expect(normalizeExperimentalSettings({ enableChatConnectors: true })).toMatchObject({ enableChatConnectors: true, enableGitHubReviewBots: false });
     const saved = applyExperimentalSettingsPatch({}, { enableGitHubReviewBots: true });

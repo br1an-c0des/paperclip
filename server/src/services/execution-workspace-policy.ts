@@ -161,14 +161,6 @@ export function parseProjectExecutionWorkspacePolicy(raw: unknown): ProjectExecu
   };
 }
 
-export function gateProjectExecutionWorkspacePolicy(
-  projectPolicy: ProjectExecutionWorkspacePolicy | null,
-  isolatedWorkspacesEnabled: boolean,
-): ProjectExecutionWorkspacePolicy | null {
-  if (!isolatedWorkspacesEnabled) return null;
-  return projectPolicy;
-}
-
 /**
  * Operator default: a project with a configured workspace and no policy of its
  * own runs its tasks in an isolated per-task worktree.
@@ -506,14 +498,6 @@ export function buildExecutionWorkspaceAdapterConfig(input: {
   }
 
   return { ...nextConfig, ...input.adapterConfigOverrides };
-}
-
-export function taskWorkspaceRuntimeSelectionEnabled(input: {
-  legacyUiEnabled: boolean;
-  hasTypedSelection: boolean;
-  hasBinding: boolean;
-}): boolean {
-  return input.legacyUiEnabled || input.hasTypedSelection || input.hasBinding;
 }
 
 export function canApplyTaskWorkspaceSelectionAtAdmission(input: {

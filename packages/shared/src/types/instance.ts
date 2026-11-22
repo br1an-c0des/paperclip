@@ -178,42 +178,67 @@ export interface InstanceExperimentalSettings {
    */
   worktreeRunExecutionActivationInstanceId: string | null;
   /**
-   * Cleaning up finished tasks' worktrees (upstream's git workspace expiration sweep). Absent when
-   * never saved: the sweep then follows `PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED` and
-   * `PAPERCLIP_GIT_RESTORE_POINTS_ENABLED`. A saved mode runs for real, never as a dry run.
+   * How the terminal workspace reaper treats finished tasks' git worktrees (step 4b part 3): see
+   * `WorktreeCleanupMode`. Absent when never saved: the reaper then keeps upstream's
+   * environment-driven rules (the merged-and-clean archive and compaction always on,
+   * `PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED` and `PAPERCLIP_GIT_RESTORE_POINTS_ENABLED` for
+   * expiration, the environment's day counts). Once saved, the setting and the four values below
+   * rule, and a mode runs for real, never as a dry run. Other workspaces keep upstream's rules.
    */
   worktreeCleanup?: WorktreeCleanupMode | null;
+  /** Days to wait after a task's tree closes before archiving or expiring its worktree (default 1). */
+  worktreeCleanupWaitDays?: number | null;
+  /** Remove installed dependencies and build output from finished worktrees (default on). */
+  worktreeCleanupRemoveBuildOutput?: boolean | null;
+  /** Restore points mode: save the restore point this many days after the tree closes (default 3). */
+  worktreeRestorePointAfterDays?: number | null;
+  /** Restore points mode: also remove an open task's worktree idle this many days; 0 never (default 7). */
+  worktreeRestorePointIdleDays?: number | null;
 }
 
-export const WORKTREE_CLEANUP_MODES = ["off", "strict", "restore_points"] as const;
+export const WORKTREE_CLEANUP_MODES = ["off", "merged", "strict", "restore_points"] as const;
 /**
- * `off`: finished tasks' worktrees stay. `strict`: removed only when the remote can rebuild them
- * exactly. `restore_points`: also removed with unpushed or uncommitted work, after saving an
- * encrypted restore point.
+ * `off`: the reaper leaves task worktrees alone (no archive, compaction or expiration); closing one
+ * by hand still works. `merged`: archive a worktree once its work is merged into the base and it's
+ * clean. `strict`: also remove one the remote can rebuild exactly (pushed, nothing local).
+ * `restore_points`: also remove one with unpushed or uncommitted work, after saving an encrypted
+ * restore point.
  */
 export type WorktreeCleanupMode = (typeof WORKTREE_CLEANUP_MODES)[number];
+
+/** The worktree cleanup values a saved mode uses when the value itself was never saved. */
+export const WORKTREE_CLEANUP_DEFAULTS = {
+  waitDays: 1,
+  removeBuildOutput: true,
+  restorePointAfterDays: 3,
+  restorePointIdleDays: 7,
+} as const;
+
+/** The worktree cleanup values in force. */
+export interface WorktreeCleanupValues {
+  waitDays: number;
+  removeBuildOutput: boolean;
+  restorePointAfterDays: number;
+  restorePointIdleDays: number;
+}
 
 /** `GET /api/instance/settings/worktree-cleanup`: the cleanup setting and what is in force. */
 export interface WorktreeCleanupStatus {
   /** The saved mode, or null when never saved (the environment variables decide). */
   saved: WorktreeCleanupMode | null;
-  /** The mode the sweep uses now. */
+  /** The mode the reaper uses now. Never saved, `merged` unless the environment enables expiration. */
   mode: WorktreeCleanupMode;
   source: "setting" | "environment";
   /** Only the environment fallback can be a dry run (`PAPERCLIP_GIT_CACHE_EXPIRATION_DRY_RUN`). */
   dryRun: boolean;
   restorePoints: { available: boolean; reason: string | null };
-  /** The day counts in force, all from environment variables. */
-  days: {
-    /** Strict mode waits at least this long after the task tree closes. */
-    strictDelay: number;
-    /** Restore point mode waits this long after the task tree closes. */
-    restorePointDelay: number;
-    /** Restore point mode removes an open task's worktree after this many idle days; 0 is off. */
-    idle: number;
-    /** How long restore points are kept. */
-    retention: number;
-  };
+  /**
+   * The values in force: the saved ones (or `WORKTREE_CLEANUP_DEFAULTS`), or the environment's when
+   * never saved. In the environment fallback, strict expiration's wait is upstream's fixed 1 day.
+   */
+  values: WorktreeCleanupValues;
+  /** How long restore points are kept (`PAPERCLIP_GIT_RESTORE_POINT_RETENTION_DAYS`, environment only). */
+  retentionDays: number;
 }
 
 /**

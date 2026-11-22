@@ -113,6 +113,9 @@ function stripServerManagedExperimentalPatchFields(
   return patchable as PatchInstanceExperimentalSettings;
 }
 
+const WORKTREE_CLEANUP_KEYS = ["worktreeCleanup", "worktreeCleanupWaitDays", "worktreeCleanupRemoveBuildOutput",
+  "worktreeRestorePointAfterDays", "worktreeRestorePointIdleDays"] as const;
+
 export function applyExperimentalSettingsPatch(
   current: unknown,
   patch: PatchInstanceExperimentalSettings | Record<string, unknown>,
@@ -303,8 +306,13 @@ export function normalizeExperimentalSettings(raw: unknown): InstanceExperimenta
       worktreeRunExecutionActivatedAt: parsed.data.worktreeRunExecutionActivatedAt ?? null,
       worktreeRunExecutionActivationInstanceId:
         parsed.data.worktreeRunExecutionActivationInstanceId ?? null,
-      // Absent until saved, so the sweep can fall back to the environment variables.
+      // Absent until saved, so the reaper can fall back to the environment variables.
       ...(parsed.data.worktreeCleanup ? { worktreeCleanup: parsed.data.worktreeCleanup } : {}),
+      ...(typeof parsed.data.worktreeCleanupWaitDays === "number" ? { worktreeCleanupWaitDays: parsed.data.worktreeCleanupWaitDays } : {}),
+      ...(typeof parsed.data.worktreeCleanupRemoveBuildOutput === "boolean"
+        ? { worktreeCleanupRemoveBuildOutput: parsed.data.worktreeCleanupRemoveBuildOutput } : {}),
+      ...(typeof parsed.data.worktreeRestorePointAfterDays === "number" ? { worktreeRestorePointAfterDays: parsed.data.worktreeRestorePointAfterDays } : {}),
+      ...(typeof parsed.data.worktreeRestorePointIdleDays === "number" ? { worktreeRestorePointIdleDays: parsed.data.worktreeRestorePointIdleDays } : {}),
     };
   }
   return {
@@ -669,8 +677,9 @@ export function instanceSettingsService(db: Db, options: InstanceSettingsService
         if (chatBecameEnabled) await notifyDeferredExecutionEligibility(tx);
         if(toExperimentalView(current.experimental).enablePublicMcp!==toExperimentalView(nextExperimental).enablePublicMcp)await prepareMcpClientMirrorPolicy(tx as unknown as Db,toExperimentalView(nextExperimental).enablePublicMcp);
         if (patch.enableMcpTasks !== undefined) await notifyDeliveryWork(tx, DELIVERY_QUEUES.mcpTasks);
-        // Step 4b part 3: a new worktree cleanup mode arms the workspace sweep's next full rotation.
-        if (patch.worktreeCleanup !== undefined) await notifyDeliveryWork(tx, DELIVERY_QUEUES.terminalWorkspaces);
+        // Step 4b part 3: a worktree cleanup change arms the workspace reaper's next pass.
+        if (WORKTREE_CLEANUP_KEYS.some((key) => (patch as Record<string, unknown>)[key] !== undefined))
+          await notifyDeliveryWork(tx, DELIVERY_QUEUES.terminalWorkspaces);
         await notifyDeliveryWork(tx, DELIVERY_QUEUES.mcpIngressHandoffs);
         await notifyDeliveryWork(tx, DELIVERY_QUEUES.mcpClientMirror);
         await notifyDeliveryWork(tx, DELIVERY_QUEUES.mcpRevocationIndex, "*");

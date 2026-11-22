@@ -57,7 +57,7 @@ import {
 } from "./services/native-runtime/native-harness-backup-expiration.js";
 import { registerNativeRunnerEvidenceRetentionWork } from "./services/native-runtime/native-runner-evidence-retention-work.js";
 import { gitRestorePointRetentionService, registerGitRestorePointWork } from "./services/git-restore-point-ledger.js";
-import { readWorktreeCleanup, restorePointAvailability } from "./services/worktree-cleanup.js";
+import { readWorktreeCleanup, restorePointAvailability, worktreeSweepRules } from "./services/worktree-cleanup.js";
 import { remoteWorkspaceSnapshotRetentionService, registerRemoteWorkspaceSnapshotRetentionWork } from "./services/remote-workspace-snapshot-retention.js";
 import {
   nativeWorkspaceSyncRetentionService,
@@ -1683,23 +1683,11 @@ async function startServerWithDatabaseTeardown(
         idleMs: config.gitRestorePointIdleDays > 0 ? config.gitRestorePointIdleDays * 24 * 60 * 60 * 1000 : null,
         keyDurable: config.storageProvider !== "s3" || Boolean(process.env.PAPERCLIP_SECRETS_MASTER_KEY?.trim()),
       } : undefined,
-      // Step 4b part 3: git workspace expiration follows the worktree cleanup setting, read each
-      // sweep; never saved, it falls back to the environment variables above.
-      resolveGitExpiration: async () => {
-        const cleanup = await readWorktreeCleanup(db as any, config);
-        const keyDurable = restorePointAvailability(config).keyDurable;
-        return {
-          enabled: cleanup.mode !== "off",
-          dryRun: cleanup.dryRun,
-          mode: cleanup.mode === "off" ? null : cleanup.mode,
-          restorePoints: cleanup.mode === "restore_points" ? {
-            storage: storageService,
-            terminalDelayMs: config.gitRestorePointTerminalDelayDays * 24 * 60 * 60 * 1000,
-            idleMs: config.gitRestorePointIdleDays > 0 ? config.gitRestorePointIdleDays * 24 * 60 * 60 * 1000 : null,
-            keyDurable,
-          } : undefined,
-        };
-      },
+      // Step 4b part 3: what the reaper does to task worktrees (archive, compaction, git workspace
+      // expiration) follows the worktree cleanup setting, read each sweep; never saved, it falls
+      // back to the environment variables these other options come from.
+      resolveWorktreeCleanup: async () => worktreeSweepRules(await readWorktreeCleanup(db as any, config),
+        { storage: storageService, keyDurable: restorePointAvailability(config).keyDurable }),
       taskDirectoryRetention: config.taskDirectoryRetentionEnabled ? {
         dryRun: config.taskDirectoryRetentionDryRun,
         terminalDelayMs: config.gitRestorePointTerminalDelayDays * 24 * 60 * 60 * 1000,

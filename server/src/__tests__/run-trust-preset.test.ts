@@ -27,8 +27,6 @@ import { initializeRunIdentity } from "../services/run-identity.js";
 import { resolveAndRetainRunTrustPreset } from "../services/run-trust-preset.js";
 import { resolveGitHubOperationCredentials } from "../services/github-operation-credentials.js";
 import {
-  gateProjectExecutionWorkspacePolicy,
-  parseProjectExecutionWorkspacePolicy,
 } from "../services/execution-workspace-policy.js";
 
 // Actual dispatch retention and operation-time authorization use real rows.
@@ -329,12 +327,6 @@ it("dispatch retains raw trust before workspace and broker setup", () => {
         .update(projects)
         .set({ executionWorkspacePolicy: policy })
         .where(eq(projects.id, input.projectId));
-      expect(
-        gateProjectExecutionWorkspacePolicy(
-          parseProjectExecutionWorkspacePolicy(policy),
-          false,
-        ),
-      ).toBeNull();
       expect((await launch(input)).trustPreset).toMatchObject({
         kind: "low_trust_review",
         sourcePresets: { project: LOW_TRUST_REVIEW_PRESET },

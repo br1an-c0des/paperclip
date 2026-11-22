@@ -1,18 +1,29 @@
 import type { Db } from "@paperclipai/db";
 import { executionWorkspaces } from "@paperclipai/db";
-import type { ExecutionWorkspaceWorktreeKept, WorktreeCleanupMode, WorktreeCleanupStatus } from "@paperclipai/shared";
+import {
+  WORKTREE_CLEANUP_DEFAULTS,
+  type ExecutionWorkspaceWorktreeKept,
+  type InstanceExperimentalSettings,
+  type WorktreeCleanupMode,
+  type WorktreeCleanupStatus,
+  type WorktreeCleanupValues,
+} from "@paperclipai/shared";
 import { eq, sql } from "drizzle-orm";
+import type { StorageService } from "../storage/types.js";
 import { instanceSettingsService } from "./instance-settings.js";
 
 /*
- * Step 4b part 3: cleaning up finished tasks' worktrees with upstream's git workspace expiration
- * sweep (doc/recoverable-disk-cleanup.md, "Git workspace restore points"), behind an instance
- * setting (`experimental.worktreeCleanup`) that is off by default. The sweep reads it on every pass,
- * so a change applies without a restart. Never saved, it falls back to the environment variables
- * an operator may have set (`PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED`,
- * `PAPERCLIP_GIT_RESTORE_POINTS_ENABLED`, `PAPERCLIP_GIT_CACHE_EXPIRATION_DRY_RUN`). A saved mode
- * runs for real. The day counts stay environment variables.
+ * Step 4b part 3: one setting (`experimental.worktreeCleanup`, off by default) for everything the
+ * terminal workspace reaper does to finished tasks' git worktrees: the merged-and-clean archive,
+ * compaction (removing dependencies and build output), and upstream's git workspace expiration
+ * (doc/recoverable-disk-cleanup.md). The reaper reads it on every pass, so a change applies without
+ * a restart. Never saved, the reaper keeps upstream's environment-driven rules, so an install that
+ * never opens the UI isn't changed silently. A saved mode runs for real. Other workspaces (shared
+ * checkouts, task directories, remote and plugin workspaces) keep upstream's rules.
  */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 
 /** The config fields the cleanup reads; `server/src/config.ts` sets them from the environment. */
 export type WorktreeCleanupConfig = {
@@ -23,21 +34,46 @@ export type WorktreeCleanupConfig = {
   gitRestorePointTerminalDelayDays: number;
   gitRestorePointIdleDays: number;
   gitRestorePointRetentionDays: number;
+  workspaceReaperCooldownDays: number;
+  /** null when `PAPERCLIP_WORKSPACE_COMPACTION_ENABLED=false`. */
+  workspaceCompactionDelayHours: number | null;
 };
 
+/** The saved settings, as instance settings store them. */
+export type SavedWorktreeCleanup = Pick<InstanceExperimentalSettings,
+  "worktreeCleanup" | "worktreeCleanupWaitDays" | "worktreeCleanupRemoveBuildOutput"
+  | "worktreeRestorePointAfterDays" | "worktreeRestorePointIdleDays">;
+
+/** What the reaper applies to task worktrees on one pass. */
 export type ResolvedWorktreeCleanup = {
   mode: WorktreeCleanupMode;
   source: "setting" | "environment";
   dryRun: boolean;
+  values: WorktreeCleanupValues;
+  /** Archive a worktree whose work is merged and that is clean, after `archiveCooldownMs`. */
+  archive: boolean;
+  archiveCooldownMs: number;
+  /** null: no compaction. */
+  compactionDelayMs: number | null;
+  /** Git workspace expiration, or null when off. */
+  expiration: {
+    dryRun: boolean;
+    restorePoints: boolean;
+    /** The wait after the tree closes; undefined keeps upstream's fixed 1 day. */
+    terminalDelayMs?: number;
+    restorePointDelayMs: number;
+    idleMs: number | null;
+  } | null;
 };
 
 /** The mode the environment variables give, for an instance that never saved the setting. */
 export function environmentWorktreeCleanupMode(config: Pick<WorktreeCleanupConfig, "gitCacheExpirationEnabled" | "gitRestorePointsEnabled">): WorktreeCleanupMode {
-  if (!config.gitCacheExpirationEnabled) return "off";
+  // Upstream's archive runs whatever the environment says, so the floor is `merged`.
+  if (!config.gitCacheExpirationEnabled) return "merged";
   return config.gitRestorePointsEnabled ? "restore_points" : "strict";
 }
 
-/** The environment's switches, read as `server/src/config.ts` reads them. */
+/** The environment's expiration switches, read as `server/src/config.ts` reads them. */
 export function environmentWorktreeCleanupFlags(env: Record<string, string | undefined> = process.env) {
   return {
     gitCacheExpirationEnabled: env.PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED === "true",
@@ -46,10 +82,101 @@ export function environmentWorktreeCleanupFlags(env: Record<string, string | und
   };
 }
 
-export function resolveWorktreeCleanup(saved: WorktreeCleanupMode | null | undefined, config: Pick<WorktreeCleanupConfig, "gitCacheExpirationEnabled" | "gitRestorePointsEnabled" | "gitCacheExpirationDryRun">): ResolvedWorktreeCleanup {
-  if (saved) return { mode: saved, source: "setting", dryRun: false };
+/** The mode in force, from the saved setting or the environment's switches. */
+export function worktreeCleanupMode(saved: SavedWorktreeCleanup | null | undefined,
+  flags: Pick<WorktreeCleanupConfig, "gitCacheExpirationEnabled" | "gitRestorePointsEnabled">): WorktreeCleanupMode {
+  return saved?.worktreeCleanup ?? environmentWorktreeCleanupMode(flags);
+}
+
+export function resolveWorktreeCleanup(saved: SavedWorktreeCleanup | null | undefined, config: WorktreeCleanupConfig): ResolvedWorktreeCleanup {
+  const compactionDelayHours = config.workspaceCompactionDelayHours;
+  if (saved?.worktreeCleanup) {
+    const mode = saved.worktreeCleanup;
+    const values: WorktreeCleanupValues = {
+      waitDays: saved.worktreeCleanupWaitDays ?? WORKTREE_CLEANUP_DEFAULTS.waitDays,
+      removeBuildOutput: saved.worktreeCleanupRemoveBuildOutput ?? WORKTREE_CLEANUP_DEFAULTS.removeBuildOutput,
+      restorePointAfterDays: saved.worktreeRestorePointAfterDays ?? WORKTREE_CLEANUP_DEFAULTS.restorePointAfterDays,
+      restorePointIdleDays: saved.worktreeRestorePointIdleDays ?? WORKTREE_CLEANUP_DEFAULTS.restorePointIdleDays,
+    };
+    const on = mode !== "off";
+    return {
+      mode, source: "setting", dryRun: false, values,
+      archive: on,
+      archiveCooldownMs: values.waitDays * DAY_MS,
+      // The delay stays the environment's (1 hour by default), even where it turned compaction off.
+      compactionDelayMs: on && values.removeBuildOutput ? Math.max(0, compactionDelayHours ?? 1) * HOUR_MS : null,
+      expiration: mode === "strict" || mode === "restore_points" ? {
+        dryRun: false,
+        restorePoints: mode === "restore_points",
+        terminalDelayMs: values.waitDays * DAY_MS,
+        restorePointDelayMs: values.restorePointAfterDays * DAY_MS,
+        idleMs: values.restorePointIdleDays > 0 ? values.restorePointIdleDays * DAY_MS : null,
+      } : null,
+    };
+  }
   const mode = environmentWorktreeCleanupMode(config);
-  return { mode, source: "environment", dryRun: mode !== "off" && config.gitCacheExpirationDryRun };
+  const dryRun = mode !== "merged" && config.gitCacheExpirationDryRun;
+  return {
+    mode, source: "environment", dryRun,
+    values: {
+      waitDays: config.workspaceReaperCooldownDays,
+      removeBuildOutput: compactionDelayHours !== null,
+      restorePointAfterDays: config.gitRestorePointTerminalDelayDays,
+      restorePointIdleDays: config.gitRestorePointIdleDays,
+    },
+    archive: true,
+    archiveCooldownMs: Math.max(0, config.workspaceReaperCooldownDays) * DAY_MS,
+    compactionDelayMs: compactionDelayHours === null ? null : Math.max(0, compactionDelayHours) * HOUR_MS,
+    expiration: config.gitCacheExpirationEnabled ? {
+      dryRun,
+      restorePoints: config.gitRestorePointsEnabled,
+      restorePointDelayMs: config.gitRestorePointTerminalDelayDays * DAY_MS,
+      idleMs: config.gitRestorePointIdleDays > 0 ? config.gitRestorePointIdleDays * DAY_MS : null,
+    } : null,
+  };
+}
+
+/** One pass of git workspace expiration, as the terminal workspace reaper takes it. */
+export type GitExpirationPass = {
+  enabled: boolean;
+  dryRun: boolean;
+  /** The mode kept-reason records name; null records none. */
+  mode: "strict" | "restore_points" | null;
+  /** How long the tree must have been closed; undefined keeps upstream's fixed 1 day. */
+  terminalDelayMs?: number;
+  restorePoints?: { storage: StorageService; terminalDelayMs: number; keyDurable: boolean; idleMs?: number | null };
+};
+
+/** What the terminal workspace reaper does to task worktrees on one pass. */
+export type WorktreeSweepRules = {
+  /** Archive a worktree whose work is merged and that is clean. */
+  archive: boolean;
+  archiveCooldownMs: number;
+  /** null: no compaction. */
+  compactionDelayMs: number | null;
+  expiration: GitExpirationPass;
+};
+
+/** The reaper's rules for a resolved cleanup; `storage` and `keyDurable` serve restore points. */
+export function worktreeSweepRules(cleanup: ResolvedWorktreeCleanup, restorePoints: { storage: StorageService; keyDurable: boolean }): WorktreeSweepRules {
+  const expiration = cleanup.expiration;
+  return {
+    archive: cleanup.archive,
+    archiveCooldownMs: cleanup.archiveCooldownMs,
+    compactionDelayMs: cleanup.compactionDelayMs,
+    expiration: expiration ? {
+      enabled: true,
+      dryRun: expiration.dryRun,
+      mode: cleanup.mode === "strict" || cleanup.mode === "restore_points" ? cleanup.mode : null,
+      terminalDelayMs: expiration.terminalDelayMs,
+      restorePoints: expiration.restorePoints ? {
+        storage: restorePoints.storage,
+        terminalDelayMs: expiration.restorePointDelayMs,
+        idleMs: expiration.idleMs,
+        keyDurable: restorePoints.keyDurable,
+      } : undefined,
+    } : { enabled: false, dryRun: false, mode: null },
+  };
 }
 
 /**
@@ -68,30 +195,36 @@ export function restorePointAvailability(config: Pick<WorktreeCleanupConfig, "st
       };
 }
 
-export async function readSavedWorktreeCleanup(db: Db): Promise<WorktreeCleanupMode | null> {
-  return (await instanceSettingsService(db).getExperimental()).worktreeCleanup ?? null;
+/** The five saved cleanup keys of the experimental settings, null where never saved. */
+export function savedWorktreeCleanup(experimental: SavedWorktreeCleanup): SavedWorktreeCleanup {
+  return {
+    worktreeCleanup: experimental.worktreeCleanup ?? null,
+    worktreeCleanupWaitDays: experimental.worktreeCleanupWaitDays ?? null,
+    worktreeCleanupRemoveBuildOutput: experimental.worktreeCleanupRemoveBuildOutput ?? null,
+    worktreeRestorePointAfterDays: experimental.worktreeRestorePointAfterDays ?? null,
+    worktreeRestorePointIdleDays: experimental.worktreeRestorePointIdleDays ?? null,
+  };
+}
+
+export async function readSavedWorktreeCleanup(db: Db): Promise<SavedWorktreeCleanup> {
+  return savedWorktreeCleanup(await instanceSettingsService(db).getExperimental());
 }
 
 export async function readWorktreeCleanup(db: Db, config: WorktreeCleanupConfig): Promise<ResolvedWorktreeCleanup> {
   return resolveWorktreeCleanup(await readSavedWorktreeCleanup(db), config);
 }
 
-export function worktreeCleanupStatus(saved: WorktreeCleanupMode | null, config: WorktreeCleanupConfig, env: Record<string, string | undefined> = process.env): WorktreeCleanupStatus {
+export function worktreeCleanupStatus(saved: SavedWorktreeCleanup | null, config: WorktreeCleanupConfig, env: Record<string, string | undefined> = process.env): WorktreeCleanupStatus {
   const resolved = resolveWorktreeCleanup(saved, config);
   const restorePoints = restorePointAvailability(config, env);
   return {
-    saved,
+    saved: saved?.worktreeCleanup ?? null,
     mode: resolved.mode,
     source: resolved.source,
     dryRun: resolved.dryRun,
     restorePoints: { available: restorePoints.available, reason: restorePoints.reason },
-    days: {
-      // Fixed in upstream's expiration (`isGitWorkspaceExpirationEligible`).
-      strictDelay: 1,
-      restorePointDelay: config.gitRestorePointTerminalDelayDays,
-      idle: config.gitRestorePointIdleDays,
-      retention: config.gitRestorePointRetentionDays,
-    },
+    values: resolved.values,
+    retentionDays: config.gitRestorePointRetentionDays,
   };
 }
 
@@ -139,9 +272,9 @@ export function readWorktreeKept(metadata: Record<string, unknown> | null | unde
   return { reason: record.reason, label, at: record.at, mode: record.mode };
 }
 
-/** What the task shows: the recorded reason, only while the sweep is on. */
+/** What the task shows: the recorded reason, only while expiration (strict or restore points) runs. */
 export function visibleWorktreeKept(metadata: Record<string, unknown> | null | undefined, mode: WorktreeCleanupMode): ExecutionWorkspaceWorktreeKept | null {
-  if (mode === "off") return null;
+  if (mode !== "strict" && mode !== "restore_points") return null;
   return readWorktreeKept(metadata);
 }
 
@@ -153,7 +286,7 @@ export function visibleWorktreeKept(metadata: Record<string, unknown> | null | u
 export async function recordWorktreeKept(db: Db, workspace: { id: string; metadata: Record<string, unknown> | null }, outcome: {
   expired: boolean;
   skipReason: string | null;
-  mode: Exclude<WorktreeCleanupMode, "off">;
+  mode: "strict" | "restore_points";
   now: Date;
 }) {
   const current = readWorktreeKept(workspace.metadata);

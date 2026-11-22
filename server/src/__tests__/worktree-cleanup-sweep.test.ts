@@ -12,15 +12,30 @@ import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } fro
 import { resolveExternalTestDatabaseUrl } from "./helpers/external-test-database.js";
 import { materializeIsolatedRemoteWorkspaceSource } from "../services/isolated-remote-workspace-source.js";
 import { realizeExecutionWorkspace } from "../services/workspace-runtime.js";
-import { executionWorkspaceService, type GitExpirationPass } from "../services/execution-workspaces.js";
+import { executionWorkspaceService } from "../services/execution-workspaces.js";
 import { instanceSettingsService } from "../services/instance-settings.js";
-import { WORKTREE_KEPT_METADATA_KEY } from "../services/worktree-cleanup.js";
+import {
+  WORKTREE_KEPT_METADATA_KEY,
+  resolveWorktreeCleanup,
+  worktreeSweepRules,
+  type SavedWorktreeCleanup,
+  type WorktreeCleanupConfig,
+} from "../services/worktree-cleanup.js";
 
 /*
- * Step 4b part 3: upstream's git workspace expiration behind the worktree cleanup setting. The
- * sweep reads the setting each pass (`resolveGitExpiration`), a chosen mode removes for real, and a
- * kept finished worktree records why, which close readiness shows only while cleanup is on.
+ * Step 4b part 3: the worktree cleanup setting governs what the terminal workspace reaper does to
+ * task worktrees: the merged-and-clean archive, compaction and git workspace expiration. The reaper
+ * reads it each pass (`resolveWorktreeCleanup`), a chosen level runs for real, a kept finished
+ * worktree records why (shown only while expiration runs), and a setting never saved keeps the
+ * environment's rules.
  */
+
+/** The environment's defaults, as `server/src/config.ts` reads them with no variables set. */
+const cleanupConfig = (patch: Partial<WorktreeCleanupConfig> = {}): WorktreeCleanupConfig => ({
+  gitCacheExpirationEnabled: false, gitCacheExpirationDryRun: true, gitRestorePointsEnabled: false, storageProvider: "local_disk",
+  gitRestorePointTerminalDelayDays: 3, gitRestorePointIdleDays: 7, gitRestorePointRetentionDays: 90,
+  workspaceReaperCooldownDays: 1, workspaceCompactionDelayHours: 1, ...patch,
+});
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const gitEnv = { ...process.env, GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.test",
@@ -32,7 +47,7 @@ const external = resolveExternalTestDatabaseUrl("PAPERCLIP_GIT_EXPIRATION_TEST_D
 const support = external ? { supported: true } : await getEmbeddedPostgresTestSupport();
 const describeEmbeddedPostgres = support.supported ? describe : describe.skip;
 
-describeEmbeddedPostgres("worktree cleanup setting drives the git expiration sweep", () => {
+describeEmbeddedPostgres("worktree cleanup setting drives the terminal workspace reaper", () => {
   let db: ReturnType<typeof createDb>;
   let database: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>>;
   let root: string;
@@ -57,13 +72,15 @@ describeEmbeddedPostgres("worktree cleanup setting drives the git expiration swe
     await db.$client.end({ timeout: 1 }); await database?.cleanup(); await fs.rm(root, { recursive: true, force: true });
   });
 
-  /** A finished task (closed two days ago) whose isolated worktree is clean and pushed. */
-  async function fixture() {
+  /** A finished task (closed two days ago) whose isolated worktree is clean and merged (it has no commits of its own). */
+  async function fixture(options: { providerType?: "local_fs" | "git_worktree" } = {}) {
     const companyId = randomUUID(), issueId = randomUUID(), workspaceId = randomUUID();
     const location = path.join(root, companyId), source = path.join(location, "author"), remote = path.join(location, "remote.git");
     await fs.mkdir(source, { recursive: true });
     git(source, "init", "--initial-branch=main");
     await fs.writeFile(path.join(source, "marker.txt"), "commit A\n");
+    // Ignored, so compaction may remove it.
+    await fs.writeFile(path.join(source, ".gitignore"), "node_modules/\n");
     git(source, "add", "."); git(source, "commit", "-m", "A");
     git(location, "clone", "--bare", source, remote); git(source, "remote", "add", "origin", remote);
     await db.insert(companies).values({ id: companyId, name: "Worktree cleanup fixture", issuePrefix: `WC${companyId.slice(0, 6)}` });
@@ -77,7 +94,7 @@ describeEmbeddedPostgres("worktree cleanup setting drives the git expiration swe
       skipHostProvision: true,
     });
     await db.insert(executionWorkspaces).values({ id: workspaceId, companyId, sourceIssueId: issueId, mode: "isolated_workspace", strategyType: "git_worktree", name: "Fixture", status: "active",
-      providerType: "local_fs", cwd: workspace.cwd, providerRef: workspace.cwd, repoUrl, baseRef: "origin/main", branchName: workspace.branchName,
+      providerType: options.providerType ?? "local_fs", cwd: workspace.cwd, providerRef: workspace.cwd, repoUrl, baseRef: "origin/main", branchName: workspace.branchName,
       metadata: { createdByRuntime: workspace.branchCreatedByRuntime, gitBranchOwnershipVersion: 1, baseRefSha: workspace.baseRefSha,
         isolatedRemoteSource: { schema: "paperclip.isolated-remote-source.v1", companyId, issueId, repoUrl } } });
     await db.update(issues).set({ executionWorkspaceId: workspaceId }).where(eq(issues.id, issueId));
@@ -86,8 +103,8 @@ describeEmbeddedPostgres("worktree cleanup setting drives the git expiration swe
       await fs.writeFile(path.join(workspace.cwd, "work.txt"), "unpushed\n");
       git(workspace.cwd, "add", "."); git(workspace.cwd, "commit", "-m", "Unpushed work");
     };
-    // Pushed to its own branch but not merged: the remote can rebuild it, yet the ordinary
-    // reaper (which removes merged, clean worktrees whatever the setting) leaves it.
+    // Pushed to its own branch but not merged: the remote can rebuild it, yet the archive (which
+    // needs the work merged) leaves it.
     const commitPushed = async () => {
       await commitUnpushed();
       git(workspace.cwd, "push", "origin", `HEAD:refs/heads/${workspace.branchName}`);
@@ -95,68 +112,129 @@ describeEmbeddedPostgres("worktree cleanup setting drives the git expiration swe
     return { companyId, workspaceId, cwd: workspace.cwd, row, commitUnpushed, commitPushed };
   }
 
-  /** The pass the server builds from the setting (index.ts), with a mutable mode for the test. */
-  function settingDriven(state: { mode: "off" | "strict" | "restore_points" }) {
-    return async (): Promise<GitExpirationPass> => ({
-      enabled: state.mode !== "off",
-      dryRun: false,
-      mode: state.mode === "off" ? null : state.mode,
-      restorePoints: state.mode === "restore_points"
-        ? { storage: getStorageService(), terminalDelayMs: DAY_MS, keyDurable: true, idleMs: null }
-        : undefined,
-    });
+  /** The rules the server builds from the setting each pass (index.ts), from a mutable saved setting. */
+  function settingDriven(state: { saved: SavedWorktreeCleanup | null }, env: Partial<WorktreeCleanupConfig> = {}) {
+    return async () => worktreeSweepRules(resolveWorktreeCleanup(state.saved, cleanupConfig(env)),
+      { storage: getStorageService(), keyDurable: true });
+  }
+  const level = (mode: SavedWorktreeCleanup["worktreeCleanup"], patch: Partial<SavedWorktreeCleanup> = {}) => ({ worktreeCleanup: mode, ...patch });
+  const nodeModules = (cwd: string) => path.join(cwd, "node_modules");
+  async function addBuildOutput(cwd: string) {
+    await fs.mkdir(nodeModules(cwd), { recursive: true });
+    await fs.writeFile(path.join(nodeModules(cwd), "dep.js"), "regenerable\n");
   }
 
-  it("runs no expiration while off, then removes for real once strict is chosen, without a restart", async () => {
-    const f = await fixture();
-    await f.commitPushed();
-    const state: { mode: "off" | "strict" | "restore_points" } = { mode: "off" };
-    const worker = executionWorkspaceService(db, { resolveGitExpiration: settingDriven(state) });
-    await worker.sweepTerminalWorkspaces();
-    expect(await exists(f.cwd)).toBe(true);
-    expect((await f.row()).metadata?.gitCacheRestoration).toBeUndefined();
-    state.mode = "strict";
+  it("off leaves every task worktree alone: merged and clean, pushed, and compactable", async () => {
+    const merged = await fixture();
+    const pushed = await fixture();
+    await pushed.commitPushed();
+    const compactable = await fixture({ providerType: "git_worktree" });
+    await compactable.commitPushed();
+    await addBuildOutput(compactable.cwd);
+    const worker = executionWorkspaceService(db, { resolveWorktreeCleanup: settingDriven({ saved: level("off") }) });
     const outcome = await worker.sweepTerminalWorkspaces();
-    expect(outcome.archived).toBe(1);
-    expect(await exists(f.cwd)).toBe(false);
-    expect((await f.row()).metadata?.gitCacheRestoration).toBeDefined();
-    expect((await f.row()).metadata?.[WORKTREE_KEPT_METADATA_KEY]).toBeUndefined();
+    expect(outcome).toMatchObject({ archived: 0, compacted: 0 });
+    for (const f of [merged, pushed, compactable]) expect(await exists(f.cwd)).toBe(true);
+    expect(await exists(nodeModules(compactable.cwd))).toBe(true);
+    expect((await merged.row()).status).toBe("active");
   });
 
-  it("keeps an unpushed worktree in strict mode, records why, and shows it only while cleanup is on", async () => {
-    const f = await fixture();
-    await f.commitUnpushed();
-    const worker = executionWorkspaceService(db, { resolveGitExpiration: settingDriven({ mode: "strict" }) });
-    expect((await worker.sweepTerminalWorkspaces()).archived).toBe(0);
-    expect(await exists(f.cwd)).toBe(true);
-    expect((await f.row()).metadata?.[WORKTREE_KEPT_METADATA_KEY]).toMatchObject({ reason: "upstream_commit_unverified", mode: "strict" });
+  it("merged work only archives a merged, clean worktree and compacts, but expires nothing", async () => {
+    const merged = await fixture();
+    const pushed = await fixture({ providerType: "git_worktree" });
+    await pushed.commitPushed();
+    await addBuildOutput(pushed.cwd);
+    const worker = executionWorkspaceService(db, { resolveWorktreeCleanup: settingDriven({ saved: level("merged") }) });
+    const outcome = await worker.sweepTerminalWorkspaces();
+    expect(outcome.compacted).toBe(1);
+    expect(await exists(merged.cwd)).toBe(false);
+    expect(await exists(pushed.cwd)).toBe(true);
+    expect(await exists(nodeModules(pushed.cwd))).toBe(false);
+    expect((await pushed.row()).metadata?.gitCacheRestoration).toBeUndefined();
+  });
+
+  it("merged or pushed removes a pushed worktree, keeps an unpushed one and says why", async () => {
+    const pushed = await fixture();
+    await pushed.commitPushed();
+    const unpushed = await fixture();
+    await unpushed.commitUnpushed();
+    const worker = executionWorkspaceService(db, { resolveWorktreeCleanup: settingDriven({ saved: level("strict") }) });
+    await worker.sweepTerminalWorkspaces();
+    expect(await exists(pushed.cwd)).toBe(false);
+    expect((await pushed.row()).metadata?.gitCacheRestoration).toBeDefined();
+    expect(await exists(unpushed.cwd)).toBe(true);
+    expect((await unpushed.row()).metadata?.[WORKTREE_KEPT_METADATA_KEY]).toMatchObject({ reason: "upstream_commit_unverified", mode: "strict" });
 
     const settings = instanceSettingsService(db);
     await settings.updateExperimental({ worktreeCleanup: "strict" });
-    expect((await executionWorkspaceService(db).getCloseReadiness(f.workspaceId))?.worktreeKept)
+    expect((await executionWorkspaceService(db).getCloseReadiness(unpushed.workspaceId))?.worktreeKept)
       .toMatchObject({ reason: "upstream_commit_unverified", label: "branch not pushed", mode: "strict" });
-    await settings.updateExperimental({ worktreeCleanup: "off" });
-    expect((await executionWorkspaceService(db).getCloseReadiness(f.workspaceId))?.worktreeKept ?? null).toBeNull();
+    for (const hidden of ["merged", "off"] as const) {
+      await settings.updateExperimental({ worktreeCleanup: hidden });
+      expect((await executionWorkspaceService(db).getCloseReadiness(unpushed.workspaceId))?.worktreeKept ?? null).toBeNull();
+    }
   });
 
-  it("removes an unpushed worktree in restore point mode, saving a restore point first", async () => {
+  it("everything, with restore points, removes an unpushed worktree after saving a restore point", async () => {
     vi.stubEnv("PAPERCLIP_SECRETS_MASTER_KEY", "31".repeat(32));
     const f = await fixture();
     await f.commitUnpushed();
-    const worker = executionWorkspaceService(db, { resolveGitExpiration: settingDriven({ mode: "restore_points" }) });
+    const worker = executionWorkspaceService(db, { resolveWorktreeCleanup: settingDriven({ saved: level("restore_points", { worktreeRestorePointAfterDays: 1 }) }) });
     expect((await worker.sweepTerminalWorkspaces()).archived).toBe(1);
     expect(await exists(f.cwd)).toBe(false);
     expect((await f.row()).metadata?.gitCacheRestoration).toMatchObject({ restorePoint: expect.any(Object) });
   });
 
-  it("leaves upstream's ordinary reaper alone: with cleanup off it still removes a merged, clean worktree", async () => {
-    // Not the setting's business: the terminal workspace reaper archives a worktree whose branch is
-    // merged into its base and clean, a day after its task tree closes, as upstream always has.
-    const f = await fixture();
-    const worker = executionWorkspaceService(db, { resolveGitExpiration: settingDriven({ mode: "off" }) });
+  it("the wait and compaction settings take effect on the next pass, without a restart", async () => {
+    // Each fixture's task closed two days ago.
+    const merged = await fixture();
+    const pushed = await fixture({ providerType: "git_worktree" });
+    await pushed.commitPushed();
+    await addBuildOutput(pushed.cwd);
+    const state: { saved: SavedWorktreeCleanup | null } = {
+      saved: level("strict", { worktreeCleanupWaitDays: 3, worktreeCleanupRemoveBuildOutput: false }),
+    };
+    const worker = executionWorkspaceService(db, { resolveWorktreeCleanup: settingDriven(state) });
     await worker.sweepTerminalWorkspaces();
-    expect(await exists(f.cwd)).toBe(false);
-    expect((await f.row()).metadata?.gitCacheRestoration).toBeUndefined();
+    expect(await exists(merged.cwd)).toBe(true);
+    expect(await exists(pushed.cwd)).toBe(true);
+    expect(await exists(nodeModules(pushed.cwd))).toBe(true);
+    // Compaction on, still inside the 3-day wait: build output goes, the worktrees stay.
+    state.saved = level("strict", { worktreeCleanupWaitDays: 3, worktreeCleanupRemoveBuildOutput: true });
+    await worker.sweepTerminalWorkspaces();
+    expect(await exists(nodeModules(pushed.cwd))).toBe(false);
+    expect(await exists(merged.cwd)).toBe(true);
+    expect(await exists(pushed.cwd)).toBe(true);
+    // A 1-day wait: the archive and strict expiration (which follows the wait) both run.
+    state.saved = level("strict", { worktreeCleanupWaitDays: 1 });
+    await worker.sweepTerminalWorkspaces();
+    expect(await exists(merged.cwd)).toBe(false);
+    expect(await exists(pushed.cwd)).toBe(false);
+  });
+
+  it("never saved, it keeps the environment's rules: the archive and compaction run as upstream's do", async () => {
+    const merged = await fixture();
+    const pushed = await fixture({ providerType: "git_worktree" });
+    await pushed.commitPushed();
+    await addBuildOutput(pushed.cwd);
+    const worker = executionWorkspaceService(db, { resolveWorktreeCleanup: settingDriven({ saved: null }) });
+    await worker.sweepTerminalWorkspaces();
+    expect(await exists(merged.cwd)).toBe(false);
+    expect(await exists(nodeModules(pushed.cwd))).toBe(false);
+    // Expiration stays off unless PAPERCLIP_GIT_CACHE_EXPIRATION_ENABLED says otherwise.
+    expect(await exists(pushed.cwd)).toBe(true);
+    expect((await pushed.row()).metadata?.gitCacheRestoration).toBeUndefined();
+  });
+
+  it("never saved with expiration enabled in the environment, it keeps the environment's dry run", async () => {
+    const f = await fixture();
+    await f.commitPushed();
+    const worker = executionWorkspaceService(db, {
+      resolveWorktreeCleanup: settingDriven({ saved: null }, { gitCacheExpirationEnabled: true, gitCacheExpirationDryRun: true }),
+    });
+    await worker.sweepTerminalWorkspaces();
+    expect(await exists(f.cwd)).toBe(true);
+    expect((await f.row()).metadata?.[WORKTREE_KEPT_METADATA_KEY]).toBeUndefined();
   });
 
   it("falls back to the static options when no resolver is given (upstream's env wiring)", async () => {

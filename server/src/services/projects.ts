@@ -425,11 +425,14 @@ async function attachWorkspaces(
       ...(workspaceProvider ? { workspaceProvider } : {}),
       // Step 4b part 3: the policy new tasks follow, with the worktree default applied as the
       // heartbeat applies it. Whether a local folder is a git repository is checked at run time.
-      effectiveExecutionWorkspacePolicy: applyDefaultIsolatedExecutionWorkspacePolicy({
-        projectPolicy: workspaceProvider?.effectivePolicy ?? parseProjectExecutionWorkspacePolicy(row.executionWorkspacePolicy),
-        defaultIsolatedWorkspacesEnabled: true,
-        hasProjectWorkspace: workspaces.some(workspace => Boolean(workspace.cwd?.trim() || workspace.repoUrl?.trim())),
-      }),
+      // Project reads only: the issue detail's embedded project (no provider catalog) leaves it out.
+      ...(providerCatalog ? {
+        effectiveExecutionWorkspacePolicy: applyDefaultIsolatedExecutionWorkspacePolicy({
+          projectPolicy: workspaceProvider?.effectivePolicy ?? parseProjectExecutionWorkspacePolicy(row.executionWorkspacePolicy),
+          defaultIsolatedWorkspacesEnabled: true,
+          hasProjectWorkspace: workspaces.some(workspace => Boolean(workspace.cwd?.trim() || workspace.repoUrl?.trim())),
+        }),
+      } : {}),
     };
   });
 }

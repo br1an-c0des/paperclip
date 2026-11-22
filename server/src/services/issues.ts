@@ -183,7 +183,6 @@ import {
 } from "./successful-run-handoff-state.js";
 import {
   defaultIssueExecutionWorkspaceSettingsForProject,
-  gateProjectExecutionWorkspacePolicy,
   issueExecutionWorkspaceModeForPersistedWorkspace,
   isUnrunnableWorktreeCombo,
   parseIssueExecutionWorkspaceSettings,
@@ -10655,14 +10654,6 @@ export function issueService(db: Db) {
       // A prompt prefix is not a task identity: distinct requests can share it.
       const deduplicateByTitle = allowDuplicate === false && !titleNeedsGeneration;
       issueData.title = resolvedTitle;
-      const isolatedWorkspacesEnabled = (
-        await instanceSettings.getExperimental()
-      ).enableIsolatedWorkspaces;
-      if (!isolatedWorkspacesEnabled) {
-        delete issueData.executionWorkspaceId;
-        delete issueData.executionWorkspacePreference;
-        delete issueData.executionWorkspaceSettings;
-      }
       if (data.assigneeAgentId && data.assigneeUserId) {
         throw unprocessable("Issue can only have one assignee");
       }
@@ -10986,10 +10977,7 @@ export function issueService(db: Db) {
         ) {
           executionWorkspaceSettings =
             defaultIssueExecutionWorkspaceSettingsForProject(
-              gateProjectExecutionWorkspacePolicy(
-                await loadProjectPolicyOnce(),
-                isolatedWorkspacesEnabled,
-              ),
+              await loadProjectPolicyOnce(),
             ) as Record<string, unknown> | null;
         }
         if (!executionWorkspaceId && !projectWorkspaceId && issueData.projectId && workspaceIntent?.selection.kind !== "task_directory") {
@@ -11011,7 +10999,7 @@ export function issueService(db: Db) {
           projectWorkspaceId = await resolveProjectDefaultWorkspaceId(tx, {
             companyId, projectId: issueData.projectId, policy: projectPolicy,
           });
-          if (projectWorkspaceId && isolatedWorkspacesEnabled) {
+          if (projectWorkspaceId) {
             const sourceStrategy = await executionWorkspaceService(db).resolveSourceWorkspaceStrategy({ companyId,
               assigneeAgentId: issueData.assigneeAgentId, assigneeAdapterOverrides: issueData.assigneeAdapterOverrides,
               executionWorkspaceSettings, executionWorkspacePolicy: projectPolicy, sourceWorkspaceId: projectWorkspaceId,
@@ -11045,10 +11033,7 @@ export function issueService(db: Db) {
             tx,
           );
         }
-        if (
-          isolatedWorkspacesEnabled &&
-          issueData.executionWorkspaceSettings !== undefined
-        ) {
+        if (issueData.executionWorkspaceSettings !== undefined) {
           assertExplicitPinnedWorktreeIssueRunnable({
             projectId: issueData.projectId ?? null,
             projectWorkspaceId,
@@ -11337,9 +11322,6 @@ export function issueService(db: Db) {
       actorCompanyId?: string | null,
     ): Promise<void> => {
       if (rows.length === 0) return;
-      const isolatedWorkspacesEnabled = (
-        await instanceSettings.getExperimental()
-      ).enableIsolatedWorkspaces;
       await db.transaction(async (tx) => {
         await tx.select({ id: companies.id }).from(companies).where(eq(companies.id, companyId)).for("no key update");
         const newIssueIds = new Set(rows.map(row => row.id));
@@ -11409,10 +11391,7 @@ export function issueService(db: Db) {
           });
           const defaultExecutionWorkspaceSettings =
             defaultIssueExecutionWorkspaceSettingsForProject(
-              gateProjectExecutionWorkspacePolicy(
-                policy,
-                isolatedWorkspacesEnabled,
-              ),
+              policy,
             ) as Record<string, unknown> | null;
           const derived = {
             goalId: projectRow?.goalId ?? null,
@@ -11456,11 +11435,7 @@ export function issueService(db: Db) {
 
           const projectId = row.projectId ?? null;
           let projectWorkspaceId = row.projectWorkspaceId ?? null;
-          // Isolated-workspace fields are gated the same way create() gates them:
-          // when the experiment is off the imported settings are dropped.
-          let executionWorkspaceSettings = isolatedWorkspacesEnabled
-            ? (row.executionWorkspaceSettings ?? null)
-            : null;
+          let executionWorkspaceSettings = row.executionWorkspaceSettings ?? null;
           let projectGoalId: string | null = null;
           if (projectId) {
             const derived = await loadProjectDerived(projectId);
@@ -11811,9 +11786,6 @@ export function issueService(db: Db) {
           );
         }
       }
-      const isolatedWorkspacesEnabled = (
-        await instanceSettings.getExperimental()
-      ).enableIsolatedWorkspaces;
       if (options.bindRuntimeSharedWorkspace) {
         const workspaceId = issueData.executionWorkspaceId ?? existing.executionWorkspaceId;
         if (!workspaceId) {
@@ -11833,14 +11805,6 @@ export function issueService(db: Db) {
         ) {
           throw unprocessable("Runtime workspace binding requires an existing shared workspace");
         }
-      }
-      // Warm sandbox continuity is runtime bookkeeping, independent of the
-      // opt-in UI for creating isolated worktrees. Public updates still obey
-      // the feature gate; only the internal shared-workspace binding bypasses it.
-      if (!isolatedWorkspacesEnabled && !options.bindRuntimeSharedWorkspace) {
-        delete issueData.executionWorkspaceId;
-        delete issueData.executionWorkspacePreference;
-        delete issueData.executionWorkspaceSettings;
       }
 
       if (issueData.status) {
@@ -11984,10 +11948,7 @@ export function issueService(db: Db) {
       }
       if (nextProjectWorkspaceId) await assertValidProjectWorkspace(existing.companyId, null, nextProjectWorkspaceId);
       if (nextExecutionWorkspaceId) await assertValidExecutionWorkspace(existing.companyId, null, nextExecutionWorkspaceId);
-      if (
-        isolatedWorkspacesEnabled &&
-        issueData.executionWorkspaceSettings !== undefined
-      ) {
+      if (issueData.executionWorkspaceSettings !== undefined) {
         assertExplicitPinnedWorktreeIssueRunnable({
           projectId: nextProjectId ?? null,
           projectWorkspaceId: nextProjectWorkspaceId ?? null,

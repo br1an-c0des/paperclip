@@ -939,6 +939,7 @@ export type {
   BackupRetentionPolicy,
   WorktreeCleanupMode,
   WorktreeCleanupStatus,
+  WorktreeCleanupValues,
   Agent,
   AgentAccessState,
   AgentChainOfCommandEntry,
@@ -1835,6 +1836,7 @@ export {
   DEFAULT_BACKUP_RETENTION,
   PAPERCLIP_CLOUD_MANAGED_BY,
   WORKTREE_CLEANUP_MODES,
+  WORKTREE_CLEANUP_DEFAULTS,
 } from "./types/instance.js";
 
 export type {

@@ -81,7 +81,7 @@ import {
   createHeartbeatScheduling,
   formatIssueIdentifierLink,
 } from "./heartbeat/scheduling.js";
-import { canApplyTaskWorkspaceSelectionAtAdmission, taskWorkspaceRuntimeSelectionEnabled } from "./execution-workspace-policy.js";
+import { canApplyTaskWorkspaceSelectionAtAdmission } from "./execution-workspace-policy.js";
 import { taskCheckoutSupportsWorktrees } from "./worktree-default.js";
 import { agentExecutionStopBlocker } from "./agent-execution-stop.js";
 import {
@@ -510,7 +510,6 @@ import {
   applyDefaultIsolatedExecutionWorkspacePolicy,
   buildExecutionWorkspaceAdapterConfig,
   parseIssueAssigneeAdapterOverrides,
-  gateProjectExecutionWorkspacePolicy,
   parseIssueExecutionWorkspaceSettings,
   resolveExecutionWorkspaceMode,
   selectEnvironmentExecutionWorkspaceSettings,
@@ -2487,14 +2486,10 @@ export function heartbeatService(
           : null;
       const experimentalInstanceSettings =
         await timePreparation("instance_settings", () => instanceSettings.getExperimental());
-      const isolatedWorkspacesEnabled =
-        experimentalInstanceSettings.enableIsolatedWorkspaces;
-      // Both switches are always on (step 4b part 3). The worktree default
-      // needs a git checkout: a project folder that isn't a git repository
-      // keeps sharing it.
+      // Per-task worktrees are always available and the default (step 4b
+      // part 3). The default needs a git checkout: a project folder that
+      // isn't a git repository keeps sharing it.
       const defaultIsolatedWorkspacesEnabled =
-        isolatedWorkspacesEnabled &&
-        experimentalInstanceSettings.enableIsolatedWorkspacesByDefault &&
         await taskCheckoutSupportsWorktrees(db, { companyId: agent.companyId,
           projectId: issueContext ? issueContext.projectId : readNonEmptyString(context.projectId),
           projectWorkspaceId: issueContext?.projectWorkspaceId });
@@ -2683,16 +2678,14 @@ export function heartbeatService(
         : sourcelessProjectWorkspacePolicy(workspacePolicyContext?.executionWorkspacePolicy);
       const projectExecutionWorkspacePolicy =
         applyDefaultIsolatedExecutionWorkspacePolicy({
-          projectPolicy: gateProjectExecutionWorkspacePolicy(
-            parsedProjectExecutionWorkspacePolicy,
-            isolatedWorkspacesEnabled || Boolean(parsedProjectExecutionWorkspacePolicy?.storageProviderPluginId),
-          ),
+          projectPolicy: parsedProjectExecutionWorkspacePolicy,
           defaultIsolatedWorkspacesEnabled,
           // Projects without workspace configuration get a plain managed
           // directory. The operator default cannot turn it into a worktree.
           hasProjectWorkspace: workspaceProjectContext?.hasWorkspace ?? false,
         });
-      const runtimeWorkspaceSelectionEnabled = !externalProvider && (freshWorkspace?.mode === "fresh_isolated_workspace" || taskWorkspaceRuntimeSelectionEnabled({ legacyUiEnabled: isolatedWorkspacesEnabled || Boolean(projectExecutionWorkspacePolicy?.storageProviderPluginId), hasTypedSelection: Boolean(taskWorkspaceIntentRow?.intent), hasBinding: Boolean(issueContext?.executionWorkspaceId) }));
+      // A task's workspace selection always applies now (step 4b part 3), except on an external provider.
+      const runtimeWorkspaceSelectionEnabled = !externalProvider;
       const parsedIssueExecutionWorkspaceSettings =
         parseIssueExecutionWorkspaceSettings(
           issueContext?.executionWorkspaceSettings,

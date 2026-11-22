@@ -7,7 +7,6 @@ import {
   applyDefaultIsolatedExecutionWorkspacePolicy,
   buildExecutionWorkspaceAdapterConfig,
   defaultIssueExecutionWorkspaceSettingsForProject,
-  gateProjectExecutionWorkspacePolicy,
   isUnrunnableWorktreeCombo,
   issueExecutionWorkspaceModeForPersistedWorkspace,
   parseIssueExecutionWorkspaceSettings,
@@ -650,20 +649,7 @@ describe("execution workspace policy helpers", () => {
     expect(issueExecutionWorkspaceModeForPersistedWorkspace(undefined)).toBe("agent_default");
   });
 
-  it("disables project execution workspace policy when the instance flag is off", () => {
-    expect(
-      gateProjectExecutionWorkspacePolicy(
-        { enabled: true, defaultMode: "isolated_workspace" },
-        false,
-      ),
-    ).toBeNull();
-    expect(
-      gateProjectExecutionWorkspacePolicy(
-        { enabled: true, defaultMode: "isolated_workspace" },
-        true,
-      ),
-    ).toEqual({ enabled: true, defaultMode: "isolated_workspace" });
-  });
+  // Step 4b part 3 removed gateProjectExecutionWorkspacePolicy: the instance flag it read is always on.
 });
 
 describe("operator default isolated execution workspaces", () => {

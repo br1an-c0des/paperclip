@@ -334,6 +334,7 @@ describe("instance settings routes", () => {
     const cleanupConfig = (patch: Record<string, unknown> = {}) => ({
       gitCacheExpirationEnabled: false, gitCacheExpirationDryRun: true, gitRestorePointsEnabled: false,
       storageProvider: "local_disk", gitRestorePointTerminalDelayDays: 3, gitRestorePointIdleDays: 7, gitRestorePointRetentionDays: 90,
+      workspaceReaperCooldownDays: 1, workspaceCompactionDelayHours: 1,
       ...patch,
     });
     function cleanupApp(config: Record<string, unknown>) {
@@ -351,10 +352,19 @@ describe("instance settings routes", () => {
       const fallback = await request(cleanupApp(cleanupConfig({ gitCacheExpirationEnabled: true }))).get("/api/instance/settings/worktree-cleanup");
       expect(fallback.status).toBe(200);
       expect(fallback.body).toMatchObject({ saved: null, mode: "strict", source: "environment", dryRun: true,
-        restorePoints: { available: true }, days: { strictDelay: 1, restorePointDelay: 3, idle: 7, retention: 90 } });
+        restorePoints: { available: true }, values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
+        retentionDays: 90 });
+      mockInstanceSettingsService.getExperimental.mockResolvedValue({});
+      const merged = await request(cleanupApp(cleanupConfig())).get("/api/instance/settings/worktree-cleanup");
+      expect(merged.body).toMatchObject({ saved: null, mode: "merged", source: "environment", dryRun: false });
       mockInstanceSettingsService.getExperimental.mockResolvedValue({ worktreeCleanup: "off" });
       const saved = await request(cleanupApp(cleanupConfig({ gitCacheExpirationEnabled: true }))).get("/api/instance/settings/worktree-cleanup");
       expect(saved.body).toMatchObject({ saved: "off", mode: "off", source: "setting", dryRun: false });
+      mockInstanceSettingsService.getExperimental.mockResolvedValue({ worktreeCleanup: "restore_points", worktreeCleanupWaitDays: 2,
+        worktreeCleanupRemoveBuildOutput: false, worktreeRestorePointAfterDays: 4, worktreeRestorePointIdleDays: 0 });
+      const values = await request(cleanupApp(cleanupConfig())).get("/api/instance/settings/worktree-cleanup");
+      expect(values.body).toMatchObject({ saved: "restore_points", mode: "restore_points",
+        values: { waitDays: 2, removeBuildOutput: false, restorePointAfterDays: 4, restorePointIdleDays: 0 } });
     });
 
     it("reports restore points unavailable on S3 without the master key, and refuses to save them", async () => {
@@ -370,6 +380,9 @@ describe("instance settings routes", () => {
       mockInstanceSettingsService.listCompanyIds.mockResolvedValue([]);
       await request(app).patch("/api/instance/settings/experimental").send({ worktreeCleanup: "strict" }).expect(200);
       expect(mockInstanceSettingsService.updateExperimental).toHaveBeenCalledWith({ worktreeCleanup: "strict" });
+      await request(app).patch("/api/instance/settings/experimental").send({ worktreeCleanup: "merged", worktreeCleanupWaitDays: 3 }).expect(200);
+      await request(app).patch("/api/instance/settings/experimental").send({ worktreeCleanupWaitDays: -1 }).expect(400);
+      await request(app).patch("/api/instance/settings/experimental").send({ worktreeCleanup: "bogus" }).expect(400);
       vi.unstubAllEnvs();
     });
   });

@@ -106,6 +106,10 @@ export const instanceExperimentalSettingsSchema = z.object({
   worktreeRunExecutionActivationInstanceId: z.string().min(1).nullable().default(null),
   // Absent = never saved (env fallback); null in a PATCH clears it.
   worktreeCleanup: z.enum(WORKTREE_CLEANUP_MODES).nullable().optional(),
+  worktreeCleanupWaitDays: z.number().int().min(0).max(365).nullable().optional(),
+  worktreeCleanupRemoveBuildOutput: z.boolean().nullable().optional(),
+  worktreeRestorePointAfterDays: z.number().int().min(0).max(365).nullable().optional(),
+  worktreeRestorePointIdleDays: z.number().int().min(0).max(365).nullable().optional(),
 }).strict();
 
 export const patchInstanceExperimentalSettingsSchema = z
