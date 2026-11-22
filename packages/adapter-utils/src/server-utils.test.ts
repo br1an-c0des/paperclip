@@ -28,6 +28,7 @@ import {
   refreshPaperclipWorkspaceEnvForExecution,
   renderPaperclipWakePrompt,
   resolveLegacyPaperclipDesiredSkillNames,
+  resolvePaperclipSkillsDir,
   resolvePaperclipDesiredSkillNames,
   selectPaperclipTaskMarkdown,
   selectInitialCommunicationGuidance,
@@ -4101,6 +4102,29 @@ describe("runtime skill assignment boundaries", () => {
       expect(await readPaperclipRuntimeSkillEntries({ paperclipRuntimeSkills: [] }, root, [root])).toEqual([]);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("bundled skills folder lookup", () => {
+  it("stays inside the workspace when the checkout is nested in another one's .claude/worktrees", async () => {
+    const outer = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-skills-nested-"));
+    try {
+      // The outer checkout's .claude/skills sits five levels above server/src/services.
+      const repo = path.join(outer, ".claude", "worktrees", "agent-1");
+      await fs.mkdir(path.join(outer, ".claude", "skills", "pm"), { recursive: true });
+      await fs.mkdir(path.join(repo, "skills", "paperclip"), { recursive: true });
+      await fs.mkdir(path.join(repo, "server", "src", "services"), { recursive: true });
+      await fs.mkdir(path.join(repo, "packages", "adapters", "x", "src", "server"), { recursive: true });
+      await fs.writeFile(path.join(repo, "pnpm-workspace.yaml"), "packages: []\n");
+
+      const services = path.join(repo, "server", "src", "services");
+      expect(await resolvePaperclipSkillsDir(services, [path.join(repo, "skills")])).toBe(path.join(repo, "skills"));
+      expect(await resolvePaperclipSkillsDir(services)).toBeNull();
+      // An adapter's src/server reaches the repo's skills/ by its own relative candidate.
+      expect(await resolvePaperclipSkillsDir(path.join(repo, "packages", "adapters", "x", "src", "server"))).toBe(path.join(repo, "skills"));
+    } finally {
+      await fs.rm(outer, { recursive: true, force: true });
     }
   });
 });

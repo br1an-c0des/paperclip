@@ -69,6 +69,7 @@ const paperclipRunMcp: AdapterRuntimeMcpAccess = {
   getServers: () => [{ name: "paperclip", url: "http://127.0.0.1:3100/api/mcp/paperclip", token: "runtime-secret-token", connectionId: "paperclip" }],
 };
 let defaultGeminiTestHome: string | undefined;
+let defaultClaudeTestCwd: string | undefined;
 
 async function makeTempRoot() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-acpx-skills-"));
@@ -78,6 +79,7 @@ async function makeTempRoot() {
 
 afterEach(async () => {
   defaultGeminiTestHome = undefined;
+  defaultClaudeTestCwd = undefined;
   // A remote run stages a process-session bridge whose detached event writer can
   // still be flushing a trailing event file into `.../process-sessions/<id>/events`
   // when the run's own best-effort `client.remove(sessionDir)` (which production
@@ -208,6 +210,14 @@ async function runExecutor(
   if (config.agent === "gemini" && !(typeof configuredEnv?.HOME === "string" && configuredEnv.HOME.trim())) {
     defaultGeminiTestHome ??= await makeTempRoot();
     config = { ...config, env: { ...configuredEnv, HOME: defaultGeminiTestHome } };
+  }
+  // Without a cwd the engine falls back to process.cwd(), this package's folder,
+  // and a Claude run (the default agent) writes `<cwd>/.claude/settings.local.json`
+  // there. Give such a test one private cwd, kept across its resumed turns.
+  const workspaceCwd = (options.context?.paperclipWorkspace as Record<string, unknown> | undefined)?.cwd;
+  if (!(typeof config.cwd === "string" && config.cwd.trim()) && !(typeof workspaceCwd === "string" && workspaceCwd.trim())) {
+    defaultClaudeTestCwd ??= await makeTempRoot();
+    config = { ...config, cwd: defaultClaudeTestCwd };
   }
   const runtimeOptions: Record<string, unknown>[] = [];
   const configOptions: Array<{ key: string; value: string }> = [];

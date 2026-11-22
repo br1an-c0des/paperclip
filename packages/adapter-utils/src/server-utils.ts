@@ -3904,14 +3904,40 @@ export async function ensureAbsoluteDirectory(
   }
 }
 
+/** The nearest folder at or above `start` holding a `pnpm-workspace.yaml`, or null. */
+async function findWorkspaceRoot(start: string): Promise<string | null> {
+  let dir = path.resolve(start);
+  for (;;) {
+    const found = await fs
+      .stat(path.join(dir, "pnpm-workspace.yaml"))
+      .then((stats) => stats.isFile())
+      .catch(() => false);
+    if (found) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function isInside(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
 export async function resolvePaperclipSkillsDir(
   moduleDir: string,
   additionalCandidates: string[] = [],
 ): Promise<string | null> {
+  // The relative candidates are fixed depths, written for an adapter package's
+  // `src/server` (five levels below the repo). From a shallower module they
+  // climb out of the checkout, and from a checkout nested in another one's
+  // `.claude/worktrees/` they land on the outer checkout's `.claude/skills`.
+  // Inside a workspace, accept only the candidates that stay in it.
+  const workspaceRoot = await findWorkspaceRoot(moduleDir);
   const candidates = [
     ...PAPERCLIP_SKILL_ROOT_RELATIVE_CANDIDATES.map((relativePath) =>
       path.resolve(moduleDir, relativePath),
-    ),
+    ).filter((candidate) => !workspaceRoot || isInside(workspaceRoot, candidate)),
     ...additionalCandidates.map((candidate) => path.resolve(candidate)),
   ];
   const seenRoots = new Set<string>();
