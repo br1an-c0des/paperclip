@@ -218,6 +218,30 @@ later `COMPANY.md`), sorted out later.
 - **Not in scope:** the sweep's other cleanups (isolated task directories, nested clone
   migration, base expiration) keep their own environment variables, unchanged.
 
+### Revised 2026-11-21: one setting for all of the reaper's worktree rules
+
+Agent I found that the sweep is one rule of upstream's terminal workspace reaper
+(`sweepTerminalWorkspaces`), which also archives merged, clean worktrees a day after their task
+closes (always on) and compacts finished worktrees after an hour (deleting dependencies and build
+output; on by default). The user chose one setting for all three rules on task worktrees:
+
+| Level | Rules |
+| --- | --- |
+| **Off** (default) | None: nothing archives, compacts or expires a task worktree. Close by hand. |
+| **Merged work only** | Archive (merged into base and clean, after the wait) |
+| **Merged or pushed** | Archive + strict expiration |
+| **Everything, with restore points** | Archive + expiration with restore points |
+
+With a level on: "Wait after a task closes" (days, default 1), "Remove dependencies and build
+output from finished worktrees" (default on), and at the restore-point level the save delay (3
+days) and idle delay (7 days). An instance that never saved the setting keeps the environment's
+behaviour. Non-worktree workspaces and project-less task folders keep upstream's rules (the latter
+belong to build plan 3.20). This supersedes the three-value setting above.
+
+The checks that refused when isolated workspaces were off (`email-channels.ts`,
+`chat-github-management.ts`, `low-trust-runtime-containment.ts`) and the other reads of the retired
+switches outside the Runner are removed as dead code; the rest of those gates stays.
+
 ## Testing
 
 - **Part 2:**
