@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { checkoutSupportsWorktrees, clearWorktreeDefaultProbeCache, ensureWorktreeParentExcluded } from "./worktree-default.js";
+import { checkoutSupportsWorktrees, clearWorktreeDefaultProbeCache, ensureWorktreeParentExcluded, isPaperclipManagedExcludeTail } from "./worktree-default.js";
 
 const gitEnv = { ...process.env, GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.test",
   GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.test" };
@@ -71,5 +71,23 @@ describe("ensureWorktreeParentExcluded (step 4b part 3)", () => {
     const before = await exclude(dir);
     expect(await ensureWorktreeParentExcluded(dir, path.join(dir, ".paperclip", "worktrees"))).toBe(false);
     expect(await exclude(dir)).toBe(before);
+  });
+});
+
+describe("isPaperclipManagedExcludeTail", () => {
+  const fixed = ["\n/.paperclip-repositories/\n"];
+  const block = (folder: string) => `# Paperclip task worktrees\n/${folder}/\n`;
+  it("accepts nothing, the fixed block and worktree blocks in either order", () => {
+    expect(isPaperclipManagedExcludeTail("", fixed)).toBe(true);
+    expect(isPaperclipManagedExcludeTail(fixed[0]!, fixed)).toBe(true);
+    expect(isPaperclipManagedExcludeTail(block(".paperclip/worktrees") + fixed[0], fixed)).toBe(true);
+    expect(isPaperclipManagedExcludeTail(fixed[0] + block("a") + block("b"), fixed)).toBe(true);
+  });
+  it("rejects custom lines, duplicates and blank lines", () => {
+    expect(isPaperclipManagedExcludeTail("private-output/\n", fixed)).toBe(false);
+    expect(isPaperclipManagedExcludeTail(fixed[0]! + fixed[0], fixed)).toBe(false);
+    expect(isPaperclipManagedExcludeTail(block("a") + block("a"), fixed)).toBe(false);
+    expect(isPaperclipManagedExcludeTail(block("a") + "\n", fixed)).toBe(false);
+    expect(isPaperclipManagedExcludeTail("# Paperclip task worktrees\nnot-a-folder\n", fixed)).toBe(false);
   });
 });

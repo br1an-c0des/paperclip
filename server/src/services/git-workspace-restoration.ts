@@ -254,7 +254,7 @@ export async function assertReproducibleBaseGitStorage(cwd: string, signal?: Abo
       // folder) are regenerated when a worktree is next created, so they don't make a base custom.
       const managedExclude = file === "info/exclude" && template
         && actual.subarray(0, template.length).equals(template)
-        && isPaperclipManagedExcludeTail(actual.subarray(template.length).toString("utf8"), [`/${PROJECT_REPOSITORIES_DIR}/`]);
+        && isPaperclipManagedExcludeTail(actual.subarray(template.length).toString("utf8"), [`\n/${PROJECT_REPOSITORIES_DIR}/\n`]);
       if (!template?.equals(actual) && !managedExclude) throw new Error("custom_git_metadata");
     }
   }

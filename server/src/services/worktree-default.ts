@@ -83,20 +83,28 @@ function excludePattern(relative: string) {
 const WORKTREE_EXCLUDE_COMMENT = "# Paperclip task worktrees";
 
 /**
- * Whether the lines Paperclip appended to a stock `.git/info/exclude` are only its own: the given
- * fixed lines (such as `/.paperclip-repositories/`) and task worktree folder entries, each the
- * line after the comment `ensureWorktreeParentExcluded` writes. Git workspace expiration uses it to
- * tell a reproducible base from one with custom metadata.
+ * Whether what follows a stock `.git/info/exclude` is exactly what Paperclip appended to it: the
+ * given fixed blocks, byte for byte and each at most once (such as `\n/.paperclip-repositories/\n`),
+ * and the task worktree blocks `ensureWorktreeParentExcluded` writes, each folder at most once.
+ * Anything else, a duplicate or a blank line included, is custom. Git workspace expiration uses it
+ * to tell a reproducible base from one with custom metadata.
  */
-export function isPaperclipManagedExcludeTail(tail: string, fixedLines: readonly string[]): boolean {
-  const lines = tail.split(/\r?\n/).filter((line) => line.length > 0);
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]!;
-    if (fixedLines.includes(line)) continue;
-    if (line !== WORKTREE_EXCLUDE_COMMENT) return false;
-    const pattern = lines[index + 1];
-    if (!pattern || !pattern.startsWith("/") || !pattern.endsWith("/")) return false;
-    index += 1;
+export function isPaperclipManagedExcludeTail(tail: string, fixedBlocks: readonly string[]): boolean {
+  const usedFixed = new Set<string>();
+  const usedFolders = new Set<string>();
+  const worktreeBlock = new RegExp(`^${WORKTREE_EXCLUDE_COMMENT}\\n(/[^\\n]+/)\\n`);
+  let rest = tail;
+  while (rest.length > 0) {
+    const fixed = fixedBlocks.find((block) => !usedFixed.has(block) && rest.startsWith(block));
+    if (fixed) {
+      usedFixed.add(fixed);
+      rest = rest.slice(fixed.length);
+      continue;
+    }
+    const match = worktreeBlock.exec(rest);
+    if (!match || usedFolders.has(match[1]!)) return false;
+    usedFolders.add(match[1]!);
+    rest = rest.slice(match[0].length);
   }
   return true;
 }
