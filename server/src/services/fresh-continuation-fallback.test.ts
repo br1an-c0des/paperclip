@@ -799,7 +799,12 @@ suite("fresh-continuation fallback", () => {
   it("does not mistake a recycled PID for the old writer", async () => {
     const f = await unfinishedRun({ runtime: "legacy", errorCode: "process_lost" });
     // The PID is alive now, but it belongs to a process that started after the old one was recorded.
-    await db.update(heartbeatRuns).set({ ...(await liveIdentity()), processStartedAt: new Date("2020-01-01T00:00:00Z") })
+    // The recorded start is 60.5 s before the live one's, never a whole number of seconds: on Linux a
+    // whole-second gap may be one process seen across a clock change, so it proves nothing
+    // (`ProcessStartClock`). A fixed time such as 2020-01-01T00:00:00Z made this test fail whenever
+    // the worker's own start fell on a whole second, 1 time in 100 (bug 68).
+    const live = await liveIdentity();
+    await db.update(heartbeatRuns).set({ ...live, processStartedAt: new Date(live.processStartedAt.getTime() - 60_500) })
       .where(eq(heartbeatRuns.id, f.runId));
     expect(await ensureFreshContinuation(db, { companyId, runId: f.runId, trigger: "recovery_refused" }))
       .toMatchObject({ kind: "continued" });
