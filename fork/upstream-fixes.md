@@ -102,7 +102,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 65 | [Tag the running image as previous before Compose builds the new one](#65-tag-the-running-image-as-previous-before-compose-builds-the-new-one) | fixed (`49b1c703d`) | | | 2026-11-20 | | |
 | 66 | [Let the database decide a lease that looks expired on the server's clock](#66-let-the-database-decide-a-lease-that-looks-expired-on-the-servers-clock) | fixed (`c67fff236`) | | | 2026-11-20 | | |
 | 67 | [Make `agent-commentary-skills` pass in a worktree under `.claude/`](#67-make-agent-commentary-skills-pass-in-a-worktree-under-claude) | candidate | | | 2026-11-20 | | |
-| 68 | [Steady `fresh-continuation-fallback`'s recycled-PID test](#68-steady-fresh-continuation-fallbacks-recycled-pid-test) | candidate | | | 2026-11-20 | | |
+| 68 | [Steady `fresh-continuation-fallback`'s recycled-PID test](#68-steady-fresh-continuation-fallbacks-recycled-pid-test) | fixed (`1577048c2f`, `657f0d91fb`) | | | 2026-11-20 | | |
 | 69 | [Bring the opt-in hiring and portability tests up to step 4a's access levels](#69-bring-the-opt-in-hiring-and-portability-tests-up-to-step-4as-access-levels) | candidate | | | 2026-11-20 | | |
 | 70 | [Find the bundled skills folder from a nested worktree](#70-find-the-bundled-skills-folder-from-a-nested-worktree) | candidate | | | 2026-11-21 | | |
 | 71 | [Fix the opt-in chat and email channel failures on `main`](#71-fix-the-opt-in-chat-and-email-channel-failures-on-main) | candidate | | | 2026-11-21 | | |
@@ -1202,9 +1202,16 @@ Found 2026-11-20 in CI on `feat/step-4b` (run 44797032206, shard 5).
   re-run. Twice now, both times in shard 5: under the green-push guide's rule it gets fixed next.
   A third time 2026-11-22 on `ci/hook-lock-and-quick-names` (run 45048605767, shard 4, the new
   shard weights having moved the file), on a branch without the fix; the failed job was re-run.
-- **Likely fix:** find what the test races against (the recorded start time versus the probe), and
-  make it deterministic.
-- **Fork workaround:** re-run the failed CI job.
+- **Fixed** (`1577048c2f`, merged as `875621d3f8`), test only. The test gave the worker's live PID a
+  recorded start of `2020-01-01T00:00:00Z`. On Linux a gap of a whole number of seconds between two
+  starts counts as possibly the same process seen across a clock change (`ProcessStartClock`,
+  fail closed), and Linux reports starts in hundredths of a second, so the test failed whenever the
+  worker's own start fell on a whole second: about 1 time in 100. A child process with a `.000`
+  start reproduced CI's `previous_process_running` every time. The recorded start is now 60.5 s
+  before the observed one; the file passed 20 of 20 at 2 workers. Not a leak, and not a race.
+- **Same flaw, also fixed** (`657f0d91fb`): `workspace-runtime-control-recovery.test.ts`
+  (`reusedPidOwner`); a `.000`-start owner gave `reconciled: 0`. A search of the other tests that
+  pair `process.pid` with a fixed start found none that need fixing.
 
 ### 69. Bring the opt-in hiring and portability tests up to step 4a's access levels
 
