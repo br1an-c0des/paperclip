@@ -103,6 +103,12 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 66 | [Let the database decide a lease that looks expired on the server's clock](#66-let-the-database-decide-a-lease-that-looks-expired-on-the-servers-clock) | fixed (`c67fff236`) | | | 2026-11-20 | | |
 | 67 | [Make `agent-commentary-skills` pass in a worktree under `.claude/`](#67-make-agent-commentary-skills-pass-in-a-worktree-under-claude) | candidate | | | 2026-11-20 | | |
 | 68 | [Steady `fresh-continuation-fallback`'s recycled-PID test](#68-steady-fresh-continuation-fallbacks-recycled-pid-test) | candidate | | | 2026-11-20 | | |
+| 69 | [Bring the opt-in hiring and portability tests up to step 4a's access levels](#69-bring-the-opt-in-hiring-and-portability-tests-up-to-step-4as-access-levels) | candidate | | | 2026-11-21 | | |
+| 70 | [Find the bundled skills folder from a nested worktree](#70-find-the-bundled-skills-folder-from-a-nested-worktree) | candidate | | | 2026-11-21 | | |
+| 71 | [Fix the opt-in chat and email channel failures on `main`](#71-fix-the-opt-in-chat-and-email-channel-failures-on-main) | candidate | | | 2026-11-21 | | |
+| 72 | [Steady the server tests that fail only under a full local run's load](#72-steady-the-server-tests-that-fail-only-under-a-full-local-runs-load) | candidate | | | 2026-11-21 | | |
+| 73 | [Share the worktree folder and base-ref rules between a run and its preview](#73-share-the-worktree-folder-and-base-ref-rules-between-a-run-and-its-preview) | candidate | | | 2026-11-21 | | |
+| 74 | [Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal](#74-loosen-controller-instance-leases-wall-clock-bound-on-a-blocked-renewal) | candidate | | | 2026-11-21 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1245,3 +1251,25 @@ Found 2026-11-21 by step 4b part 2's and part 3's agents G and I, in local `test
   `legacy-finalization-regression.test.ts` (a 30 s timeout). Related to bugs 62 and 68.
 - **Likely fix:** look for a shared cause (the embedded database's connection limit, or a slow
   machine) before steadying each test.
+
+### 73. Share the worktree folder and base-ref rules between a run and its preview
+
+Found 2026-11-21 by step 4b part 2's agent G, while making the run preview match a worktree run.
+
+- **Problem:** `server/src/services/run-preview-worktree.ts` copies three rules from
+  `workspace-runtime.ts` (`resolveGitOwnerRepoRoot`, the worktree folder rule and
+  `resolveAuthoritativeBaseRef`, minus fetches), because they aren't exported. If the run's rules
+  change and the copy doesn't, the "What runs get" card stops matching real runs, and nothing fails.
+- **Likely fix:** export no-fetch versions from `workspace-runtime.ts`, use them in both places, and
+  delete the copy. Also noted in the preview code: a symlinked skill folder in the base commit isn't
+  followed, and a managed AI connection's project-auth check still reads the main checkout.
+
+### 74. Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal
+
+Found 2026-11-21 by step 4b part 2's agent G.
+
+- **Problem:** `controller-instance-lease.test.ts`, "has the server cancel a renewal blocked on a row
+  lock…", took about 10.1 s against its 9.5 s limit on the desktop, including when run alone. It
+  failed in agent I's quick run too. The file imports nothing step 4b changed. Related to bug 72.
+- **Likely fix:** check it on `main` first; if it fails there too, measure what the renewal waits
+  on and set the bound from that rather than from the wall clock.
