@@ -119,10 +119,26 @@ async function listTree(root: string): Promise<string[]> {
   return out.sort();
 }
 
-async function tempHomes(): Promise<string[]> {
-  return (await readdir(tmpdir()).catch(() => [] as string[]))
-    .filter((name) => name.startsWith("paperclip-claude-home-") || name.startsWith("paperclip-ai-"))
-    .sort();
+/**
+ * Runs `fn` with the system temp folder pointed at a fresh folder of its own, and returns what `fn`
+ * left there. A run makes its temporary `HOME` (`paperclip-claude-home-*`) and a managed
+ * connection's credential home (`paperclip-ai-*`) under `os.tmpdir()`, which reads `TMPDIR` on
+ * each call. The shared temp folder is no use for this: `scripts/test.mjs` gives every file and
+ * worker of a test run the same one, and other files create and remove their own `paperclip-ai-*`
+ * folders there meanwhile (bug 79).
+ */
+async function inPrivateTmpdir<T>(parent: string, fn: () => Promise<T>): Promise<{ result: T; left: string[] }> {
+  const dir = await mkdtemp(path.join(parent, "tmpdir-"));
+  const previous = process.env.TMPDIR;
+  process.env.TMPDIR = dir;
+  try {
+    expect(tmpdir()).toBe(dir);
+    const result = await fn();
+    return { result, left: await listTree(dir) };
+  } finally {
+    if (previous === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previous;
+  }
 }
 
 describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent's runs get", () => {
@@ -359,11 +375,11 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     // The repo too, `.git` included: no worktree, no `.paperclip` folder, no exclude line.
     const repoBefore = await listTree(seeded.repo!);
     const excludeBefore = await readFile(path.join(seeded.repo!, ".git", "info", "exclude"), "utf8").catch(() => null);
-    const homesBefore = await tempHomes();
     const tokensBefore = { ...minted };
     const [{ xmax: xmaxBefore }] = (await db.execute(sql`select pg_snapshot_xmax(pg_current_snapshot())::text as xmax`)) as unknown as Array<{ xmax: string }>;
 
-    const previewed = await preview(seeded);
+    // Nothing in the temp folder either: no temporary HOME, no credential home.
+    const { result: previewed, left: tempLeft } = await inPrivateTmpdir(root, () => preview(seeded));
     expect(previewed.supported).toBe(true);
     if (previewed.supported) {
       expect(previewed.project?.checkout).toMatchObject({ kind: "local", worktree: { baseRef: "main" } });
@@ -378,7 +394,7 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     expect(await listTree(seeded.repo!)).toEqual(repoBefore);
     expect(repoBefore).not.toContain(".paperclip");
     expect(await readFile(path.join(seeded.repo!, ".git", "info", "exclude"), "utf8").catch(() => null)).toBe(excludeBefore);
-    expect(await tempHomes()).toEqual(homesBefore);
+    expect(tempLeft).toEqual([]);
     expect(minted).toEqual(tokensBefore);
 
     // The check itself sees a write.
