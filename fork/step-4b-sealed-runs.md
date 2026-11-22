@@ -6,7 +6,8 @@ Approved 2026-11-18; updated 2026-11-19 for 4a and 3a, both merged into `main`
 [hard-fork plan step 4](hard-fork-plan.md#4-make-runs-claude-native), following
 [decision 8](hard-fork-plan.md#decisions) (sealed runs). This document designs **part 1**: the
 switch to the CLI engine together with a sealed launch. Part 2 and later are listed at the end, not
-designed here. The run is traced in [claude-local-run.md](claude-local-run.md); its "Tested
+designed here: parts 2 and 3 in [step-4b-parts-2-3.md](step-4b-parts-2-3.md); part 4 moved to step 6
+on 2026-11-22 ([notes](live-sessions-on-the-cli.md)). The run is traced in [claude-local-run.md](claude-local-run.md); its "Tested
 2026-11-18" section has the CLI tests this design relies on.
 
 ## Why
@@ -482,7 +483,8 @@ Parts 2 and 3 are designed in [step-4b-parts-2-3.md](step-4b-parts-2-3.md) (2026
   carry over between tasks.
 - **The recovery handoff's content** and **server-side structured live events**
   ([claude-local-run.md §10](claude-local-run.md#10-change-points-for-steps-4-and-5)).
-- **Part 4, live sessions on the CLI** (planned 2026-11-18, decision 9). This is what ACP offers,
+- **Part 4, live sessions on the CLI** (planned 2026-11-18, decision 9; evaluated and **moved to
+  step 6** on 2026-11-22, [notes](live-sessions-on-the-cli.md)). This is what ACP offers,
   built on the CLI. None of it is tested in this repo yet:
   - follow-up messages into a running session (`--input-format stream-json`), which step 6's chat
     needs;

@@ -3,7 +3,8 @@
 **Status: built and merged into `main` 2026-11-22** (`97902f72ae`; designed 2026-11-21, part 3's cleanup revised the same day). Real run checked 2026-11-22 on the desktop's dev instance: see [the result](#real-run-check-2026-11-22). Hard-fork step 4b, after part 1 (sealed runs,
 [step-4b-sealed-runs.md](step-4b-sealed-runs.md), merged into `main` 2026-11-21). Part 2 shows
 on an agent's page what its runs will get, before any run. Part 3 makes per-task git worktrees the
-default. Part 4 (live sessions on the CLI) gets its own design later.
+default. Part 4 (live sessions on the CLI) was evaluated on 2026-11-22 and moved to step 6
+([notes](live-sessions-on-the-cli.md)), so these are the last parts of 4b.
 
 ## Why
 
@@ -31,7 +32,8 @@ default. Part 4 (live sessions on the CLI) gets its own design later.
 
 ## Non-goals
 
-- Part 4 (follow-up messages, permission prompts, streamed text).
+- Part 4 (follow-up messages, permission prompts, streamed text), since moved to step 6
+  ([notes](live-sessions-on-the-cli.md)).
 - The recovery handoff's content and server-side live events: fresh sessions already get the
   handoff packet, and nothing would use server-side events yet. They return when step 5 or 6 needs
   them.
