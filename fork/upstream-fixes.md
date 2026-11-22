@@ -109,6 +109,8 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 72 | [Steady the server tests that fail only under a full local run's load](#72-steady-the-server-tests-that-fail-only-under-a-full-local-runs-load) | candidate | | | 2026-11-21 | | |
 | 73 | [Share the worktree folder and base-ref rules between a run and its preview](#73-share-the-worktree-folder-and-base-ref-rules-between-a-run-and-its-preview) | candidate | | | 2026-11-21 | | |
 | 74 | [Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal](#74-loosen-controller-instance-leases-wall-clock-bound-on-a-blocked-renewal) | candidate | | | 2026-11-21 | | |
+| 75 | [Stop redacting the run manifest's credential row](#75-stop-redacting-the-run-manifests-credential-row) | candidate | | | 2026-11-22 | | |
+| 76 | [Record and preview a run's full environment key list](#76-record-and-preview-a-runs-full-environment-key-list) | candidate | | | 2026-11-22 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1273,3 +1275,27 @@ Found 2026-11-21 by step 4b part 2's agent G.
   failed in agent I's quick run too. The file imports nothing step 4b changed. Related to bug 72.
 - **Likely fix:** check it on `main` first; if it fails there too, measure what the renewal waits
   on and set the bound from that rather than from the wall clock.
+
+### 75. Stop redacting the run manifest's credential row
+
+Found 2026-11-22 in step 4b parts 2 and 3's real-run check (TES-42, run `0d7025ac`).
+
+- **Problem:** a sealed CLI run records its manifest on the `adapter.invoke` event, and the event
+  redaction (`server/src/redaction.ts`, `SECRET_FIELD_NAME_PATTERN`) masks any payload key named
+  `credential`. The manifest's `credential` holds no secret (kind, method, connection id and name),
+  but it's stored as `"***REDACTED***"`, so the run view's Credential row reads "Unknown method"
+  (`credentialText` in `ui-new/src/runs/run-manifest.ts`). The agent's "What runs get" card, read
+  from the preview route, shows it correctly. Since step 4b part 1.
+- **Likely fix:** exempt `runManifest.credential` from key-name redaction (the value-pattern
+  redaction still applies), or rename the field; add a test that the recorded manifest keeps it.
+
+### 76. Record and preview a run's full environment key list
+
+Found 2026-11-22 in the same real-run check.
+
+- **Problem:** the run's recorded `envKeys` is cut off after about 30 names (`{"_truncated": true,
+  "omittedItems": 22}` in the event payload). The launch also adds about 30 keys after planning
+  (telemetry, git config, the GitHub broker, Runner network roots, the agent's signing keys), which
+  the preview's `envKeys` doesn't list. Neither UI shows `envKeys` today, so nothing reads wrong yet.
+- **Likely fix:** record the key names without the payload truncation (they're short), and either
+  plan the launch-time keys in `planSealedClaudeRun` or mark the preview's list as "planned keys".
