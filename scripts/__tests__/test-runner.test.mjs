@@ -22,6 +22,7 @@ import {
   parseShardWeights,
   removeRunRoot,
   runPhases,
+  genericNames,
   selectChangedTests,
   shardCoverageProblems,
 } from "../test.mjs";
@@ -472,6 +473,39 @@ test("selectChangedTests: changed tests, name matches, direct importers and smal
 
   // The .test.ts suffix isn't part of the name: a change to scripts/test.mjs selects nothing here.
   assert.deepEqual(selectChangedTests(["scripts/test.mjs"], testFiles, read).files, []);
+});
+
+test("selectChangedTests: a generic basename (test, index, config…) doesn't select by name", () => {
+  const testFiles = [
+    "packages/db/src/test-postgres-admin.test.ts",
+    "packages/db/src/test-postgres-owner.test.ts",
+    "packages/db/src/test-embedded-postgres.test.ts",
+    "packages/adapters/claude-local/src/server/test.probe.test.ts",
+    "bar/index-cache.test.ts",
+    "bar/config-store.test.ts",
+    "foo/__tests__/foo.test.ts",
+    "baz/imports-foo.test.ts",
+  ];
+  const sources = { "baz/imports-foo.test.ts": 'import { foo } from "../foo";' };
+  const read = (file) => sources[file] ?? "";
+  for (const name of ["test", "index", "types", "utils", "config", "schema", "server", "client", "api", "run"]) {
+    assert.ok(genericNames.has(name), `${name} should be generic`);
+  }
+
+  // scripts/test.mjs: basename "test", which every test-postgres-* file contains.
+  assert.deepEqual(selectChangedTests(["scripts/test.mjs"], testFiles, read).files, []);
+
+  // foo/index.ts: not bar/index-cache by name, but still its importer and its small directory.
+  assert.deepEqual(selectChangedTests(["foo/index.ts"], testFiles, read).files, ["baz/imports-foo.test.ts", "foo/__tests__/foo.test.ts"]);
+
+  // An adapter's server/test.ts still selects the tests beside it, by the directory rule.
+  assert.deepEqual(selectChangedTests(["packages/adapters/claude-local/src/server/test.ts"], testFiles, read).files,
+    ["packages/adapters/claude-local/src/server/test.probe.test.ts"]);
+  // Without that rule (a big directory), nothing.
+  assert.deepEqual(selectChangedTests(["packages/adapters/claude-local/src/server/test.ts"], testFiles, read, { maxDirectoryFiles: 0 }).files, []);
+
+  // A specific name that contains a generic one still matches.
+  assert.deepEqual(selectChangedTests(["lib/config-store.ts"], testFiles, read).files, ["bar/config-store.test.ts"]);
 });
 
 test("selectChangedTests: the always files join any change that isn't only Markdown", () => {

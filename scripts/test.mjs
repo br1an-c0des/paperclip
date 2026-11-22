@@ -427,6 +427,19 @@ export function exitCodeFor(results) {
 
 const importPattern = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\bvi\.(?:mock|doMock|importActual)\s*(?:<[^>]*>)?\(\s*|\brequire\(\s*)["'`]([^"'`]+)["'`]/g;
 
+/**
+ * Basenames that say what a file does, not what it's about, so a test whose name contains one
+ * isn't related to a given file of that name: the name rule skips them (the import and directory
+ * rules still apply). Measured against the 4,548 test files in the tree on 2026-11-22, a change to
+ * a file of each name selected by name alone: run 586, server 75, test 71, config 71, cli 67 (it's
+ * in "client"), app 63, api 37, setup 29, client 27, index 16, schema 16, main 8, types 5,
+ * utils/util 5, constants and helpers 0 (on the list so they never start to).
+ */
+export const genericNames = new Set([
+  "api", "app", "cli", "client", "config", "constants", "helpers", "index", "main", "run", "schema",
+  "server", "setup", "test", "types", "util", "utils",
+]);
+
 function withoutExtension(file) {
   return file.replace(/\.(?:[cm]?[jt]sx?)$/, "").replace(/\/index$/, "");
 }
@@ -434,7 +447,8 @@ function withoutExtension(file) {
 /**
  * quick: the test files a change touches. For each changed file:
  * - a changed test file selects itself;
- * - a changed source file selects the test files whose name contains its basename, the test files
+ * - a changed source file selects the test files whose name contains its basename (unless the
+ *   basename is one of the generic `genericNames`, such as index or test), the test files
  *   that import it (or mock it) by a relative path, and, when its directory holds at most
  *   `maxDirectoryFiles` test files (its own and its __tests__ folder's), those too.
  * And the `always` files (test-tiers.json's alwaysQuick), whenever a changed file isn't Markdown:
@@ -470,9 +484,12 @@ export function selectChangedTests(changedFiles, testFiles, readSource, { maxDir
     const dir = path.posix.dirname(changed);
     const base = path.posix.basename(changed).replace(sourceExtensions, "");
     const target = withoutExtension(changed);
-    for (const file of testFiles) {
-      // Match the name without its .test.ts suffix, so a change to test.mjs doesn't select every test.
-      if (path.posix.basename(file).replace(/\.(?:test|spec)\.[cm]?[jt]sx?$/, "").includes(base)) selected.add(file);
+    // Match the name without its .test.ts suffix, so a change to test.mjs doesn't select every test,
+    // and not at all for a generic name such as index or test.
+    if (!genericNames.has(base)) {
+      for (const file of testFiles) {
+        if (path.posix.basename(file).replace(/\.(?:test|spec)\.[cm]?[jt]sx?$/, "").includes(base)) selected.add(file);
+      }
     }
     for (const [file, specifiers] of imports()) {
       if (specifiers.has(target)) selected.add(file);
