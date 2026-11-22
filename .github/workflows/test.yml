@@ -72,14 +72,11 @@ jobs:
       - name: Typecheck
         run: corepack pnpm typecheck
 
-      # The runner's own tests (node --test), including a dry run that checks the shards cover
-      # the tier.
-      - name: Test runner tests
+      # The scripts' own tests (node --test, listed in package.json's test:runner): the test
+      # runner (with a dry run that checks the shards cover the tier), the pre-push hook, the run
+      # summary, the flake report and the shard-weight refresh.
+      - name: Script tests
         run: corepack pnpm test:runner
-
-      # The script behind the thorough job's run summary, on trimmed reports from real runs.
-      - name: Run summary script tests
-        run: node --test scripts/__tests__/summarize-reports.test.mjs
 
   # ui-new on its own runner, so its tests and build aren't on the typecheck job's critical path.
   # Its typecheck stays in `corepack pnpm typecheck` above. Each check after setup runs even when
