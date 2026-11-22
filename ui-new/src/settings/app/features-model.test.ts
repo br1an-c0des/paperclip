@@ -10,9 +10,13 @@ import {
   featureRowState,
   linkedNote,
   visibleFeatureGroups,
+  parseCleanupDays,
+  WORKTREE_CLEANUP_VALUE_INFO,
   worktreeCleanupInfo,
   worktreeCleanupNote,
   worktreeCleanupOptions,
+  worktreeCleanupPatch,
+  worktreeCleanupValuesShown,
   type FeatureContext,
 } from "./features-model";
 import type { WorktreeCleanupStatus } from "@paperclipai/shared";
@@ -132,11 +136,12 @@ describe("visibleFeatureGroups", () => {
 describe("worktree cleanup (step 4b part 3)", () => {
   const status = (patch: Partial<WorktreeCleanupStatus> = {}): WorktreeCleanupStatus => ({
     saved: null,
-    mode: "off",
+    mode: "merged",
     source: "environment",
     dryRun: false,
     restorePoints: { available: true, reason: null },
-    days: { strictDelay: 1, restorePointDelay: 3, idle: 7, retention: 90 },
+    values: { waitDays: 1, removeBuildOutput: true, restorePointAfterDays: 3, restorePointIdleDays: 7 },
+    retentionDays: 90,
     ...patch,
   });
 
@@ -149,11 +154,12 @@ describe("worktree cleanup (step 4b part 3)", () => {
     expect(visibleFeatureGroups(new Set(["instance.experimental.worktreeCleanup"])).find((group) => group.title === "Tasks and workspaces")?.worktreeCleanup).toBeUndefined();
   });
 
-  it("offers its three values, restore points unavailable without their prerequisites", () => {
-    expect(worktreeCleanupOptions(status()).map((option) => [option.value, option.disabled])).toEqual([
-      ["off", false],
-      ["strict", false],
-      ["restore_points", false],
+  it("offers its four levels, restore points unavailable without their prerequisites", () => {
+    expect(worktreeCleanupOptions(status()).map((option) => [option.value, option.label, option.disabled])).toEqual([
+      ["off", "Off", false],
+      ["merged", "Merged work only", false],
+      ["strict", "Merged or pushed", false],
+      ["restore_points", "Everything, with restore points", false],
     ]);
     const unavailable = status({ restorePoints: { available: false, reason: "File storage is S3 and PAPERCLIP_SECRETS_MASTER_KEY isn't set." } });
     const restore = worktreeCleanupOptions(unavailable).find((option) => option.value === "restore_points")!;
@@ -163,16 +169,41 @@ describe("worktree cleanup (step 4b part 3)", () => {
   });
 
   it("says when the environment variables decide, and a dry run", () => {
-    expect(worktreeCleanupNote(status())).toBeNull();
-    expect(worktreeCleanupNote(status({ mode: "strict", dryRun: true }))).toMatch(/environment variables, as a dry run/);
-    expect(worktreeCleanupNote(status({ saved: "strict", mode: "strict", source: "setting" }))).toBeNull();
+    expect(worktreeCleanupNote(status())).toMatch(/environment variables decide\. Choosing/);
+    expect(worktreeCleanupNote(status({ mode: "strict", dryRun: true }))).toMatch(/dry run/);
+    expect(worktreeCleanupNote(status({ saved: "off", mode: "off", source: "setting" }))).toBeNull();
   });
 
-  it("puts what each mode does, with the day counts in force, behind the info icon", () => {
-    const info = worktreeCleanupInfo(status({ days: { strictDelay: 1, restorePointDelay: 5, idle: 0, retention: 30 } }));
-    expect(info).toMatch(/1 day after/);
-    expect(info).toMatch(/5 days after/);
+  it("puts what each level does behind the info icon", () => {
+    const info = worktreeCleanupInfo(status({ retentionDays: 30 }));
+    expect(info).toMatch(/Off: nothing/);
+    expect(info).toMatch(/Merged work only: archives/);
+    expect(info).toMatch(/Merged or pushed: also removes/);
     expect(info).toMatch(/kept 30 days/);
-    expect(info).not.toMatch(/open task/);
+    expect(WORKTREE_CLEANUP_VALUE_INFO.waitDays).toMatch(/Default 1 day\./);
+    expect(WORKTREE_CLEANUP_VALUE_INFO.restorePointIdleDays).toMatch(/0 never/);
+  });
+
+  it("shows the values only when not off, and the restore point days only at that level", () => {
+    expect(worktreeCleanupValuesShown("off")).toEqual({ general: false, restorePoints: false });
+    expect(worktreeCleanupValuesShown(undefined)).toEqual({ general: false, restorePoints: false });
+    expect(worktreeCleanupValuesShown("merged")).toEqual({ general: true, restorePoints: false });
+    expect(worktreeCleanupValuesShown("restore_points")).toEqual({ general: true, restorePoints: true });
+  });
+
+  it("reads day counts from 0 to 365", () => {
+    expect(parseCleanupDays(" 3 ")).toBe(3);
+    expect(parseCleanupDays("0")).toBe(0);
+    expect(parseCleanupDays("365")).toBe(365);
+    for (const bad of ["", "-1", "1.5", "366", "abc"]) expect(parseCleanupDays(bad)).toBeNull();
+  });
+
+  it("saves the level, and a value with the level in force while the environment still decides", () => {
+    expect(worktreeCleanupPatch(status(), { mode: "off" })).toEqual({ worktreeCleanup: "off" });
+    expect(worktreeCleanupPatch(status(), { waitDays: 2 })).toEqual({ worktreeCleanup: "merged", worktreeCleanupWaitDays: 2 });
+    expect(worktreeCleanupPatch(status({ saved: "strict", mode: "strict", source: "setting" }), { removeBuildOutput: false }))
+      .toEqual({ worktreeCleanupRemoveBuildOutput: false });
+    expect(worktreeCleanupPatch(status({ saved: "restore_points", mode: "restore_points", source: "setting" }), { restorePointAfterDays: 5, restorePointIdleDays: 0 }))
+      .toEqual({ worktreeRestorePointAfterDays: 5, worktreeRestorePointIdleDays: 0 });
   });
 });

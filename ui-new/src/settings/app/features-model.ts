@@ -4,10 +4,11 @@ import type {
   PatchInstanceExperimentalSettings,
   WorktreeCleanupMode,
   WorktreeCleanupStatus,
+  WorktreeCleanupValues,
 } from "@paperclipai/shared";
 
 // Kept in step with WORKTREE_CLEANUP_MODES in @paperclipai/shared (imported as a type only here).
-const WORKTREE_CLEANUP_MODES: readonly WorktreeCleanupMode[] = ["off", "strict", "restore_points"];
+const WORKTREE_CLEANUP_MODES: readonly WorktreeCleanupMode[] = ["off", "merged", "strict", "restore_points"];
 
 /*
  * App settings → General → Features (decision 32): plain switches for the experimental flags the
@@ -279,17 +280,28 @@ export function visibleFeatureGroups(hidden: ReadonlySet<string>): FeatureGroup[
 // ---------------------------------------------------------------------------------------------
 // Cleaning up finished worktrees (step 4b part 3)
 //
-// Upstream's git workspace expiration sweep, behind `experimental.worktreeCleanup`: off by
-// default, or one of its two modes. `GET /instance/settings/worktree-cleanup` says what's in force:
-// never saved, the sweep follows the environment variables an operator set. It saves with the same
-// PATCH as the switches; the server refuses restore points when they can't work here.
+// One setting, `experimental.worktreeCleanup`, for everything the server's workspace reaper does to
+// finished tasks' worktrees: archive merged work, remove dependencies and build output, and expire
+// worktrees the remote (or a restore point) can rebuild. Off once chosen. `GET
+// /instance/settings/worktree-cleanup` says what's in force: never saved, the reaper follows the
+// server's environment variables. Saves with the same PATCH as the switches; the server refuses
+// restore points when they can't work here.
 
 export const WORKTREE_CLEANUP_HIDDEN_KEY = "instance.experimental.worktreeCleanup";
 
 export const WORKTREE_CLEANUP_LABELS: Record<WorktreeCleanupMode, string> = {
   off: "Off",
-  strict: "Only when everything is pushed",
-  restore_points: "Save a restore point, then remove",
+  merged: "Merged work only",
+  strict: "Merged or pushed",
+  restore_points: "Everything, with restore points",
+};
+
+// Kept in step with WORKTREE_CLEANUP_DEFAULTS in @paperclipai/shared.
+export const WORKTREE_CLEANUP_DEFAULT_VALUES: WorktreeCleanupValues = {
+  waitDays: 1,
+  removeBuildOutput: true,
+  restorePointAfterDays: 3,
+  restorePointIdleDays: 7,
 };
 
 export type WorktreeCleanupOption = { value: WorktreeCleanupMode; label: string; disabled: boolean };
@@ -305,24 +317,74 @@ export function worktreeCleanupOptions(status: WorktreeCleanupStatus | undefined
 
 const days = (count: number) => `${count} day${count === 1 ? "" : "s"}`;
 
-/** What each mode does, with the day counts in force, for the row's "i" tip. */
+/** What each level does, for the row's "i" tip. */
 export function worktreeCleanupInfo(status: WorktreeCleanupStatus | undefined): string {
-  const d = status?.days;
-  const strict = `Only when everything is pushed: removes a finished task's worktree ${d ? days(d.strictDelay) : "a day"} after its task tree closes, when the remote can rebuild it exactly. Unpushed or uncommitted work keeps it.`;
-  const idle = d && d.idle > 0 ? ` An open task's worktree goes after ${days(d.idle)} with nothing happening.` : "";
-  const restore = `Save a restore point, then remove: also removes worktrees with unpushed or uncommitted work, ${d ? days(d.restorePointDelay) : "3 days"} after the task tree closes, saving an encrypted restore point to file storage first${d ? `, kept ${days(d.retention)}` : ""}.${idle} A later run or a comment on the task brings it back.`;
-  return `Whether Paperclip removes finished tasks' worktrees. Off keeps them. ${strict} ${restore} Either way a worktree with a live run is never touched. The day counts are environment variables (PAPERCLIP_GIT_RESTORE_POINT_TERMINAL_DELAY_DAYS, _IDLE_DAYS, _RETENTION_DAYS).`;
+  const retention = status ? `, kept ${days(status.retentionDays)}` : "";
+  return [
+    "What Paperclip does with a task's worktree once the task is finished.",
+    "Off: nothing; finished worktrees stay until you close them from the Workspaces page.",
+    "Merged work only: archives a worktree once its work is merged into the base branch and nothing is left uncommitted.",
+    "Merged or pushed: also removes one the remote can rebuild exactly, because everything in it is pushed.",
+    `Everything, with restore points: also removes worktrees with unpushed or uncommitted work, after saving an encrypted restore point to file storage${retention}; a later run or a comment on the task brings it back.`,
+    "A worktree with a live run is never touched, and other workspaces keep the server's own rules.",
+  ].join(" ");
 }
 
-/** The state line under the choice: the environment fallback, a dry run, or why restore points can't be picked. */
+/** The "i" tips of the values shown below the level, with their defaults. */
+export const WORKTREE_CLEANUP_VALUE_INFO = {
+  waitDays: `How long after a task and its subtasks close before its worktree is archived or removed, so reopening it in that time finds it as it was. Default ${days(WORKTREE_CLEANUP_DEFAULT_VALUES.waitDays)}.`,
+  removeBuildOutput: "Removes installed dependencies, build output and tool caches from a finished task's worktree about an hour after it closes. Its source files, branch and commits stay, and the next run regenerates what was removed. Default on.",
+  restorePointAfterDays: `How long after the task closes before its restore point is saved and the worktree removed. Default ${days(WORKTREE_CLEANUP_DEFAULT_VALUES.restorePointAfterDays)}.`,
+  restorePointIdleDays: `Also removes the worktree of a task that's still open once nothing has happened on it for this long, after saving a restore point. 0 never does. Default ${days(WORKTREE_CLEANUP_DEFAULT_VALUES.restorePointIdleDays)}.`,
+} as const;
+
+/** The state line under the level: the environment fallback, a dry run, or why restore points can't be picked. */
 export function worktreeCleanupNote(status: WorktreeCleanupStatus | undefined): string | null {
   if (!status) return null;
   const notes: string[] = [];
-  if (status.source === "environment" && status.mode !== "off") {
-    notes.push(`Set by the server's environment variables${status.dryRun ? ", as a dry run: nothing is removed yet" : ""}. Choosing here replaces them.`);
+  if (status.source === "environment") {
+    notes.push(`Not chosen yet: the server's environment variables decide${status.dryRun ? ", and expiration runs as a dry run" : ""}. Choosing here replaces them.`);
   }
   if (!status.restorePoints.available && status.restorePoints.reason) notes.push(`Restore points are unavailable: ${status.restorePoints.reason}`);
   return notes.length ? notes.join(" ") : null;
+}
+
+/** Whether the wait and compaction values show (not at Off), and the restore point days (at that level only). */
+export function worktreeCleanupValuesShown(mode: WorktreeCleanupMode | undefined) {
+  return { general: !!mode && mode !== "off", restorePoints: mode === "restore_points" };
+}
+
+/** A day count typed into one of the value inputs: a whole number from 0 to 365, else null. */
+export function parseCleanupDays(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  return value <= 365 ? value : null;
+}
+
+const VALUE_KEYS = {
+  waitDays: "worktreeCleanupWaitDays",
+  removeBuildOutput: "worktreeCleanupRemoveBuildOutput",
+  restorePointAfterDays: "worktreeRestorePointAfterDays",
+  restorePointIdleDays: "worktreeRestorePointIdleDays",
+} as const satisfies Record<keyof WorktreeCleanupValues, keyof PatchInstanceExperimentalSettings>;
+
+/**
+ * The PATCH for a new level or value. A value changed while the environment still decides saves the
+ * level in force with it, since saved values only apply once a level is saved.
+ */
+export function worktreeCleanupPatch(
+  status: WorktreeCleanupStatus | undefined,
+  change: { mode?: WorktreeCleanupMode } & Partial<WorktreeCleanupValues>,
+): PatchInstanceExperimentalSettings {
+  const patch: Record<string, unknown> = {};
+  const { mode, ...values } = change;
+  if (mode) patch.worktreeCleanup = mode;
+  else if (status?.source === "environment") patch.worktreeCleanup = status.mode;
+  for (const [key, value] of Object.entries(values) as [keyof WorktreeCleanupValues, number | boolean | undefined][]) {
+    if (value !== undefined) patch[VALUE_KEYS[key]] = value;
+  }
+  return patch as PatchInstanceExperimentalSettings;
 }
 
 export type FeatureRowState = {

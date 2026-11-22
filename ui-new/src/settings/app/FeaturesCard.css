@@ -69,3 +69,26 @@
     max-width: 180px;
   }
 }
+
+/* The cleanup values under the level: indented, a short day count with its unit. */
+.ft-subrow {
+  padding-left: 36px;
+}
+
+.ft-days {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ft-days-input {
+  width: 72px;
+}
+
+@media (max-width: 640px) {
+  .ft-subrow {
+    padding-left: 28px;
+  }
+}
