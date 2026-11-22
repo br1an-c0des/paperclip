@@ -1,0 +1,18 @@
+#!/bin/sh
+# Runs the fork's pre-push checks (scripts/pre-push.mjs: workspace typecheck, then test:quick on
+# the pushed range). Install with `corepack pnpm hooks:install`; bypass with `git push --no-verify`
+# or PAPERCLIP_SKIP_PREPUSH=1. git passes the remote's name and url as arguments and the pushed
+# refs on stdin; both go straight through.
+# Next to this file when it runs from .githooks; else (copied into .git/hooks) from the top of the
+# working tree, where git runs hooks.
+script="$(dirname "$0")/../scripts/pre-push.mjs"
+[ -f "$script" ] || script="scripts/pre-push.mjs"
+case "$PAPERCLIP_SKIP_PREPUSH" in
+  1|true) echo "[pre-push] PAPERCLIP_SKIP_PREPUSH is set: skipping the pre-push checks." >&2; exit 0 ;;
+esac
+if ! command -v node >/dev/null 2>&1; then
+  echo "[pre-push] node isn't on PATH, so the checks can't run." >&2
+  echo "[pre-push] To push anyway: git push --no-verify, or PAPERCLIP_SKIP_PREPUSH=1 git push." >&2
+  exit 1
+fi
+exec node "$script" "$@"
