@@ -9,8 +9,9 @@
 # and this is a separate workflow. It doesn't run on pushes or pull requests.
 #
 # GitHub runs `schedule` only from the default branch (`main`), and turns scheduled workflows off
-# in a public repository after 60 days without activity. `workflow_dispatch` runs it by hand, on
-# any branch.
+# in a public repository after 60 days without activity. A manual run (`workflow_dispatch`) is
+# offered only once this file is on the default branch; from then on it can run against any
+# branch: `gh workflow run optin-weekly.yml -R br1an-c0des/paperclip --ref <branch>`.
 #
 # Setup steps are test.yml's, with the same pinned actions; keep the two in step.
 name: Opt-in tier (weekly)
