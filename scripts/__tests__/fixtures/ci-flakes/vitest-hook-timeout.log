@@ -1,0 +1,8 @@
+2026-11-19T16:33:39.1453768Z [31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+2026-11-19T16:33:39.1454380Z 
+2026-11-19T16:33:39.1457336Z [41m[1m FAIL [22m[49m [30m[42m @paperclipai/server (shared) [49m[39m src/__tests__/heartbeat-worktree-suppression.test.ts[2m > [22mheartbeat worktree suppression[2m > [22msuppresses new assignment wakes in worktree instances without creating heartbeat runs
+2026-11-19T16:33:39.1460904Z [31m[1mError[22m: Hook timed out in 30000ms.
+2026-11-19T16:33:39.1462200Z If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".[39m
+2026-11-19T16:33:39.1464334Z [36m [2m❯[22m src/__tests__/heartbeat-worktree-suppression.test.ts:[2m75:3[22m[39m
+2026-11-19T16:33:39.1540679Z     [90m 73|[39m   }, 20_000);
+2026-11-19T16:34:40.7161051Z ##[error]Process completed with exit code 1.

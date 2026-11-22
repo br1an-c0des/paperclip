@@ -1,0 +1,10 @@
+2026-11-20T18:37:46.3895770Z packages/plugins/plugin-workspace-diff typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /home/runner/work/paperclip/paperclip/packages/plugins/sdk
+2026-11-20T18:37:46.3902513Z packages/plugins/plugin-workspace-diff typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+2026-11-20T18:37:50.3967613Z .../paperclip-plugin-fake-sandbox typecheck: Done
+2026-11-20T18:37:50.9078696Z ##[error]packages/plugins/plugin-llm-wiki typecheck: tests/plugin.spec.ts(520,3): error TS2739: Type '{ id: string; companyId: string; urlKey: string; goalId: null; goalIds: never[]; goals: never[]; name: string; description: string; status: "in_progress"; leadAgentId: null; targetDate: null; color: string; icon: null; env: null; pauseReason: null; pausedAt: null; executionWorkspacePolicy: null; ... 6 more ...; upda...' is missing the following properties from type 'Project': agentsReadClaudeMd, agentsUseRepoSkills
+2026-11-20T18:37:51.0004873Z packages/plugins/plugin-llm-wiki typecheck: Failed
+2026-11-20T18:37:51.0034915Z /home/runner/work/paperclip/paperclip/packages/plugins/plugin-llm-wiki:
+2026-11-20T18:37:51.0038759Z  ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @paperclipai/plugin-llm-wiki@0.1.0 typecheck: `pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit`
+2026-11-20T18:37:51.0040571Z Exit status 1
+2026-11-20T18:37:51.0495576Z  ELIFECYCLE  Command failed with exit code 1.
+2026-11-20T18:37:51.1214173Z ##[error]Process completed with exit code 1.
