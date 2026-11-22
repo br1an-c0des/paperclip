@@ -37,6 +37,20 @@ describe("checkoutSupportsWorktrees (step 4b part 3)", () => {
     expect(await checkoutSupportsWorktrees({ cwd: null, repoUrl: null })).toBe(false);
     expect(await checkoutSupportsWorktrees(null)).toBe(false);
   });
+
+  it("keeps a git repository with no commit yet shared (git worktree add needs a HEAD commit)", async () => {
+    const empty = path.join(root, "probe-no-commit");
+    await fs.mkdir(empty, { recursive: true });
+    git(empty, "init", "--initial-branch=main");
+    expect(await checkoutSupportsWorktrees({ cwd: empty })).toBe(false);
+    // A subfolder of it too, and once it has a commit (after the probe cache is cleared) it qualifies.
+    await fs.mkdir(path.join(empty, "sub"));
+    expect(await checkoutSupportsWorktrees({ cwd: path.join(empty, "sub") })).toBe(false);
+    await fs.writeFile(path.join(empty, "README.md"), "x\n");
+    git(empty, "add", "."); git(empty, "commit", "-m", "first");
+    clearWorktreeDefaultProbeCache();
+    expect(await checkoutSupportsWorktrees({ cwd: empty })).toBe(true);
+  });
 });
 
 describe("ensureWorktreeParentExcluded (step 4b part 3)", () => {

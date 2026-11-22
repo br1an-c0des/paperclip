@@ -28,8 +28,9 @@ export function clearWorktreeDefaultProbeCache() {
 
 /**
  * Whether a project checkout can give tasks their own worktree: a repository URL (Paperclip clones
- * it), or a local folder inside a git work tree. A folder that isn't a git repository keeps sharing
- * the checkout, as it did before worktrees were the default.
+ * it), or a local folder inside a git work tree whose HEAD is a commit (`git worktree add` needs
+ * one). A folder that isn't a git repository, or a repository with no commit yet, keeps sharing the
+ * checkout, as it did before worktrees were the default.
  */
 export async function checkoutSupportsWorktrees(source: { cwd?: string | null; repoUrl?: string | null } | null | undefined): Promise<boolean> {
   if (!source) return false;
@@ -38,8 +39,10 @@ export async function checkoutSupportsWorktrees(source: { cwd?: string | null; r
   if (!cwd) return false;
   const cached = probeCache.get(cwd);
   if (cached && Date.now() - cached.at < PROBE_TTL_MS) return cached.value;
-  const value = await execFile("git", ["-C", cwd, "rev-parse", "--is-inside-work-tree"], { timeout: 10_000, env: GIT_ENV })
-    .then((result) => result.stdout.trim() === "true")
+  const git = (...args: string[]) => execFile("git", ["-C", cwd, ...args], { timeout: 10_000, env: GIT_ENV });
+  const value = await git("rev-parse", "--is-inside-work-tree")
+    .then(async (result) => result.stdout.trim() === "true"
+      && Boolean((await git("rev-parse", "--verify", "--quiet", "HEAD^{commit}")).stdout.trim()))
     .catch(() => false);
   if (probeCache.size >= 512) probeCache.delete(probeCache.keys().next().value!);
   probeCache.set(cwd, { value, at: Date.now() });
