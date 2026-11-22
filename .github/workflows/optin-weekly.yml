@@ -1,0 +1,104 @@
+# The opt-in test tier, once a week: the files `scripts/test-tiers.json` keeps out of the push run
+# (dormant halves, the Paperclip Runner, other adapters, the CLI, plugins, chat channels).
+#
+# It's for seeing the drift, not for gating anything. Nothing else runs these files, so they fall
+# behind the core a little with every change (bug 69 in fork/upstream-fixes.md), and failures here
+# are expected. Read a red run as a list of what has drifted, and fix what you're about to wake up.
+#
+# It never blocks a deploy: `deploy/deploy.sh` reads only the `Test` workflow's runs (test.yml),
+# and this is a separate workflow. It doesn't run on pushes or pull requests.
+#
+# GitHub runs `schedule` only from the default branch (`main`), and turns scheduled workflows off
+# in a public repository after 60 days without activity. `workflow_dispatch` runs it by hand, on
+# any branch.
+#
+# Setup steps are test.yml's, with the same pinned actions; keep the two in step.
+name: Opt-in tier (weekly)
+
+on:
+  schedule:
+    # Mondays, 04:17 UTC (off the hour, when GitHub's scheduler is busiest).
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+# The repo is public and the jobs need nothing but a read of the code: no secrets are used.
+permissions:
+  contents: read
+
+# Its own group, so it never cancels or waits on a `Test` run. A newer run of this workflow on the
+# same ref (say, a dispatch during the scheduled one) replaces the older.
+concurrency:
+  group: optin-weekly-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_UPDATE_NOTIFIER: "false"
+
+jobs:
+  optin:
+    name: Opt-in tier, shard ${{ matrix.shard }}/${{ matrix.count }}
+    runs-on: ubuntu-latest
+    # Longer than test.yml's 45: the tier's weights are rougher (a third of its files have no
+    # recorded time) and it holds the slowest files (chat-channels' integration suite).
+    timeout-minutes: 60
+    strategy:
+      # Every shard runs to the end, so one run shows every failing file.
+      fail-fast: false
+      matrix:
+        # 10 shards of ~133 files and ~17.8 expected worker-minutes each
+        # (`node scripts/test.mjs --dry-run --tier optin --shard 1/10 --workers 2`).
+        # To change the shard count, change `count` and list 1..count in `shard`.
+        count: [10]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Enable corepack (pnpm from package.json's packageManager)
+        run: corepack enable && corepack pnpm --version
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build the plugin SDK
+        run: corepack pnpm --filter @paperclipai/plugin-sdk build
+
+      # No Vitest module cache here: a weekly run would find its own entries evicted (GitHub drops
+      # entries unused for 7 days), and saving one per shard would crowd test.yml's out.
+
+      # Workers default to the machine: half of the runner's 4 cores, so 2 (scripts/test.mjs).
+      - name: Run shard ${{ matrix.shard }} of the opt-in tier
+        run: node scripts/test.mjs --tier optin --shard ${{ matrix.shard }}/${{ matrix.count }} --report-dir test-reports
+
+      # Each phase's Vitest JSON report: the failures, and per-file durations to rebalance the shards.
+      - name: Upload the test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: optin-reports-shard-${{ matrix.shard }}-of-${{ matrix.count }}
+          path: test-reports/
+          if-no-files-found: ignore
+          # Long enough to compare a run with the few weeks before it.
+          retention-days: 30
