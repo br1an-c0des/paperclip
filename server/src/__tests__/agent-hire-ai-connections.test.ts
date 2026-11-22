@@ -69,7 +69,10 @@ async function fixture(provider: "anthropic" | "openai", method: "api_key" | "su
   await db.insert(companies).values({ id: companyId, name: "Hiring connection test", issuePrefix: `H${companyId.slice(0, 7)}`, defaultResponsibleUserId: userId });
   await db.insert(companyMemberships).values({ companyId, principalType: "user", principalId: userId, membershipRole: "owner", status: "active" });
   await db.insert(principalPermissionGrants).values({ companyId, principalType: "user", principalId: userId, permissionKey: "agents:create" });
-  await db.insert(agents).values({ id: agentId, companyId, name: "Manager", role: "ceo", adapterType, runtimeConfig: { aiConnection: binding } });
+  // Since step 4a an agent's hiring comes from its access level, not the grants below: a new CEO
+  // starts at manager with the agents:create override (newAgentAccess), as this one does.
+  await db.insert(agents).values({ id: agentId, companyId, name: "Manager", role: "ceo", adapterType, runtimeConfig: { aiConnection: binding },
+    permissions: { access: { level: "manager", overrides: { "agents:create": true } } } });
   await accessService(db).ensureMembership(companyId, "agent", agentId, "member", "active");
   await db.insert(principalPermissionGrants).values(["tools:manage_profiles", "agents:configure"].map(permissionKey => ({ companyId, principalType: "agent" as const, principalId: agentId, permissionKey })));
   const [run] = await db.insert(heartbeatRuns).values({ companyId, agentId, status: "running", responsibleUserId: userId }).returning();
