@@ -10,8 +10,10 @@ import {
   assignShards,
   buildPlan,
   buildShards,
+  checkTiers,
   defaultWorkerCount,
   exitCodeFor,
+  loadTiers,
   maxDefaultWorkers,
   parseArgs,
   parseExpectedSeconds,
@@ -391,6 +393,58 @@ test("selectChangedTests: changed tests, name matches, direct importers and smal
 
   // The .test.ts suffix isn't part of the name: a change to scripts/test.mjs selects nothing here.
   assert.deepEqual(selectChangedTests(["scripts/test.mjs"], testFiles, read).files, []);
+});
+
+test("selectChangedTests: the always files join any change that isn't only Markdown", () => {
+  const testFiles = [
+    "server/src/routes/issues.test.ts",
+    "server/src/__tests__/openapi-routes.test.ts",
+    "server/src/__tests__/golden.test.ts",
+  ];
+  const always = ["server/src/__tests__/openapi-routes.test.ts", "server/src/__tests__/golden.test.ts"];
+  const read = () => "";
+
+  // A source change far from the always files still brings them in.
+  assert.deepEqual(selectChangedTests(["packages/shared/src/types/project.ts"], testFiles, read, { always }).files, [
+    "server/src/__tests__/golden.test.ts",
+    "server/src/__tests__/openapi-routes.test.ts",
+  ]);
+
+  // So does a change to a file that is neither a source nor Markdown, such as a migration.
+  assert.deepEqual(
+    selectChangedTests(["packages/db/src/migrations/0493_x.sql"], testFiles, read, { always }).files,
+    ["server/src/__tests__/golden.test.ts", "server/src/__tests__/openapi-routes.test.ts"],
+  );
+
+  // A change to Markdown only, or no change at all, runs nothing.
+  assert.deepEqual(selectChangedTests(["fork/green-push.md", "README.md"], testFiles, read, { always }).files, []);
+  assert.deepEqual(selectChangedTests([], testFiles, read, { always }).files, []);
+});
+
+test("loadTiers reads alwaysQuick, which may be left out, and wants a reason for each file", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "test-tiers-"));
+  const write = (name, value) => {
+    const file = path.join(dir, name);
+    writeFileSync(file, JSON.stringify(value));
+    return file;
+  };
+
+  assert.deepEqual(loadTiers(write("none.json", emptyTiers)).alwaysQuick, []);
+  const entry = { file: "server/src/__tests__/a.test.ts", reason: "checks every route" };
+  assert.deepEqual(loadTiers(write("one.json", { ...emptyTiers, alwaysQuick: [entry] })).alwaysQuick, [entry]);
+  assert.throws(
+    () => loadTiers(write("bad.json", { ...emptyTiers, alwaysQuick: [{ file: "server/src/__tests__/a.test.ts" }] })),
+    /alwaysQuick must be an array of \{ file, reason \}/,
+  );
+});
+
+test("checkTiers refuses an alwaysQuick file that isn't a test file, or that is opt-in", () => {
+  const withAlways = (file) => ({ ...tiers, alwaysQuick: [{ file, reason: "whole-app check" }] });
+  assert.doesNotThrow(() => checkTiers(withAlways("server/src/__tests__/a.test.ts"), inventory));
+  assert.throws(() => checkTiers(withAlways("server/src/__tests__/gone.test.ts"), inventory),
+    /alwaysQuick path is not a test file: server\/src\/__tests__\/gone\.test\.ts/);
+  assert.throws(() => checkTiers(withAlways("server/src/services/native-runtime/n.test.ts"), inventory),
+    /alwaysQuick path is opt-in, so quick would never run it: server\/src\/services\/native-runtime\/n\.test\.ts/);
 });
 
 test("--dry-run lists the thorough phases with file counts and checks coverage", () => {

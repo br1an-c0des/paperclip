@@ -127,6 +127,11 @@ export function loadTiers(file = tiersFile) {
     typeof entry?.glob === "string" && typeof entry?.reason === "string" && entry.reason.trim())) {
     throw new Error(`${file}: optIn must be an array of { glob, reason } with a reason for each.`);
   }
+  tiers.alwaysQuick ??= [];
+  if (!Array.isArray(tiers.alwaysQuick) || !tiers.alwaysQuick.every((entry) =>
+    typeof entry?.file === "string" && typeof entry?.reason === "string" && entry.reason.trim())) {
+    throw new Error(`${file}: alwaysQuick must be an array of { file, reason } with a reason for each.`);
+  }
   return tiers;
 }
 
@@ -397,12 +402,17 @@ function withoutExtension(file) {
  * - a changed source file selects the test files whose name contains its basename, the test files
  *   that import it (or mock it) by a relative path, and, when its directory holds at most
  *   `maxDirectoryFiles` test files (its own and its __tests__ folder's), those too.
+ * And the `always` files (test-tiers.json's alwaysQuick), whenever a changed file isn't Markdown:
+ * whole-app checks such as the OpenAPI route coverage, which no rule above would select.
  * Vitest's own --changed follows the server's module graph, which links nearly everything: a
  * one-line change in server/src/services/ selected ~1,370 files (results-runner.md).
  */
-export function selectChangedTests(changedFiles, testFiles, readSource, { maxDirectoryFiles = quickMaxDirectoryFiles } = {}) {
+export function selectChangedTests(changedFiles, testFiles, readSource, { maxDirectoryFiles = quickMaxDirectoryFiles, always = [] } = {}) {
   const tests = new Set(testFiles);
   const selected = new Set();
+  if (changedFiles.some((file) => !file.endsWith(".md"))) {
+    for (const file of always) if (tests.has(file)) selected.add(file);
+  }
   const sourceExtensions = /\.(?:[cm]?[jt]sx?)$/;
   let importsByTest = null;
   const imports = () => {
@@ -600,11 +610,15 @@ function changedFilesSince(ref) {
     .filter((file) => existsSync(path.join(repoRoot, file)));
 }
 
-function checkTiers(tiers, inventory) {
+export function checkTiers(tiers, inventory) {
   const byFile = new Map(inventory.map((entry) => [entry.file, entry.project]));
   const problems = tiers.serialServer
     .filter((file) => !serverProjectPattern.test(byFile.get(file) ?? ""))
     .map((file) => `serialServer path is not a server test file: ${file}`);
+  for (const { file } of tiers.alwaysQuick ?? []) {
+    if (!byFile.has(file)) problems.push(`alwaysQuick path is not a test file: ${file}`);
+    else if (isOptIn(file, tiers)) problems.push(`alwaysQuick path is opt-in, so quick would never run it: ${file}`);
+  }
   for (const { glob } of tiers.optIn) {
     if (!inventory.some((entry) => path.posix.matchesGlob(entry.file, glob))) log(`warning: optIn glob matches no test file: ${glob}`);
   }
@@ -718,7 +732,8 @@ async function main() {
     if (options.tier === "quick") {
       const changed = changedFilesSince(options.changed);
       const testFiles = inventory.map((entry) => entry.file);
-      files = selectChangedTests(changed, testFiles, (file) => readFileSync(path.join(repoRoot, file), "utf8")).files
+      const always = tiers.alwaysQuick.map((entry) => entry.file);
+      files = selectChangedTests(changed, testFiles, (file) => readFileSync(path.join(repoRoot, file), "utf8"), { always }).files
         .filter((file) => files === null || files.includes(file));
       log(`quick: ${changed.length} files changed since ${options.changed}, ${files.length} test files selected`);
     }

@@ -10,7 +10,7 @@ Hard-fork step 3a (2026-11-18) split the suite into tiers. The workflow (when to
 
 | Tier | Command | What runs |
 | --- | --- | --- |
-| quick | `pnpm test:quick [--changed <ref>]` | The thorough-tier tests a change touches since its merge base with `main` (default), plus untracked files: changed test files, test files named after or importing a changed source file, and small directories' tests. |
+| quick | `pnpm test:quick [--changed <ref>]` | The thorough-tier tests a change touches since its merge base with `main` (default), plus untracked files: changed test files, test files named after or importing a changed source file, and small directories' tests. Unless the change is only Markdown, also the `alwaysQuick` files in `scripts/test-tiers.json`: whole-app checks (OpenAPI route coverage, the issue-detail golden file, the route access scan) that no other rule selects. |
 | thorough | `pnpm test` | Every test file except `optIn` ones. CI runs it on every push. |
 | optin | `pnpm test:optin` | Files matching `optIn` globs in `scripts/test-tiers.json`, each with its reason: dormant halves of split files (`*.dormant.test.ts`), the Runner, other adapters, the CLI, plugins, chat channels, cloud and sandbox code. On demand only. |
 | all | `pnpm test:all` | thorough, then optin. |
