@@ -25,6 +25,9 @@ const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd,
 const exists = (target: string) => fs.lstat(target).then(() => true, () => false);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const noAuth = async () => null;
+// Tests that clone, convert, expire and restore more than once. Alone on the desktop they take 5–8 s;
+// on CI's 2-worker shards 9–14 s on green runs and 17 s on a failed one, past the 15 s default (bug 80).
+const HEAVY_GIT_TEST_TIMEOUT_MS = 45_000;
 
 describe("nested clone migration batches", () => {
   it("puts pending recoveries first, rotates through the rest and stops retrying an exhausted rotation until the list changes", () => {
@@ -249,7 +252,7 @@ describeEmbeddedPostgres("nested repository clone migration", () => {
     expect(() => git(f.base, "cat-file", "-e", `${feature}^{commit}`)).toThrow();
     expect(await f.reopen()).toMatchObject({ ok: true, reopened: true });
     expect(git(f.checkout, "cat-file", "-t", feature)).toBe("commit");
-  });
+  }, HEAVY_GIT_TEST_TIMEOUT_MS);
 
   it("fingerprints a converted checkout's own history rather than the shared clone's remote refs", async () => {
     const f = await fixture();
@@ -412,7 +415,7 @@ describeEmbeddedPostgres("nested repository clone migration", () => {
     expect(ownedRefs(f.base, second.prefix)).toBe(`refs/heads/${second.prefix}main ${twoHead}`);
     expect(ownedRefs(f.base, f.prefix).split("\n")).toHaveLength(4);
     expect(worktreePaths(f.base)).toEqual(expect.arrayContaining([f.checkout, second.checkout]));
-  });
+  }, HEAVY_GIT_TEST_TIMEOUT_MS);
 
   it.each(["afterAside", "afterMove", "afterFinalize"] as const)("recovers a conversion interrupted at %s on the next pass", async (step) => {
     const f = await fixture();
@@ -489,7 +492,7 @@ describeEmbeddedPostgres("nested repository clone migration", () => {
     expect(await second.migrate()).toMatchObject({ outcome: "migrated" });
     expect(await second.expire()).toMatchObject({ expired: false, skipReason: "unpushed_managed_checkout_branches" });
     expect(await exists(second.checkout)).toBe(true);
-  });
+  }, HEAVY_GIT_TEST_TIMEOUT_MS);
 
   it("is disabled by default, changes nothing in dry run, and runs from the reaper when enabled", async () => {
     const f = await fixture();
