@@ -23,13 +23,30 @@
 //   - Uncommitted changes to tracked files are tested along with the commit, and the hook warns
 //     that the result covers the working tree as it is, not exactly what is pushed.
 //
+// The machine lock: the checks hold /tmp/paperclip-test-bench.lock, the lock every full local test
+// run here takes (`flock /tmp/paperclip-test-bench.lock …`), from the first check until the last
+// finishes. Several agents pushing at once would otherwise each start a workspace typecheck
+// (~6.5 GB) and test:quick together and run the machine out of memory. A hook that has to wait
+// says so, and says how long it waited.
+//   - PAPERCLIP_PREPUSH_LOCK=<path> takes another lock file; PAPERCLIP_PREPUSH_LOCK=off takes none.
+//   - Without `flock` on PATH it warns and runs the checks unlocked.
+//   - A push with nothing to check (Markdown only, a bypass, deletions, a ref that isn't HEAD)
+//     never touches the lock.
+//   How: a small holder process, `sh` taking the lock on a file descriptor with `flock` and then
+//   waiting on its stdin, holds the lock while this script runs the checks as before; closing its
+//   stdin releases it. Running the checks under `flock <lock> <child>` instead would hand the lock's
+//   descriptor to every process the checks start, so anything they leave running (a stray Vitest
+//   worker, an embedded Postgres) would keep the lock held after the hook ended. The holder is the
+//   only process with the descriptor, and it exits when this script does, however that happens.
+//   The lock is released before the hook returns, so it isn't held while git sends the push.
+//
 // Bypass: `git push --no-verify`, or PAPERCLIP_SKIP_PREPUSH=1.
 // For the hook's own tests, PAPERCLIP_PREPUSH_CHECK_COMMAND names a program run in place of each
 // check, as `<program> <check name> <command> <args...>`.
 //
-// The decisions (parsing git's input, the ranges, the Markdown rule, what to run) are the pure
-// functions exported below; the git calls and processes are at the end.
-import { spawnSync } from "node:child_process";
+// The decisions (parsing git's input, the ranges, the Markdown rule, what to run, which lock) are
+// the pure functions exported below; the git calls and processes are at the end.
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -162,6 +179,25 @@ export function childEnv(env, localVars) {
   return Object.fromEntries(Object.entries(env).filter(([key]) => !drop.has(key)));
 }
 
+export const defaultLockFile = "/tmp/paperclip-test-bench.lock";
+
+/**
+ * Which lock the checks hold: `{ file, notes, warnings }`, `file` null for none. PAPERCLIP_PREPUSH_LOCK
+ * names the file, or is `off`; `flockAvailable` says whether `flock` is on PATH.
+ */
+export function lockDecision(env, { flockAvailable }) {
+  const setting = String(env.PAPERCLIP_PREPUSH_LOCK ?? "").trim();
+  if (setting.toLowerCase() === "off") {
+    return { file: null, notes: ["PAPERCLIP_PREPUSH_LOCK=off: running the checks without the machine lock."], warnings: [] };
+  }
+  const file = setting || defaultLockFile;
+  if (!flockAvailable) {
+    return { file: null, notes: [], warnings: [`flock isn't installed, so the checks run without the machine lock (${file}), `
+      + "alongside any other test run on this machine."] };
+  }
+  return { file, notes: [], warnings: [] };
+}
+
 export function formatDuration(ms) {
   const seconds = ms / 1000;
   if (seconds < 60) return `${seconds.toFixed(1)} s`;
@@ -214,6 +250,62 @@ function gitRepo(root) {
   };
 }
 
+function flockAvailable() {
+  return !spawnSync("flock", ["--version"], { stdio: "ignore" }).error;
+}
+
+// Opens the lock file on descriptor 9, takes the lock (trying first without waiting, to know
+// whether to say it's waiting), reports on stdout, then becomes `cat`, which holds the descriptor
+// until its stdin closes.
+const holderScript = 'exec 9>>"$1" || exit 3\n'
+  + "if ! flock -n 9; then echo waiting; flock 9 || exit 4; fi\n"
+  + "echo locked\n"
+  + "exec cat >/dev/null\n";
+
+/**
+ * Takes the lock in a holder process. Resolves to `release()` (an async function) once it's held,
+ * or to null, with a warning, when it couldn't be taken.
+ */
+function takeLock(file, log) {
+  const holder = spawn("sh", ["-c", holderScript, "sh", file], { stdio: ["pipe", "pipe", "inherit"] });
+  const started = performance.now();
+  const exited = new Promise((resolve) => holder.once("close", resolve));
+  return new Promise((resolve) => {
+    let buffered = "";
+    let waited = false;
+    let settled = false;
+    const settle = (value) => {
+      if (!settled) resolve(value);
+      settled = true;
+    };
+    holder.once("error", (error) => {
+      if (!settled) log(`warning: couldn't take the machine lock (${file}): ${error.message}. Running the checks without it.`);
+      settle(null);
+    });
+    exited.then((code) => {
+      if (!settled) log(`warning: couldn't take the machine lock (${file}; exit ${code}). Running the checks without it.`);
+      settle(null);
+    });
+    holder.stdout.on("data", (chunk) => {
+      buffered += chunk;
+      const lines = buffered.split("\n");
+      buffered = lines.pop();
+      for (const line of lines) {
+        if (line === "waiting") {
+          waited = true;
+          log(`waiting for the machine lock (${file}), held by another test run…`);
+        } else if (line === "locked") {
+          if (waited) log(`Got the machine lock after ${formatDuration(performance.now() - started)}.`);
+          settle(async () => {
+            holder.stdin.end();
+            await exited;
+          });
+        }
+      }
+    });
+  });
+}
+
 async function main() {
   const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).out || process.cwd();
   const log = (line) => console.error(`${prefix} ${line}`);
@@ -236,18 +328,26 @@ async function main() {
     return 1;
   }
   const env = childEnv(process.env, git(root, ["rev-parse", "--local-env-vars"]).out.split("\n").filter(Boolean));
-  const totalStart = performance.now();
-  const exitCode = await runChecks(plan.checks, {
-    log,
-    exec: (check) => {
-      const [command, args] = stub ? [stub, [check.name, check.command, ...check.args]] : [check.command, check.args];
-      const result = spawnSync(command, args, { cwd: root, env, stdio: ["ignore", "inherit", "inherit"] });
-      if (result.error) log(`${check.name}: ${result.error.message}`);
-      return result.status ?? 1;
-    },
-  });
-  if (exitCode === 0) log(`All checks passed in ${formatDuration(performance.now() - totalStart)}.`);
-  return exitCode;
+  const lock = lockDecision(process.env, { flockAvailable: flockAvailable() });
+  for (const note of lock.notes) log(note);
+  for (const warning of lock.warnings) log(`warning: ${warning}`);
+  const release = lock.file ? await takeLock(path.resolve(root, lock.file), log) : null;
+  try {
+    const totalStart = performance.now();
+    const exitCode = await runChecks(plan.checks, {
+      log,
+      exec: (check) => {
+        const [command, args] = stub ? [stub, [check.name, check.command, ...check.args]] : [check.command, check.args];
+        const result = spawnSync(command, args, { cwd: root, env, stdio: ["ignore", "inherit", "inherit"] });
+        if (result.error) log(`${check.name}: ${result.error.message}`);
+        return result.status ?? 1;
+      },
+    });
+    if (exitCode === 0) log(`All checks passed in ${formatDuration(performance.now() - totalStart)}.`);
+    return exitCode;
+  } finally {
+    await release?.();
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

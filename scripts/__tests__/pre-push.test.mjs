@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,8 +10,10 @@ import test from "node:test";
 import {
   bypassRequested,
   childEnv,
+  defaultLockFile,
   formatDuration,
   isMarkdown,
+  lockDecision,
   parsePushLines,
   planPush,
   pushRanges,
@@ -244,14 +247,64 @@ test("formatDuration shows seconds, then minutes", () => {
   assert.equal(formatDuration(65_000), "1 min 5 s");
 });
 
+test("lockDecision: the machine lock by default, the path PAPERCLIP_PREPUSH_LOCK names otherwise", () => {
+  assert.equal(defaultLockFile, "/tmp/paperclip-test-bench.lock");
+  assert.deepEqual(lockDecision({}, { flockAvailable: true }), { file: defaultLockFile, notes: [], warnings: [] });
+  assert.deepEqual(lockDecision({ PAPERCLIP_PREPUSH_LOCK: "  " }, { flockAvailable: true }).file, defaultLockFile);
+  assert.deepEqual(lockDecision({ PAPERCLIP_PREPUSH_LOCK: "/tmp/x.lock" }, { flockAvailable: true }),
+    { file: "/tmp/x.lock", notes: [], warnings: [] });
+});
+
+test("lockDecision: PAPERCLIP_PREPUSH_LOCK=off runs without the lock, and says so", () => {
+  for (const value of ["off", "OFF", " Off "]) {
+    const decision = lockDecision({ PAPERCLIP_PREPUSH_LOCK: value }, { flockAvailable: true });
+    assert.equal(decision.file, null);
+    assert.match(decision.notes.join("\n"), /PAPERCLIP_PREPUSH_LOCK=off/);
+    assert.deepEqual(decision.warnings, []);
+  }
+  // Off doesn't need flock, so there's nothing to warn about without it.
+  assert.deepEqual(lockDecision({ PAPERCLIP_PREPUSH_LOCK: "off" }, { flockAvailable: false }).warnings, []);
+});
+
+test("lockDecision: without flock it warns and runs without the lock", () => {
+  const decision = lockDecision({}, { flockAvailable: false });
+  assert.equal(decision.file, null);
+  assert.match(decision.warnings.join("\n"), /flock/);
+  assert.match(decision.warnings.join("\n"), /without the machine lock/);
+  assert.match(decision.warnings.join("\n"), /paperclip-test-bench\.lock/);
+});
+
 // ---------------------------------------------------------------------------------------------
 // The hook in a real push: a throwaway repository and bare remote, with core.hooksPath set in that
-// repository only, and the checks stubbed through PAPERCLIP_PREPUSH_CHECK_COMMAND.
+// repository only, and the checks stubbed through PAPERCLIP_PREPUSH_CHECK_COMMAND. Each repository
+// gets its own lock file: these tests may run under `flock /tmp/paperclip-test-bench.lock`, and a
+// hook waiting on that lock would wait for its own test run.
+
+function testEnv(env) {
+  const base = childEnv(process.env, ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX",
+    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "PAPERCLIP_PREPUSH_LOCK", "PAPERCLIP_SKIP_PREPUSH"]);
+  return { ...base, ...env };
+}
 
 function gitIn(cwd, args, env = {}) {
-  const base = childEnv(process.env, ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX",
-    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"]);
-  return spawnSync("git", args, { cwd, encoding: "utf8", env: { ...base, ...env } });
+  return spawnSync("git", args, { cwd, encoding: "utf8", env: testEnv({ PAPERCLIP_PREPUSH_LOCK: path.join(cwd, "..", "test.lock"), ...env }) });
+}
+
+/** git, without waiting: `done` resolves to `{ status, stderr }` when it exits; `stderr()` is so far. */
+function gitAsync(cwd, args, env) {
+  const child = spawn("git", args, { cwd, env: testEnv(env), stdio: ["ignore", "ignore", "pipe"] });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const done = new Promise((resolve) => child.on("close", (status) => resolve({ status, stderr })));
+  return { done, stderr: () => stderr };
+}
+
+async function waitFor(condition, what) {
+  for (let i = 0; i < 400; i++) {
+    if (condition()) return;
+    await delay(50);
+  }
+  assert.fail(`timed out waiting for ${what}`);
 }
 
 function makeRepo() {
@@ -354,6 +407,99 @@ test("hook: pushing a sha other than HEAD skips the checks with a warning", { ti
     assert.match(result.stderr, /isn't HEAD/);
     assert.equal(stub.ran(), "");
   } finally {
+    repo.cleanup();
+  }
+});
+
+/** Holds `lock` from another process, as another test run would; resolves once it's held. */
+async function holdLock(lock) {
+  // One process, so that killing it releases the lock.
+  const holder = spawn("sh", ["-c", 'exec 9>>"$1" && flock 9 && echo held && exec sleep 60', "sh", lock],
+    { stdio: ["ignore", "pipe", "ignore"] });
+  await new Promise((resolve, reject) => {
+    holder.stdout.once("data", resolve);
+    holder.once("error", reject);
+  });
+  return holder;
+}
+
+test("hook: a second push waits for the machine lock while a first one's checks hold it", { timeout: 60_000 }, async () => {
+  const first = makeRepo();
+  const second = makeRepo();
+  try {
+    // Both hooks share one lock file and one log. The first push's typecheck lasts until the test
+    // creates the `go` file, which it does once the second push says it's waiting.
+    const lock = path.join(first.dir, "machine.lock");
+    const log = path.join(first.dir, "order.log");
+    const go = path.join(first.dir, "go");
+    const stub = path.join(first.dir, "slow-stub.sh");
+    writeFileSync(stub, `#!/bin/sh\necho "start $PUSH_TAG $1" >> "${log}"\n`
+      + `if [ "$PUSH_TAG" = one ] && [ "$1" = typecheck ]; then while [ ! -f "${go}" ]; do sleep 0.05; done; fi\n`
+      + `echo "end $PUSH_TAG $1" >> "${log}"\n`);
+    chmodSync(stub, 0o755);
+    const env = (tag) => ({ PAPERCLIP_PREPUSH_LOCK: lock, PAPERCLIP_PREPUSH_CHECK_COMMAND: stub, PUSH_TAG: tag });
+    const ran = () => (existsSync(log) ? readFileSync(log, "utf8").trim().split("\n") : []);
+    first.commit("app.ts", "export const a = 5;\n");
+    second.commit("app.ts", "export const a = 6;\n");
+
+    const one = gitAsync(first.work, ["push", "origin", "feat"], env("one"));
+    // The first hook's check has started, so it holds the lock.
+    await waitFor(() => ran().length > 0, "the first push's typecheck");
+    const two = gitAsync(second.work, ["push", "origin", "feat"], env("two"));
+    await waitFor(() => two.stderr().includes("waiting for the machine lock"), "the second push to wait");
+    await delay(300);
+    assert.deepEqual(ran(), ["start one typecheck"]);
+    writeFileSync(go, "");
+    const [oneResult, twoResult] = await Promise.all([one.done, two.done]);
+
+    assert.equal(oneResult.status, 0, oneResult.stderr);
+    assert.equal(twoResult.status, 0, twoResult.stderr);
+    assert.doesNotMatch(oneResult.stderr, /waiting for the machine lock/);
+    assert.ok(twoResult.stderr.includes(`waiting for the machine lock (${lock}), held by another test run`), twoResult.stderr);
+    assert.match(twoResult.stderr, /got the machine lock after \d+(?:\.\d)? s/i);
+    // The second hook's checks ran only after both of the first's had finished.
+    assert.deepEqual(ran(), [
+      "start one typecheck", "end one typecheck", "start one test:quick", "end one test:quick",
+      "start two typecheck", "end two typecheck", "start two test:quick", "end two test:quick",
+    ]);
+  } finally {
+    first.cleanup();
+    second.cleanup();
+  }
+});
+
+test("hook: a push with nothing to check doesn't wait for the lock", { timeout: 30_000 }, async () => {
+  const repo = makeRepo();
+  const lock = path.join(repo.dir, "machine.lock");
+  const holder = await holdLock(lock);
+  try {
+    const stub = stubCommand(repo.dir, 0);
+    repo.commit("NOTES.md", "notes\n");
+    const result = await gitAsync(repo.work, ["push", "origin", "feat"],
+      { PAPERCLIP_PREPUSH_LOCK: lock, PAPERCLIP_PREPUSH_CHECK_COMMAND: stub.command }).done;
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /only Markdown/i);
+    assert.doesNotMatch(result.stderr, /machine lock/);
+  } finally {
+    holder.kill();
+    repo.cleanup();
+  }
+});
+
+test("hook: PAPERCLIP_PREPUSH_LOCK=off runs the checks while another run holds the lock", { timeout: 30_000 }, async () => {
+  const repo = makeRepo();
+  const lock = path.join(repo.dir, "machine.lock");
+  const holder = await holdLock(lock);
+  try {
+    const stub = stubCommand(repo.dir, 0);
+    repo.commit("app.ts", "export const a = 7;\n");
+    const result = await gitAsync(repo.work, ["push", "origin", "feat"],
+      { PAPERCLIP_PREPUSH_LOCK: "off", PAPERCLIP_PREPUSH_CHECK_COMMAND: stub.command }).done;
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /PAPERCLIP_PREPUSH_LOCK=off/);
+    assert.equal(stub.ran().trim().split("\n").length, 2);
+  } finally {
+    holder.kill();
     repo.cleanup();
   }
 });
