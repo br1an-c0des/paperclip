@@ -240,9 +240,9 @@ suite("controller instance lease: a replaced container's records are provable", 
       const [before] = await db.select({ renewedAt: controllerInstances.renewedAt }).from(controllerInstances)
         .where(eq(controllerInstances.bootId, currentControllerBootId()));
       currentControllerProcessStamp();
-      const started = Date.now();
+      const started = performance.now();
       await tickControllerInstanceLease();
-      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(performance.now() - started).toBeLessThan(5_000);
       const [after] = await db.select({ renewedAt: controllerInstances.renewedAt }).from(controllerInstances)
         .where(eq(controllerInstances.bootId, currentControllerBootId()));
       expect(after.renewedAt!.getTime()).toBeGreaterThan(before.renewedAt!.getTime());
@@ -284,9 +284,12 @@ suite("controller instance lease: a replaced container's records are provable", 
       });
       await lockTaken;
       currentControllerProcessStamp();
-      const started = Date.now();
+      // The renewal waits out the server's statement_timeout (8.0 s alone and in CI). Time it on the
+      // monotonic clock, as the lease does: WSL steps the wall clock forward ~0.6 s every ~33 s, more
+      // under load, which read a wait vitest timed at 8.03 s as 10.5 s (bug 74).
+      const started = performance.now();
       await tickControllerInstanceLease();
-      const elapsed = Date.now() - started;
+      const elapsed = performance.now() - started;
       expect(elapsed).toBeGreaterThanOrEqual(RENEW_STATEMENT_TIMEOUT_MS - 500);
       expect(elapsed).toBeLessThan(RENEW_STATEMENT_TIMEOUT_MS + 1_500);
       // Cancelled by the server, not left running behind the client timeout.
@@ -296,9 +299,9 @@ suite("controller instance lease: a replaced container's records are provable", 
       release();
       await holder;
       currentControllerProcessStamp();
-      const next = Date.now();
+      const next = performance.now();
       await tickControllerInstanceLease();
-      expect(Date.now() - next).toBeLessThan(2_000);
+      expect(performance.now() - next).toBeLessThan(2_000);
       const [after] = await db.select({ renewedAt: controllerInstances.renewedAt }).from(controllerInstances)
         .where(eq(controllerInstances.bootId, currentControllerBootId()));
       expect(after.renewedAt!.getTime()).toBeGreaterThan(before.renewedAt!.getTime());

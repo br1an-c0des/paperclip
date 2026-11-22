@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { agents, authUsers, companies, companyMemberships, createDb, heartbeatRunEvents, heartbeatRuns, issues } from "@paperclipai/db";
 import { registerServerAdapter, unregisterServerAdapter, type AdapterExecutionContext } from "../adapters/index.js";
 import { heartbeatService } from "../services/heartbeat.js";
+import { LEGACY_CONTROLLER_RENEW_MS } from "../services/legacy-controller-lease.js";
 import { getRunLogStore } from "../services/run-log-store.js";
 import { withS3FailureDiagnostics } from "../storage/s3-failure.js";
 import { sendThroughStorageOutage } from "../storage/storage-unavailable.js";
@@ -126,10 +127,15 @@ describePostgres("heartbeat output through adapter dispatch and finalization", (
     const run = await heartbeat.wakeup(f.agentId, { source: "on_demand", triggerDetail: "manual", reason: "manual",
       payload: { issueId: f.issueId }, contextSnapshot: { issueId: f.issueId } });
     await vi.waitFor(() => expect(begin).toHaveBeenCalled(), { timeout: 10_000 });
-    const stoppedAt = Date.now();
+    // The run is stopped before it registers its execution control, so the stop reaches the outage wait
+    // through the controller lease: its next renewal (every LEGACY_CONTROLLER_RENEW_MS from the run's
+    // start) is refused and aborts the run, 9.1 s after the stop alone. Bound it by one renewal plus
+    // room for finalization, on the monotonic clock: WSL steps the wall clock forward ~0.6 s every
+    // ~33 s, which read that 9.2 s as 9.8 s (bug 72).
+    const stoppedAt = performance.now();
     await heartbeat.cancelRun(run!.id, "Cancelled by a board operator");
     await heartbeat.drainActiveRunExecutions();
-    expect(Date.now() - stoppedAt).toBeLessThan(10_000);
+    expect(performance.now() - stoppedAt).toBeLessThan(LEGACY_CONTROLLER_RENEW_MS + 2_000);
     const [stopped] = await db.select().from(heartbeatRuns).where(eq(heartbeatRuns.id, run!.id));
     expect(stopped).toMatchObject({ status: "cancelled" });
   }, 60_000);
