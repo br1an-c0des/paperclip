@@ -1,0 +1,73 @@
+{
+ "numTotalTestSuites": 1,
+ "numPassedTestSuites": 1,
+ "numFailedTestSuites": 0,
+ "numPendingTestSuites": 0,
+ "numTotalTests": 3,
+ "numPassedTests": 3,
+ "numFailedTests": 0,
+ "numPendingTests": 0,
+ "numTodoTests": 0,
+ "snapshot": {
+  "added": 0,
+  "failure": false,
+  "filesAdded": 0,
+  "filesRemoved": 0,
+  "filesRemovedList": [],
+  "filesUnmatched": 0,
+  "filesUpdated": 0,
+  "matched": 0,
+  "total": 0,
+  "unchecked": 0,
+  "uncheckedKeysByFile": [],
+  "unmatched": 0,
+  "updated": 0,
+  "didUpdate": false
+ },
+ "startTime": 1795303139399,
+ "success": true,
+ "testResults": [
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [],
+     "fullName": "parses split UTF-8 and NUL records while rejecting truncation and oversized records",
+     "status": "passed",
+     "title": "parses split UTF-8 and NUL records while rejecting truncation and oversized records",
+     "duration": 3.3184260000000023,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [],
+     "fullName": "deduplicates paths on disk and rejects incomplete manifest metadata",
+     "status": "passed",
+     "title": "deduplicates paths on disk and rejects incomplete manifest metadata",
+     "duration": 8.335148000000004,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [],
+     "fullName": "refuses new manifests and fails ongoing writes when the disk reserve is exhausted",
+     "status": "passed",
+     "title": "refuses new manifests and fails ongoing writes when the disk reserve is exhausted",
+     "duration": 13.131141999999997,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    }
+   ],
+   "startTime": 1795303141087,
+   "endTime": 1795303141309.9954,
+   "status": "passed",
+   "message": "",
+   "name": "/home/runner/work/paperclip/paperclip/packages/adapter-utils/src/workspace-manifest.test.ts"
+  }
+ ]
+}

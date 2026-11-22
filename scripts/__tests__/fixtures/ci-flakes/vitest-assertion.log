@@ -1,0 +1,23 @@
+2026-11-20T18:57:31.0877070Z [31m     [31m×[31m does not mistake a recycled PID for the old writer[39m[32m 207[2mms[22m[39m
+2026-11-20T18:59:55.7395678Z  [32m✓[39m [30m[42m @paperclipai/server (shared) [49m[39m src/__tests__/secret-binding-discovery.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 161[2mms[22m[39m
+2026-11-20T18:59:55.7723929Z 
+2026-11-20T18:59:55.7754893Z [31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+2026-11-20T18:59:55.7755279Z 
+2026-11-20T18:59:55.7756669Z [41m[1m FAIL [22m[49m [30m[42m @paperclipai/server (shared) [49m[39m src/services/fresh-continuation-fallback.test.ts[2m > [22mfresh-continuation fallback[2m > [22mdoes not mistake a recycled PID for the old writer
+2026-11-20T18:59:55.7758654Z [31m[1mAssertionError[22m: expected { Object (kind, reason, ...) } to match object { kind: 'continued' }
+2026-11-20T18:59:55.7759469Z (4 matching properties omitted from actual)[39m
+2026-11-20T18:59:55.7759754Z 
+2026-11-20T18:59:55.7795171Z [2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m119 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (121)[39m
+2026-11-20T18:59:55.7807797Z [2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2078 passed[39m[22m[2m | [22m[33m3 skipped[39m[90m (2082)[39m
+2026-11-20T18:59:55.7759914Z [32m- Expected[39m
+2026-11-20T18:59:55.7760226Z [31m+ Received[39m
+2026-11-20T18:59:55.7760408Z 
+2026-11-20T18:59:55.7760532Z [2m  {[22m
+2026-11-20T18:59:55.7760969Z [32m-   "kind": "continued",[39m
+2026-11-20T18:59:55.7761462Z [31m+   "kind": "exact_recovery_pending",[39m
+2026-11-20T18:59:55.7761872Z [2m  }[22m
+2026-11-20T18:59:55.7762015Z 
+2026-11-20T18:59:55.7762561Z [36m [2m❯[22m src/services/fresh-continuation-fallback.test.ts:[2m805:8[22m[39m
+2026-11-20T18:59:55.7763033Z 
+2026-11-20T18:59:55.7763417Z     [90m803|[39m       .where(eq(heartbeatRuns.id, f.runId));
+2026-11-20T19:00:22.0939866Z ##[error]Process completed with exit code 1.

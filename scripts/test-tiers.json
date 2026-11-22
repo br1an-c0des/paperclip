@@ -1,5 +1,19 @@
 {
   "serialServer": [],
+  "alwaysQuick": [
+    {
+      "file": "server/src/__tests__/openapi-routes.test.ts",
+      "reason": "Checks every mounted route against server/src/routes/openapi.ts: a new route anywhere fails it (two red CI runs, 2026-11-21)"
+    },
+    {
+      "file": "server/src/__tests__/issue-detail-statements.test.ts",
+      "reason": "Compares the whole issue response with a golden file: a new field on a project, goal or agent fails it (red CI run, 2026-11-20)"
+    },
+    {
+      "file": "server/src/__tests__/authz-existence-oracle-guard.test.ts",
+      "reason": "Scans every route file for a company-access check before an existence check: a new route anywhere can fail it"
+    }
+  ],
   "optIn": [
     {
       "glob": "server/**/*.dormant.test.ts",

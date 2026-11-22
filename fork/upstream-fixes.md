@@ -1193,6 +1193,9 @@ Found 2026-11-20 in CI on `feat/step-4b` (run 44797032206, shard 5).
   `kind: "exact_recovery_pending"` (line 805). The same shard passed on the previous run of the
   branch, and on the re-run of the failed job, and step 4b doesn't touch that code: a flake, likely
   timing-sensitive around the process-start-time check.
+- **Since then:** failed again 2026-11-22 on `ci/workflow-jobs` (run 44978484878, shard 5, same
+  assertion at line 805), on a branch that changes only the CI workflow; the failed job was
+  re-run. Twice now, both times in shard 5: under the green-push guide's rule it gets fixed next.
 - **Likely fix:** find what the test races against (the recorded start time versus the probe), and
   make it deterministic.
 - **Fork workaround:** re-run the failed CI job.

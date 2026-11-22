@@ -44,8 +44,11 @@ const serverProjectPattern = /^@paperclipai\/server/;
 // process tree, Postgres included, at 4 isolated workers; fork/test-suite-audit/results-ci.md).
 export const maxDefaultWorkers = 8;
 export const bytesPerWorker = 1.5 * 1024 ** 3;
-// Expected seconds per test file, for balancing shards: local_s (this machine's profile), else ci_s
-// (upstream's recorded durations). Files with neither count as the median of those that have one.
+// Expected seconds per test file, for balancing shards, from the first of these that has the file:
+// test-weights.json (this workflow's own CI timings, written by scripts/refresh-shard-weights.mjs),
+// then classification.csv's local_s (the desktop's profile), then its ci_s (upstream's recorded
+// durations). Files with none count as the median of those that have one.
+export const shardWeightsFile = path.join(scriptsDir, "test-weights.json");
 export const expectedSecondsFile = path.join(repoRoot, "fork", "test-suite-audit", "classification.csv");
 // quick: a directory with more test files than this contributes no directory files.
 export const quickMaxDirectoryFiles = 50;
@@ -126,6 +129,11 @@ export function loadTiers(file = tiersFile) {
   if (!Array.isArray(tiers.optIn) || !tiers.optIn.every((entry) =>
     typeof entry?.glob === "string" && typeof entry?.reason === "string" && entry.reason.trim())) {
     throw new Error(`${file}: optIn must be an array of { glob, reason } with a reason for each.`);
+  }
+  tiers.alwaysQuick ??= [];
+  if (!Array.isArray(tiers.alwaysQuick) || !tiers.alwaysQuick.every((entry) =>
+    typeof entry?.file === "string" && typeof entry?.reason === "string" && entry.reason.trim())) {
+    throw new Error(`${file}: alwaysQuick must be an array of { file, reason } with a reason for each.`);
   }
   return tiers;
 }
@@ -234,6 +242,38 @@ export function shardCoverageProblems(shards, expected) {
     ...[...seen].filter(([, indexes]) => indexes.length > 1)
       .map(([file, indexes]) => `in more than one shard: ${file} (${indexes.join(", ")})`),
   ];
+}
+
+/** Expected seconds per file from test-weights.json's text: its `seconds` object. */
+export function parseShardWeights(jsonText) {
+  const data = JSON.parse(jsonText);
+  if (!data || typeof data.seconds !== "object" || data.seconds === null || Array.isArray(data.seconds)) {
+    throw new Error("expected a `seconds` object of repo-relative test files to seconds");
+  }
+  const seconds = new Map();
+  for (const [file, value] of Object.entries(data.seconds)) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new Error(`${file}: not a number of seconds (${value})`);
+    seconds.set(file, value);
+  }
+  return seconds;
+}
+
+/**
+ * Combines expected-seconds sources, `[{ name, seconds: Map }]` in order of preference: each file
+ * takes its seconds from the first source that has it. Returns `{ seconds, sourceOf }`, both keyed
+ * by file; `sourceOf` holds the name of the source each file's seconds came from.
+ */
+export function mergeExpectedSeconds(sources) {
+  const seconds = new Map();
+  const sourceOf = new Map();
+  for (const source of sources) {
+    for (const [file, value] of source.seconds) {
+      if (seconds.has(file)) continue;
+      seconds.set(file, value);
+      sourceOf.set(file, source.name);
+    }
+  }
+  return { seconds, sourceOf };
 }
 
 /** Expected seconds per file from classification.csv's text: local_s, else ci_s. */
@@ -397,12 +437,17 @@ function withoutExtension(file) {
  * - a changed source file selects the test files whose name contains its basename, the test files
  *   that import it (or mock it) by a relative path, and, when its directory holds at most
  *   `maxDirectoryFiles` test files (its own and its __tests__ folder's), those too.
+ * And the `always` files (test-tiers.json's alwaysQuick), whenever a changed file isn't Markdown:
+ * whole-app checks such as the OpenAPI route coverage, which no rule above would select.
  * Vitest's own --changed follows the server's module graph, which links nearly everything: a
  * one-line change in server/src/services/ selected ~1,370 files (results-runner.md).
  */
-export function selectChangedTests(changedFiles, testFiles, readSource, { maxDirectoryFiles = quickMaxDirectoryFiles } = {}) {
+export function selectChangedTests(changedFiles, testFiles, readSource, { maxDirectoryFiles = quickMaxDirectoryFiles, always = [] } = {}) {
   const tests = new Set(testFiles);
   const selected = new Set();
+  if (changedFiles.some((file) => !file.endsWith(".md"))) {
+    for (const file of always) if (tests.has(file)) selected.add(file);
+  }
   const sourceExtensions = /\.(?:[cm]?[jt]sx?)$/;
   let importsByTest = null;
   const imports = () => {
@@ -572,13 +617,24 @@ async function preflight() {
   }
 }
 
-// Expected seconds per repo-relative test file; empty (every file at weight 1) without the CSV.
-function loadExpectedSeconds(file = expectedSecondsFile) {
-  if (!existsSync(file)) {
-    log(`warning: ${path.relative(repoRoot, file)} not found: shards are balanced by file count`);
-    return new Map();
+/**
+ * Expected seconds per repo-relative test file: test-weights.json, then the CSV, per file (see
+ * mergeExpectedSeconds). Returns `{ seconds, sourceOf, sources }`, `sources` being the base names
+ * of the files that were there. Without the weights file it's the CSV alone, as before the weights
+ * existed; with neither, empty (every file at weight 1).
+ */
+export function loadExpectedSeconds({ weightsFile = shardWeightsFile, csvFile = expectedSecondsFile } = {}) {
+  const sources = [];
+  if (existsSync(weightsFile)) {
+    try {
+      sources.push({ name: path.basename(weightsFile), seconds: parseShardWeights(readFileSync(weightsFile, "utf8")) });
+    } catch (error) {
+      throw new Error(`${path.relative(repoRoot, weightsFile)}: ${error.message}`);
+    }
   }
-  return parseExpectedSeconds(readFileSync(file, "utf8"));
+  if (existsSync(csvFile)) sources.push({ name: path.basename(csvFile), seconds: parseExpectedSeconds(readFileSync(csvFile, "utf8")) });
+  if (sources.length === 0) log(`warning: ${path.relative(repoRoot, csvFile)} not found: shards are balanced by file count`);
+  return { ...mergeExpectedSeconds(sources), sources: sources.map((source) => source.name) };
 }
 
 function readFilesList(file) {
@@ -600,11 +656,15 @@ function changedFilesSince(ref) {
     .filter((file) => existsSync(path.join(repoRoot, file)));
 }
 
-function checkTiers(tiers, inventory) {
+export function checkTiers(tiers, inventory) {
   const byFile = new Map(inventory.map((entry) => [entry.file, entry.project]));
   const problems = tiers.serialServer
     .filter((file) => !serverProjectPattern.test(byFile.get(file) ?? ""))
     .map((file) => `serialServer path is not a server test file: ${file}`);
+  for (const { file } of tiers.alwaysQuick ?? []) {
+    if (!byFile.has(file)) problems.push(`alwaysQuick path is not a test file: ${file}`);
+    else if (isOptIn(file, tiers)) problems.push(`alwaysQuick path is opt-in, so quick would never run it: ${file}`);
+  }
   for (const { glob } of tiers.optIn) {
     if (!inventory.some((entry) => path.posix.matchesGlob(entry.file, glob))) log(`warning: optIn glob matches no test file: ${glob}`);
   }
@@ -718,7 +778,8 @@ async function main() {
     if (options.tier === "quick") {
       const changed = changedFilesSince(options.changed);
       const testFiles = inventory.map((entry) => entry.file);
-      files = selectChangedTests(changed, testFiles, (file) => readFileSync(path.join(repoRoot, file), "utf8")).files
+      const always = tiers.alwaysQuick.map((entry) => entry.file);
+      files = selectChangedTests(changed, testFiles, (file) => readFileSync(path.join(repoRoot, file), "utf8"), { always }).files
         .filter((file) => files === null || files.includes(file));
       log(`quick: ${changed.length} files changed since ${options.changed}, ${files.length} test files selected`);
     }
@@ -734,7 +795,7 @@ async function main() {
     let expected = expectedFiles(options.tier, tiers, inventory, files);
     const { shard } = options;
     if (shard) {
-      const seconds = loadExpectedSeconds();
+      const { seconds, sourceOf, sources } = loadExpectedSeconds();
       const shards = buildShards(options.tier, tiers, { ...planOptions, shardCount: shard.count, expectedSeconds: (file) => seconds.get(file) });
       const problems = shardCoverageProblems(shards, new Set([...expected].map((file) => path.posix.join(repoRoot, file))));
       if (problems.length > 0) {
@@ -743,13 +804,18 @@ async function main() {
       }
       log(`coverage: the ${shard.count} shards hold every one of ${expected.size} test files exactly once`);
       const weightOf = shardWeights(shards.flat().flatMap((phase) => phase.files), repoRoot, (file) => seconds.get(file));
-      log(`shards, balanced by expected seconds (${path.relative(repoRoot, expectedSecondsFile)}, unknown files at the median):`);
+      const sourcePaths = [shardWeightsFile, expectedSecondsFile].filter((file) => sources.includes(path.basename(file)))
+        .map((file) => path.relative(repoRoot, file));
+      log(`shards, balanced by expected seconds (${sourcePaths.length > 0 ? sourcePaths.join(", then ") : path.relative(repoRoot, expectedSecondsFile)}, unknown files at the median):`);
       shards.forEach((plan, index) => {
         const planFiles = plan.flatMap((phase) => phase.files);
-        const known = planFiles.filter((file) => seconds.has(toRepoPath(file))).length;
+        const recorded = planFiles.map((file) => sourceOf.get(toRepoPath(file))).filter(Boolean);
+        // With more than one source, how many of the recorded files each one gave.
+        const bySource = sources.length > 1
+          ? `: ${sources.map((name) => `${recorded.filter((source) => source === name).length} ${name}`).join(", ")}` : "";
         const minutes = planFiles.reduce((sum, file) => sum + weightOf(file), 0) / 60;
         console.log(`  ${pad(`shard ${index + 1}/${shard.count}`, 12, true)}${pad(planFiles.length, 6)} files  `
-          + `${pad(minutes.toFixed(1), 6)} expected worker-minutes (${known} files recorded)  `
+          + `${pad(minutes.toFixed(1), 6)} expected worker-minutes (${recorded.length} files recorded${bySource})  `
           + plan.map((phase) => `${phase.name} ${phase.files.length}`).join(", "));
       });
       phases = shards[shard.index - 1];

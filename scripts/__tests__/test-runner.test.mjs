@@ -10,11 +10,16 @@ import {
   assignShards,
   buildPlan,
   buildShards,
+  checkTiers,
   defaultWorkerCount,
   exitCodeFor,
+  loadExpectedSeconds,
+  loadTiers,
   maxDefaultWorkers,
+  mergeExpectedSeconds,
   parseArgs,
   parseExpectedSeconds,
+  parseShardWeights,
   removeRunRoot,
   runPhases,
   selectChangedTests,
@@ -140,6 +145,82 @@ test("parseExpectedSeconds: local_s, else ci_s, from the classification CSV with
   assert.equal(seconds.get("a.test.ts"), 30.1);
   assert.equal(seconds.get("b.test.ts"), 7);
   assert.equal(seconds.has("c.test.ts"), false);
+});
+
+test("parseShardWeights reads test-weights.json's seconds and refuses a malformed file", () => {
+  const seconds = parseShardWeights(JSON.stringify({
+    source: [{ run: 1, commit: "abc", date: "2026-11-21T00:00:00Z" }],
+    seconds: { "a.test.ts": 12.5, "b.test.ts": 0 },
+  }));
+  assert.deepEqual([...seconds], [["a.test.ts", 12.5], ["b.test.ts", 0]]);
+  assert.throws(() => parseShardWeights("{}"), /seconds/);
+  assert.throws(() => parseShardWeights(JSON.stringify({ seconds: { "a.test.ts": "slow" } })), /a\.test\.ts/);
+  assert.throws(() => parseShardWeights(JSON.stringify({ seconds: { "a.test.ts": -1 } })), /a\.test\.ts/);
+});
+
+test("mergeExpectedSeconds: per file, the first source that has it wins", () => {
+  const { seconds, sourceOf } = mergeExpectedSeconds([
+    { name: "weights", seconds: new Map([["a.test.ts", 40], ["b.test.ts", 0]]) },
+    { name: "csv", seconds: new Map([["a.test.ts", 5], ["b.test.ts", 9], ["c.test.ts", 7]]) },
+  ]);
+  assert.deepEqual(Object.fromEntries(seconds), { "a.test.ts": 40, "b.test.ts": 0, "c.test.ts": 7 });
+  assert.deepEqual(Object.fromEntries(sourceOf), { "a.test.ts": "weights", "b.test.ts": "weights", "c.test.ts": "csv" });
+});
+
+function writeWeightSources(dir, { weights, csv }) {
+  const weightsFile = path.join(dir, "test-weights.json");
+  const csvFile = path.join(dir, "classification.csv");
+  if (weights) writeFileSync(weightsFile, JSON.stringify({ source: [], seconds: weights }));
+  if (csv) writeFileSync(csvFile, ["file,ci_s,local_s", ...Object.entries(csv).map(([file, s]) => `${file},,${s}`)].join("\n"));
+  return { weightsFile, csvFile };
+}
+
+test("loadExpectedSeconds: test-weights.json wins over the CSV per file; without it, the CSV alone", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "test-runner-weights-"));
+  const csv = { "server/src/__tests__/a.test.ts": 5, "packages/db/src/d.test.ts": 3 };
+  const both = loadExpectedSeconds(writeWeightSources(dir, { weights: { "server/src/__tests__/a.test.ts": 80 }, csv }));
+  assert.equal(both.seconds.get("server/src/__tests__/a.test.ts"), 80);
+  assert.equal(both.seconds.get("packages/db/src/d.test.ts"), 3);
+  assert.deepEqual(both.sources, ["test-weights.json", "classification.csv"]);
+  assert.equal(both.sourceOf.get("server/src/__tests__/a.test.ts"), "test-weights.json");
+
+  const empty = mkdtempSync(path.join(os.tmpdir(), "test-runner-weights-"));
+  const csvOnly = loadExpectedSeconds(writeWeightSources(empty, { csv }));
+  assert.deepEqual(Object.fromEntries(csvOnly.seconds), csv);
+  assert.deepEqual(csvOnly.sources, ["classification.csv"]);
+
+  const none = loadExpectedSeconds(writeWeightSources(mkdtempSync(path.join(os.tmpdir(), "test-runner-weights-")), {}));
+  assert.equal(none.seconds.size, 0);
+  assert.deepEqual(none.sources, []);
+});
+
+test("without test-weights.json the shards are exactly what the CSV alone gives", () => {
+  const csv = { "server/src/__tests__/a.test.ts": 100, "server/src/services/c.test.ts": 1, "packages/db/src/d.test.ts": 3 };
+  const dir = mkdtempSync(path.join(os.tmpdir(), "test-runner-weights-"));
+  const { seconds } = loadExpectedSeconds(writeWeightSources(dir, { csv }));
+  const options = { root, workers: 2, inventory, shardCount: 2 };
+  assert.deepEqual(buildShards("thorough", emptyTiers, { ...options, expectedSeconds: (file) => seconds.get(file) }),
+    buildShards("thorough", emptyTiers, { ...options, expectedSeconds: (file) => csv[file] }));
+});
+
+test("--shard with CI weights: the weights move a file the CSV calls light; unknown files at the median; same split every time", () => {
+  const csv = { "server/src/__tests__/a.test.ts": 100, "server/src/__tests__/b-routes.test.ts": 1, "server/src/services/c.test.ts": 1 };
+  const dir = mkdtempSync(path.join(os.tmpdir(), "test-runner-weights-"));
+  // CI says b-routes is the slow one and a is quick; c keeps the CSV's 1 s; n, d, e and f have neither (median).
+  const weights = { "server/src/__tests__/a.test.ts": 2, "server/src/__tests__/b-routes.test.ts": 90 };
+  const sources = writeWeightSources(dir, { weights, csv });
+  const split = () => {
+    const { seconds } = loadExpectedSeconds(sources);
+    return buildShards("thorough", emptyTiers, { root, workers: 2, inventory, shardCount: 2, expectedSeconds: (file) => seconds.get(file) });
+  };
+  const shards = split();
+  const serverOf = (shard) => shard.find((item) => item.name === "server")?.files ?? [];
+  const heavy = shards.find((shard) => serverOf(shard).includes(abs("server/src/__tests__/b-routes.test.ts")));
+  assert.deepEqual(serverOf(heavy), [abs("server/src/__tests__/b-routes.test.ts")]);
+  // The median of the known weights (1, 2, 90) is 2: the three packages files count 2 s each and split 2 and 1.
+  const packagesOf = (shard) => shard.find((item) => item.name === "packages")?.files ?? [];
+  assert.deepEqual(shards.map((shard) => packagesOf(shard).length).sort(), [1, 2]);
+  assert.deepEqual(split(), shards);
 });
 
 function phase(name, files, args = ["--maxWorkers=4"]) {
@@ -391,6 +472,58 @@ test("selectChangedTests: changed tests, name matches, direct importers and smal
 
   // The .test.ts suffix isn't part of the name: a change to scripts/test.mjs selects nothing here.
   assert.deepEqual(selectChangedTests(["scripts/test.mjs"], testFiles, read).files, []);
+});
+
+test("selectChangedTests: the always files join any change that isn't only Markdown", () => {
+  const testFiles = [
+    "server/src/routes/issues.test.ts",
+    "server/src/__tests__/openapi-routes.test.ts",
+    "server/src/__tests__/golden.test.ts",
+  ];
+  const always = ["server/src/__tests__/openapi-routes.test.ts", "server/src/__tests__/golden.test.ts"];
+  const read = () => "";
+
+  // A source change far from the always files still brings them in.
+  assert.deepEqual(selectChangedTests(["packages/shared/src/types/project.ts"], testFiles, read, { always }).files, [
+    "server/src/__tests__/golden.test.ts",
+    "server/src/__tests__/openapi-routes.test.ts",
+  ]);
+
+  // So does a change to a file that is neither a source nor Markdown, such as a migration.
+  assert.deepEqual(
+    selectChangedTests(["packages/db/src/migrations/0493_x.sql"], testFiles, read, { always }).files,
+    ["server/src/__tests__/golden.test.ts", "server/src/__tests__/openapi-routes.test.ts"],
+  );
+
+  // A change to Markdown only, or no change at all, runs nothing.
+  assert.deepEqual(selectChangedTests(["fork/green-push.md", "README.md"], testFiles, read, { always }).files, []);
+  assert.deepEqual(selectChangedTests([], testFiles, read, { always }).files, []);
+});
+
+test("loadTiers reads alwaysQuick, which may be left out, and wants a reason for each file", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "test-tiers-"));
+  const write = (name, value) => {
+    const file = path.join(dir, name);
+    writeFileSync(file, JSON.stringify(value));
+    return file;
+  };
+
+  assert.deepEqual(loadTiers(write("none.json", emptyTiers)).alwaysQuick, []);
+  const entry = { file: "server/src/__tests__/a.test.ts", reason: "checks every route" };
+  assert.deepEqual(loadTiers(write("one.json", { ...emptyTiers, alwaysQuick: [entry] })).alwaysQuick, [entry]);
+  assert.throws(
+    () => loadTiers(write("bad.json", { ...emptyTiers, alwaysQuick: [{ file: "server/src/__tests__/a.test.ts" }] })),
+    /alwaysQuick must be an array of \{ file, reason \}/,
+  );
+});
+
+test("checkTiers refuses an alwaysQuick file that isn't a test file, or that is opt-in", () => {
+  const withAlways = (file) => ({ ...tiers, alwaysQuick: [{ file, reason: "whole-app check" }] });
+  assert.doesNotThrow(() => checkTiers(withAlways("server/src/__tests__/a.test.ts"), inventory));
+  assert.throws(() => checkTiers(withAlways("server/src/__tests__/gone.test.ts"), inventory),
+    /alwaysQuick path is not a test file: server\/src\/__tests__\/gone\.test\.ts/);
+  assert.throws(() => checkTiers(withAlways("server/src/services/native-runtime/n.test.ts"), inventory),
+    /alwaysQuick path is opt-in, so quick would never run it: server\/src\/services\/native-runtime\/n\.test\.ts/);
 });
 
 test("--dry-run lists the thorough phases with file counts and checks coverage", () => {
