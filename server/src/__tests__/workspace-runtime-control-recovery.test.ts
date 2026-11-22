@@ -22,7 +22,7 @@ import {
   workspaceOperationService,
   workspaceRuntimeControlOwnerIdForTests,
 } from "../services/workspace-operations.js";
-import { currentControllerProcessStamp, currentProcessSpaceHash, currentProcessStartedAtMs } from "../services/controller-process-identity.js";
+import { currentControllerProcessStamp, currentProcessSpaceHash, currentProcessStartedAtMs, observedProcessStartedAt } from "../services/controller-process-identity.js";
 import {
   createOwnershipReportState,
   runOwnershipReconciliationPass,
@@ -554,13 +554,24 @@ describeEmbeddedPostgres("managed runtime-control operation recovery", () => {
   describe("shared ownership path (plan Phase 2)", () => {
     const kind = OWNABLE_KINDS.find((entry) => entry.id === "workspace_runtime_control_operation")!;
     // The server resolves its own start time at boot; the stamp reads it without I/O.
-    beforeAll(async () => { await currentProcessStartedAtMs(); });
+    // This process's start as the owner proof observes it (`currentProcessProbe().readStartedAt`).
+    let observedStartMs = 0;
+    beforeAll(async () => {
+      await currentProcessStartedAtMs();
+      const observed = await observedProcessStartedAt(process.pid);
+      if (observed === null) throw new Error("This host cannot report this process's start time");
+      observedStartMs = observed;
+    });
     const pass = (record = true) => runOwnershipReconciliationPass(db, { state: createOwnershipReportState(),
       kinds: [kind], record });
     // A previous server whose PID this test process now reuses: same PID space,
-    // same PID, but it started long before this process did.
+    // same PID, but it started 60.5 s before this process did. Never a whole number
+    // of seconds: on Linux a whole-second gap may be one process seen across a clock
+    // change, so it proves nothing (`ProcessStartClock`). A fixed time such as
+    // 2000-01-01T00:00:00.000Z failed whenever this process's start fell on a whole
+    // second, 1 time in 100 (bug 68).
     const reusedPidOwner = () => ({ ownerId: randomUUID(), pid: process.pid, heartbeatAt: new Date(),
-      bootId: randomUUID(), processStartedAt: "2000-01-01T00:00:00.000Z" });
+      bootId: randomUUID(), processStartedAt: new Date(observedStartMs - 60_500).toISOString() });
 
     it("recovers at once a start whose owner's PID now belongs to a later process", async () => {
       const seeded = await seedWorkspace();
