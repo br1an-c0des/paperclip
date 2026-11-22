@@ -121,6 +121,10 @@ export function planPush(updates, repo, env) {
     if (changed && changed.every(isMarkdown)) markdownFiles += changed.length;
     else needChecks.push(range);
   }
+  if (needChecks.length === 0 && markdownFiles === 0) {
+    plan.notes.push("No files change in the pushed range: nothing to check.");
+    return plan;
+  }
   if (needChecks.length === 0) {
     plan.notes.push(`Only Markdown changed (${markdownFiles} file${markdownFiles === 1 ? "" : "s"}): skipping the typecheck and tests.`);
     return plan;

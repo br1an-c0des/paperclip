@@ -205,6 +205,12 @@ test("childEnv drops git's repository variables and keeps the rest", () => {
   assert.deepEqual(env, { GIT_SSH_COMMAND: "ssh", PATH: "/bin" });
 });
 
+test("planPush: a range with no file changes runs nothing", () => {
+  const plan = planPush([update("refs/heads/feat", C, "refs/heads/copy", C)], fakeRepo(), {});
+  assert.deepEqual(plan.checks, []);
+  assert.match(plan.notes.join("\n"), /No files change/);
+});
+
 test("runChecks runs in order, stops at the first failure, and says how to bypass", async () => {
   const ran = [];
   const lines = [];
