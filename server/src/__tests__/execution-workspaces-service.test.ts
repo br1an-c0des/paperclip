@@ -44,6 +44,7 @@ import {
   readExecutionWorkspaceConfig,
   readMetadataReopenPendingConsumptionSince,
 } from "../services/execution-workspaces.ts";
+import { clearWorktreeDefaultProbeCache } from "../services/worktree-default.js";
 import { issueService } from "../services/issues.ts";
 import { workProductService } from "../services/work-products.js";
 import { DELIVERY_QUEUES } from "../services/delivery-work-notifications.js";
@@ -5281,5 +5282,24 @@ describeEmbeddedPostgres("executionWorkspaceService.getCloseReadiness", () => {
     const legacyReadiness = await svc.getCloseReadiness(executionWorkspaceId);
     expect(legacyReadiness?.git?.createdByRuntime).toBe(false);
     expect(legacyReadiness?.plannedActions.map((action) => action.kind)).not.toContain("git_branch_delete");
+  }, 20_000);
+
+  it("keeps a project whose checkout is a git repository with no commit on the shared checkout (step 4b part 3)", async () => {
+    // `git worktree add` needs a HEAD commit, so the worktree default waits for the first commit.
+    const companyId = randomUUID();
+    const projectId = randomUUID();
+    const checkout = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-no-commit-"));
+    tempDirs.add(checkout);
+    await runGit(checkout, ["init", "--initial-branch=main"]);
+    await db.insert(companies).values({ id: companyId, name: "Paperclip", issuePrefix: "PNC", requireBoardApprovalForNewAgents: false });
+    await db.insert(projects).values({ id: projectId, companyId, name: "Empty repository", status: "in_progress" });
+    await db.insert(projectWorkspaces).values({ id: randomUUID(), companyId, projectId, name: "Primary", sourceType: "local_path", isPrimary: true, cwd: checkout });
+    const strategy = () => svc.resolveSourceWorkspaceStrategy({ companyId, projectId, executionWorkspacePolicy: null });
+    expect(await strategy()).not.toBe("git_worktree");
+    await fs.writeFile(path.join(checkout, "README.md"), "x\n", "utf8");
+    await runGit(checkout, ["add", "README.md"]);
+    await runGit(checkout, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "First"]);
+    clearWorktreeDefaultProbeCache();
+    expect(await strategy()).toBe("git_worktree");
   }, 20_000);
 });
