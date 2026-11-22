@@ -1830,6 +1830,9 @@ describe("company portability", () => {
     expect(agentSvc.updatePermissions).toHaveBeenCalledWith(expect.stringMatching(/^imported-/), {
       canCreateAgents: false,
       ceoHiringDeniedBy: expect.objectContaining({ actorType: "user", actorId: "user-1", at: expect.any(String) }),
+      // Since step 4a the denial also sets the agents:create override to false. The level is the
+      // mocked agent's: it has no stored access, so it resolves to the default.
+      access: expect.objectContaining({ overrides: { "agents:create": false } }),
     });
     const importedId = agentSvc.updatePermissions.mock.calls[0]![0];
     expect(accessSvc.setPrincipalPermission).toHaveBeenCalledWith(expect.any(String), "agent", importedId, "agents:create", false, null);
