@@ -87,7 +87,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | fixed on `feat/step-4a` (`5c499f719`) | | | 2026-11-18 | | |
 | 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | fixed on `feat/step-4a` (`846bc008d`) | | | 2026-11-18 | | |
 | 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | fixed on `feat/step-4a` (`1137643cc`) | | | 2026-11-18 | | |
-| 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | candidate | | | 2026-11-18 | | |
+| 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | fixed (`b30f07d57f`, `b4d5ecbe9e`) | | | 2026-11-18 | | |
 | 54 | [Check access on the other plugin-origin agent writes](#54-check-access-on-the-other-plugin-origin-agent-writes) | candidate | | | 2026-11-18 | | |
 | 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
 | 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
@@ -101,20 +101,22 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 64 | [Find the file that leaves a heartbeat run behind for heartbeat-task-drain](#64-find-the-file-that-leaves-a-heartbeat-run-behind-for-heartbeat-task-drain) | fixed (`877fe4dd7`, `ec3d65627`) | | | 2026-11-20 | | |
 | 65 | [Tag the running image as previous before Compose builds the new one](#65-tag-the-running-image-as-previous-before-compose-builds-the-new-one) | fixed (`49b1c703d`) | | | 2026-11-20 | | |
 | 66 | [Let the database decide a lease that looks expired on the server's clock](#66-let-the-database-decide-a-lease-that-looks-expired-on-the-servers-clock) | fixed (`c67fff236`) | | | 2026-11-20 | | |
-| 67 | [Make `agent-commentary-skills` pass in a worktree under `.claude/`](#67-make-agent-commentary-skills-pass-in-a-worktree-under-claude) | candidate | | | 2026-11-20 | | |
+| 67 | [Make `agent-commentary-skills` pass in a worktree under `.claude/`](#67-make-agent-commentary-skills-pass-in-a-worktree-under-claude) | fixed (`e6e1b65da8`) | | | 2026-11-20 | | |
 | 68 | [Steady `fresh-continuation-fallback`'s recycled-PID test](#68-steady-fresh-continuation-fallbacks-recycled-pid-test) | fixed (`1577048c2f`, `657f0d91fb`) | | | 2026-11-20 | | |
 | 69 | [Bring the opt-in hiring and portability tests up to step 4a's access levels](#69-bring-the-opt-in-hiring-and-portability-tests-up-to-step-4as-access-levels) | candidate | | | 2026-11-20 | | |
-| 70 | [Find the bundled skills folder from a nested worktree](#70-find-the-bundled-skills-folder-from-a-nested-worktree) | candidate | | | 2026-11-21 | | |
+| 70 | [Find the bundled skills folder from a nested worktree](#70-find-the-bundled-skills-folder-from-a-nested-worktree) | fixed (`e6e1b65da8`) | | | 2026-11-21 | | |
 | 71 | [Fix the opt-in chat and email channel failures on `main`](#71-fix-the-opt-in-chat-and-email-channel-failures-on-main) | candidate | | | 2026-11-21 | | |
-| 72 | [Steady the server tests that fail only under a full local run's load](#72-steady-the-server-tests-that-fail-only-under-a-full-local-runs-load) | candidate | | | 2026-11-21 | | |
+| 72 | [Steady the server tests that fail only under a full local run's load](#72-steady-the-server-tests-that-fail-only-under-a-full-local-runs-load) | fixed (`7058a272a5`, `f4f04c17a9`) | | | 2026-11-21 | | |
 | 73 | [Share the worktree folder and base-ref rules between a run and its preview](#73-share-the-worktree-folder-and-base-ref-rules-between-a-run-and-its-preview) | candidate | | | 2026-11-21 | | |
-| 74 | [Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal](#74-loosen-controller-instance-leases-wall-clock-bound-on-a-blocked-renewal) | candidate | | | 2026-11-21 | | |
+| 74 | [Loosen `controller-instance-lease`'s wall-clock bound on a blocked renewal](#74-loosen-controller-instance-leases-wall-clock-bound-on-a-blocked-renewal) | fixed (`400317287b`) | | | 2026-11-21 | | |
 | 75 | [Stop redacting the run manifest's credential row](#75-stop-redacting-the-run-manifests-credential-row) | candidate | | | 2026-11-22 | | |
 | 76 | [Record and preview a run's full environment key list](#76-record-and-preview-a-runs-full-environment-key-list) | candidate | | | 2026-11-22 | | |
 | 77 | [Find the package test that failed once in a local `test:quick`](#77-find-the-package-test-that-failed-once-in-a-local-testquick) | candidate | | | 2026-11-22 | | |
 | 78 | [Tell the agent when its permission request is denied](#78-tell-the-agent-when-its-permission-request-is-denied) | candidate | | | 2026-11-22 | | |
 | 79 | [Make the run preview's "writes no files" test ignore other files' temp folders](#79-make-the-run-previews-writes-no-files-test-ignore-other-files-temp-folders) | fixed (`2789106d6e`) | | | 2026-11-22 | | |
-| 80 | [Give `nested-clone-migration`'s expire-and-restore test room on a loaded CI runner](#80-give-nested-clone-migrations-expire-and-restore-test-room-on-a-loaded-ci-runner) | candidate | | | 2026-11-22 | | |
+| 80 | [Give `nested-clone-migration`'s expire-and-restore test room on a loaded CI runner](#80-give-nested-clone-migrations-expire-and-restore-test-room-on-a-loaded-ci-runner) | fixed (`fc9c76393b`) | | | 2026-11-22 | | |
+| 81 | [Make `paperclip-skill-utils` read the skills folder from the repo, not the current directory](#81-make-paperclip-skill-utils-read-the-skills-folder-from-the-repo-not-the-current-directory) | candidate | | | 2026-11-22 | | |
+| 82 | [Time test waits on the monotonic clock: the desktop's wall clock jumps](#82-time-test-waits-on-the-monotonic-clock-the-desktops-wall-clock-jumps) | candidate | | | 2026-11-22 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -914,6 +916,13 @@ Found by the step 4a run-MCP agent (2026-11-18).
   tests run without a temporary `cwd`, and `acpx-engine/execute.ts:1674` writes
   `<cwd>/.claude/settings.local.json`. It can slip into a commit.
 - **Likely fix:** give those tests a temporary `cwd`, or add the path to `.gitignore` as a guard.
+- **Fixed** (`b30f07d57f`, `b4d5ecbe9e`, merged as `dfd82949d6`), tests only. Seven tests in
+  `acpx-engine/execute.test.ts` had no cwd, so the engine fell back to `process.cwd()` (`execute.ts`,
+  ~:1900); `runExecutor` now gives such a test one private temp cwd, kept across its resumed turns.
+  Worse, `claude-local`'s `acp.quota.test.ts` passed the repo root as cwd on purpose, so every run
+  merged its permissions into the checkout's own root `.claude/settings.local.json`; it now uses its
+  temp folder. The path was already gitignored. adapter-utils (95 files), claude-local (32) and
+  `test:quick` now leave nothing behind (`git status --ignored` before and after).
 
 ### 54. Check access on the other plugin-origin agent writes
 
@@ -1187,6 +1196,10 @@ Found 2026-11-20 by step 4b's agent A.
 - **Likely fix:** find which path rule the Codex half applies to the skill source; make the test
   independent of the checkout's location, or fix the rule if it's wrong for real installs.
 - **Fork workaround:** none; reviewers re-run it from the main checkout.
+- **Fixed** with bug 70 (`e6e1b65da8`, merged as `dfd82949d6`). Same cause: the test passes
+  `server/src/__tests__` as the module folder, so in a nested worktree the shared lookup mounted the
+  outer checkout's `.claude/skills` (pm, upstream-watch…) instead of the repo's `skills/`, and
+  `complain/SKILL.md` was missing. Codex wasn't at fault. Passes 3 of 3 in a nested worktree now.
 
 ### 68. Steady `fresh-continuation-fallback`'s recycled-PID test
 
@@ -1245,6 +1258,16 @@ Found 2026-11-21 by step 4b part 3's agent I.
   nested, so it's a dev and test problem.
 - **Likely fix:** look for the repo's own `skills/` (next to the package root) before any
   `.claude/skills`, or stop at the first `pnpm-workspace.yaml`.
+- **Fixed** (`e6e1b65da8`, merged as `dfd82949d6`). Not a walk-up: `resolvePaperclipSkillsDir` is
+  the shared one in `packages/adapter-utils/src/server-utils.ts`, and it tries fixed relative
+  candidates first. `../../../../../skills` was written for an adapter's `src/server`, five levels
+  below the repo; from `server/src/services` it climbs out of the checkout, and from one nested under
+  `.claude/worktrees/` it lands on the outer `.claude/skills`. Relative candidates must now stay
+  inside the nearest folder with a `pnpm-workspace.yaml`; without one (published installs) nothing
+  changes. The image (`/app`, the whole repo) resolves to `/app/skills` as before, checked on a
+  mock layout for six module locations. It also fixes the CLI's lookup
+  (`cli/src/commands/client/agent.ts`). A regression test in `server-utils.test.ts` pins it. In a
+  nested worktree it fixes 2 of the 3 email-channel failures and 2 of the 10 chat ones (bug 71).
 
 ### 71. Fix the opt-in chat and email channel failures on `main`
 
@@ -1269,6 +1292,18 @@ Found 2026-11-21 by step 4b part 2's and part 3's agents G and I, in local `test
   `legacy-finalization-regression.test.ts` (a 30 s timeout). Related to bugs 62 and 68.
 - **Likely fix:** look for a shared cause (the embedded database's connection limit, or a slow
   machine) before steadying each test.
+- **Fixed** (`7058a272a5`, merged as `ea9ee48c84`), with no shared cause: three separate findings.
+  - `legacy-finalization-regression` was already fixed by `f4f04c17a9` (the test uses the shared
+    checkout, not a worktree of the whole repo). The CI timeout (run 44971919760) tested a commit
+    without it; it takes 1.5–2.2 s since.
+  - `heartbeat-run-output`: the `CONNECTION_ENDED` line was another file's leftover native-resume
+    timer (bug 64's open item), logged, not the failure. A real risk was found and fixed: "ends a run
+    stopped during a storage outage as cancelled" stops the run before it registers its execution
+    control, so the stop lands only when the legacy controller lease's next renewal is refused
+    (~9.1 s). The test checked `Date.now()` against 10 s, which the wall-clock jumps of bug 82 can
+    eat; it now uses `performance.now()` and allows one renewal (`LEGACY_CONTROLLER_RENEW_MS`) plus 2 s.
+  - `connection-management.integration` (Arcade): not reproduced (5 of 5 at 2 workers under a 2-CPU
+    cap; never failed in CI, no failure message kept). Reopen if it recurs.
 
 ### 73. Share the worktree folder and base-ref rules between a run and its preview
 
@@ -1291,6 +1326,11 @@ Found 2026-11-21 by step 4b part 2's agent G.
   failed in agent I's quick run too. The file imports nothing step 4b changed. Related to bug 72.
 - **Likely fix:** check it on `main` first; if it fails there too, measure what the renewal waits
   on and set the bound from that rather than from the wall clock.
+- **Fixed** (`400317287b`, merged as `ea9ee48c84`), test only. The renewal waits exactly the
+  server's 8 s `statement_timeout` (8.0 s here, 8025–8038 ms in 7 CI runs). The test timed it with
+  `Date.now()`, which on this desktop jumps forward (bug 82): vitest timed the failing test at
+  8.03 s while `Date.now()` read the renewal as 10.5 s. The file's three elapsed-time checks now use
+  `performance.now()`, as the lease code does; the bound is unchanged.
 
 ### 75. Stop redacting the run manifest's credential row
 
@@ -1378,3 +1418,33 @@ The test is upstream's, not step 4b's (last changed in `d23dd19750`, upstream #1
   clones, commits and an expire-and-restore cycle in one test.
 - **Likely fix:** a longer timeout for this test (its own `it(..., 45_000)`), or split the
   expire and restore halves. Check `node scripts/ci-flakes.mjs` first for how often it fails.
+- **Fixed** (`fc9c76393b`, merged as `ea9ee48c84`), test only. Real git work, no fixed waits: 5–7 s
+  alone, 6–14 s on CI's 2-worker shards in 7 green runs, 17.1 s in the failed one. It and the two
+  siblings that reach 11 s in CI (the remote-tracking expire, the two-task serialize) get their own
+  45 s timeout (`HEAVY_GIT_TEST_TIMEOUT_MS`); the global timeouts are unchanged. Failed once in CI
+  since 2026-11-15.
+
+### 81. Make `paperclip-skill-utils` read the skills folder from the repo, not the current directory
+
+Found 2026-11-22 by the CI/DevOps session's agent B (bug 70's fix).
+
+- **Problem:** `server/src/__tests__/paperclip-skill-utils.test.ts` fails 15 tests with `ENOENT` on
+  `server/skills/paperclip/SKILL.md` when vitest starts from `server/`, because it reads
+  `path.resolve("skills/...")` against `process.cwd()`. It passes from the repo root, which is how
+  `scripts/test.mjs` and CI run it, so only a direct `cd server && vitest run …` hits it.
+- **Likely fix:** resolve the path from the test file (`import.meta.dirname`) instead of the cwd.
+
+### 82. Time test waits on the monotonic clock: the desktop's wall clock jumps
+
+Found 2026-11-22 by the CI/DevOps session's agent A (bugs 72 and 74).
+
+- **Problem:** on the WSL desktop, time sync steps the wall clock forward about 0.6 s every ~33 s
+  (0.8 s under load; the journal logs "Clock change detected" ~110 times an hour idle, ~220 under
+  load). `performance.now()` doesn't jump, `Date.now()` does, so a test that bounds a wait with
+  `Date.now()` can read it as up to ~1 s longer. That caused bug 74 and part of bug 72, and fits
+  `live-recovery-work.test.ts:627` failing once in a local quick run with a deadline 439 ms off. A
+  search found 63 other `expect(Date.now() - x).toBeLessThan(...)` bounds in the tests. CI's
+  runners don't show it.
+- **Likely fix:** move elapsed-time bounds to `performance.now()` as they come up, starting with the
+  tight ones (a margin under ~2 s). Not the deadlines that compare against stored timestamps, which
+  need the wall clock.
