@@ -1207,3 +1207,41 @@ Found 2026-11-20 by step 4b's agent E; confirmed on `feat/step-4b` before E's me
   still belong in the opt-in tier: the `claude_local` agents here bind one (`aiConnection`), so
   part of that area isn't dormant.
 - **Fork workaround:** none; the files only run with `corepack pnpm test:optin`.
+
+### 70. Find the bundled skills folder from a nested worktree
+
+Found 2026-11-21 by step 4b part 3's agent I.
+
+- **Problem:** `resolvePaperclipSkillsDir` (`server/src/services/connector-runtime.ts:200-205`)
+  walks up from the module and takes the first `.claude/skills` it meets. From a worktree nested
+  under the main checkout's `.claude/worktrees/`, that's the main checkout's
+  `/home/brian/coding/paperclip/.claude/skills`, not the repo's `skills/`, so the bundled connector
+  skills (agentmail, slack) read as missing there. Part of the `email-channels.integration` and
+  `chat-channels.integration` failures in agent worktrees comes from this. A deployment isn't
+  nested, so it's a dev and test problem.
+- **Likely fix:** look for the repo's own `skills/` (next to the package root) before any
+  `.claude/skills`, or stop at the first `pnpm-workspace.yaml`.
+
+### 71. Fix the opt-in chat and email channel failures on `main`
+
+Found 2026-11-21 by step 4b part 3's agent I; identical on `main` at `3535df8071`.
+
+- **Problem:** two opt-in files fail on `main`, and CI doesn't run them:
+  `chat-channels.integration.test.ts` (10 of 1970, among them "keeps one exact chat delivery
+  owner…", "does not resolve or mint a substitute owner…", "binds Slack tools to the admitted
+  linked request…", plus lock contention on `chat_endpoints`), and
+  `email-channels.integration.test.ts` (3). Some, maybe all, come from bug 70 when run in a
+  worktree; it's unchecked whether they also fail from the main checkout.
+- **Likely fix:** run both from the main checkout first; fix what remains, or skip it with a note
+  (chat channels are dormant here).
+
+### 72. Steady the server tests that fail only under a full local run's load
+
+Found 2026-11-21 by step 4b part 2's and part 3's agents G and I, in local `test:quick` runs.
+
+- **Problem:** these each failed once in a full local quick run and pass alone and in CI:
+  `heartbeat-run-output.test.ts` (`write CONNECTION_ENDED` on a `heartbeat_runs` select),
+  `connection-management.integration.test.ts` (Arcade discovery) and
+  `legacy-finalization-regression.test.ts` (a 30 s timeout). Related to bugs 62 and 68.
+- **Likely fix:** look for a shared cause (the embedded database's connection limit, or a slow
+  machine) before steadying each test.
