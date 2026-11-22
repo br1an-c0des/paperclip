@@ -24,7 +24,9 @@ corepack pnpm test:quick
 1. **Typecheck the whole workspace, not one package.** A change to a shared type has to compile in
    every package that builds it, the dormant ones included. A plugin's test fixture broke a run
    this way.
-2. **`test:quick`** runs the tests your change touches, by name and import. Unless the change is
+2. **`test:quick`** runs the tests your change touches, by name and import. Name matching skips
+   generic file names (`index`, `test`, `config`, `run` and the rest of `genericNames` in
+   `scripts/test.mjs`), which would otherwise select dozens of unrelated tests. Unless the change is
    only Markdown, it also runs the whole-app checks listed under `alwaysQuick` in
    `scripts/test-tiers.json` (~40 s): OpenAPI route coverage, the issue-detail golden file, and the
    route access scan. Name and import rules never select them, and they caused two of the three
@@ -42,6 +44,11 @@ corepack pnpm hooks:install
 - **It covers every worktree:** the setting lives in `.git/config`, which all worktrees share, so
   agents' pushes are checked too. A worktree without `node_modules` gets a blocked push telling it
   to install first.
+- **It takes turns:** the checks hold the machine lock (`/tmp/paperclip-test-bench.lock`, the one
+  full local test runs take) from the first check to the last, so parallel pushes queue instead
+  of stacking typechecks. It says when it's waiting. `PAPERCLIP_PREPUSH_LOCK=<path>` picks another
+  lock file, `=off` none. The lock isn't reentrant: don't push from inside `flock` on that lock,
+  or the push waits on itself.
 - **What it can't check:** the checks run on the working tree. A pushed commit that isn't checked
   out (`git push origin other-branch`) is let through with a warning, and uncommitted changes are
   tested along with the commit.
