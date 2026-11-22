@@ -1,0 +1,211 @@
+{
+ "numTotalTestSuites": 3,
+ "numPassedTestSuites": 2,
+ "numFailedTestSuites": 1,
+ "numPendingTestSuites": 0,
+ "numTotalTests": 12,
+ "numPassedTests": 6,
+ "numFailedTests": 1,
+ "numPendingTests": 5,
+ "numTodoTests": 0,
+ "snapshot": {
+  "added": 0,
+  "failure": false,
+  "filesAdded": 0,
+  "filesRemoved": 0,
+  "filesRemovedList": [],
+  "filesUnmatched": 0,
+  "filesUpdated": 0,
+  "matched": 0,
+  "total": 0,
+  "unchecked": 0,
+  "uncheckedKeysByFile": [],
+  "unmatched": 0,
+  "updated": 0,
+  "didUpdate": false
+ },
+ "startTime": 1795299845744,
+ "success": false,
+ "testResults": [
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [
+      "adapter model listing"
+     ],
+     "fullName": "adapter model listing returns an empty list for unknown adapters",
+     "status": "passed",
+     "title": "returns an empty list for unknown adapters",
+     "duration": 9.769132999999783,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "adapter model listing"
+     ],
+     "fullName": "adapter model listing does not expose models for the retired acpx_local tombstone",
+     "status": "passed",
+     "title": "does not expose models for the retired acpx_local tombstone",
+     "duration": 0.7937259999998787,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "adapter model listing"
+     ],
+     "fullName": "adapter model listing returns codex fallback models when no OpenAI key is available",
+     "status": "passed",
+     "title": "returns codex fallback models when no OpenAI key is available",
+     "duration": 5.253190999999788,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    }
+   ],
+   "startTime": 1795299924330,
+   "endTime": 1795299924483.5234,
+   "status": "passed",
+   "message": "",
+   "name": "/home/runner/work/paperclip/paperclip/server/src/__tests__/adapter-models.test.ts"
+  },
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [
+      "openapi routes"
+     ],
+     "fullName": "openapi routes describes cached link results with the lookup shape and shared batch bound",
+     "status": "passed",
+     "title": "describes cached link results with the lookup shape and shared batch bound",
+     "duration": 85.30695699999887,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "openapi routes"
+     ],
+     "fullName": "openapi routes tells agents that unpriced usage in cost reports is unknown cost, not zero",
+     "status": "passed",
+     "title": "tells agents that unpriced usage in cost reports is unknown cost, not zero",
+     "duration": 32.30422799999906,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "openapi routes"
+     ],
+     "fullName": "openapi routes tells agents managed-agent profiles are created with the CLI, not a web page",
+     "status": "passed",
+     "title": "tells agents managed-agent profiles are created with the CLI, not a web page",
+     "duration": 37.193137000000206,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "openapi routes"
+     ],
+     "fullName": "openapi routes covers the mounted server routes exactly",
+     "status": "failed",
+     "title": "covers the mounted server routes exactly",
+     "duration": 62.447377000000415,
+     "failureMessages": [
+      "AssertionError: expected { unknownRouteFiles: [], …(3) } to deeply equal { unknownRouteFiles: [], …(3) }\n    at /home/runner/work/paperclip/paperclip/server/src/__tests__/openapi-routes.test.ts:1336:8\n    at file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:1628:35\n    at file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:26\n    at file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3321:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3316:10)\n    at file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3301:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3259:10)\n    at file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3882:64"
+     ],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    }
+   ],
+   "startTime": 1795300195810,
+   "endTime": 1795300197927.2178,
+   "status": "failed",
+   "message": "",
+   "name": "/home/runner/work/paperclip/paperclip/server/src/__tests__/openapi-routes.test.ts"
+  },
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [
+      "trace migration cancellation through the real S3 SDK"
+     ],
+     "fullName": "trace migration cancellation through the real S3 SDK cancels a stalled open and releases its capture",
+     "status": "skipped",
+     "title": "cancels a stalled open and releases its capture",
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "trace migration cancellation through the real S3 SDK"
+     ],
+     "fullName": "trace migration cancellation through the real S3 SDK cancels a stalled probe and releases its capture",
+     "status": "skipped",
+     "title": "cancels a stalled probe and releases its capture",
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "trace migration cancellation through the real S3 SDK"
+     ],
+     "fullName": "trace migration cancellation through the real S3 SDK cancels a stalled upload and releases its capture",
+     "status": "skipped",
+     "title": "cancels a stalled upload and releases its capture",
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "trace migration cancellation through the real S3 SDK"
+     ],
+     "fullName": "trace migration cancellation through the real S3 SDK cancels a stalled restore and releases its capture",
+     "status": "skipped",
+     "title": "cancels a stalled restore and releases its capture",
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "trace migration cancellation through the real S3 SDK"
+     ],
+     "fullName": "trace migration cancellation through the real S3 SDK cancels a stalled read and releases its capture",
+     "status": "skipped",
+     "title": "cancels a stalled read and releases its capture",
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    }
+   ],
+   "startTime": 1795299845744,
+   "endTime": 1795299845744,
+   "status": "passed",
+   "message": "",
+   "name": "/home/runner/work/paperclip/paperclip/server/src/services/provider-trace-cancellation.integration.test.ts"
+  }
+ ]
+}
