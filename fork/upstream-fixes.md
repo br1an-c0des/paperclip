@@ -113,7 +113,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 76 | [Record and preview a run's full environment key list](#76-record-and-preview-a-runs-full-environment-key-list) | candidate | | | 2026-11-22 | | |
 | 77 | [Find the package test that failed once in a local `test:quick`](#77-find-the-package-test-that-failed-once-in-a-local-testquick) | candidate | | | 2026-11-22 | | |
 | 78 | [Tell the agent when its permission request is denied](#78-tell-the-agent-when-its-permission-request-is-denied) | candidate | | | 2026-11-22 | | |
-| 79 | [Make the run preview's "writes no files" test ignore other files' temp folders](#79-make-the-run-previews-writes-no-files-test-ignore-other-files-temp-folders) | candidate | | | 2026-11-22 | | |
+| 79 | [Make the run preview's "writes no files" test ignore other files' temp folders](#79-make-the-run-previews-writes-no-files-test-ignore-other-files-temp-folders) | fixed (`2789106d6e`) | | | 2026-11-22 | | |
 | 80 | [Give `nested-clone-migration`'s expire-and-restore test room on a loaded CI runner](#80-give-nested-clone-migrations-expire-and-restore-test-room-on-a-loaded-ci-runner) | candidate | | | 2026-11-22 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
@@ -1358,6 +1358,14 @@ based on `main` at `804b1ccf59`), server (isolated) shard 6/10. Added in step 4b
   preview call, so `tmpdir()` resolves there) and compare that, or compare only names that appear
   after and not before and check none is the preview's. The file's earlier failure (run
   44984434117, shard 10) was a different cause, `invalid reference: HEAD`, fixed before the merge.
+- **Since then:** failed again on the same run's attempt 2 (shard 6, the other way round: a folder
+  that was there before was gone after).
+- **Fixed** (`2789106d6e`, merged as `00e44a3661`), test only. The race was with
+  `plugin-task-credential-writeback.test.ts`, which ran in the same shard at the same moment on both
+  attempts: its credential folders land in the run's shared `TMPDIR`. The preview call now runs with
+  `TMPDIR` pointed at a private folder, and the test expects that folder to be empty. It still
+  fails if the preview writes a credential folder (checked with a temporary one), and passed 20
+  runs in a row at 2 workers, and 5 alongside the writeback file.
 
 ### 80. Give `nested-clone-migration`'s expire-and-restore test room on a loaded CI runner
 
