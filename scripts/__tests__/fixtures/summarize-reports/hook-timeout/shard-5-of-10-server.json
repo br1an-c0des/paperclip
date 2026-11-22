@@ -1,0 +1,94 @@
+{
+ "numTotalTestSuites": 1,
+ "numPassedTestSuites": 0,
+ "numFailedTestSuites": 1,
+ "numPendingTestSuites": 0,
+ "numTotalTests": 4,
+ "numPassedTests": 3,
+ "numFailedTests": 1,
+ "numPendingTests": 0,
+ "numTodoTests": 0,
+ "snapshot": {
+  "added": 0,
+  "failure": false,
+  "filesAdded": 0,
+  "filesRemoved": 0,
+  "filesRemovedList": [],
+  "filesUnmatched": 0,
+  "filesUpdated": 0,
+  "matched": 0,
+  "total": 0,
+  "unchecked": 0,
+  "uncheckedKeysByFile": [],
+  "unmatched": 0,
+  "updated": 0,
+  "didUpdate": false
+ },
+ "startTime": 1795105597377,
+ "success": false,
+ "testResults": [
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [
+      "heartbeat worktree suppression"
+     ],
+     "fullName": "heartbeat worktree suppression suppresses new assignment wakes in worktree instances without creating heartbeat runs",
+     "status": "failed",
+     "title": "suppresses new assignment wakes in worktree instances without creating heartbeat runs",
+     "duration": 30070.02429,
+     "failureMessages": [
+      "Error: Hook timed out in 30000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n    at afterEach (file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2006:122)\n    at /home/runner/work/paperclip/paperclip/server/src/__tests__/heartbeat-worktree-suppression.test.ts:75:3\n    at file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2763:52\n    at runWithSuite (file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3250:8)\n    at Object.collect (file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2763:22)\n    at Object.collect (file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2768:51)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3451:26\n    at collectTests (file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3424:3)\n    at startTests (file:///home/runner/work/paperclip/paperclip/node_modules/.pnpm/vitest@5.0.3_@opentelemetry+api@1.9.1_@types+node@24.13.3_jsdom@30.0.1_@noble+hashes@2.4.0__v_rv5bm4asruuay5qyvxrxd6xvsu/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:4166:17)"
+     ],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "heartbeat worktree suppression"
+     ],
+     "fullName": "heartbeat worktree suppression does not replay copied queued runs or timer wakes while worktree scheduling is suppressed",
+     "status": "passed",
+     "title": "does not replay copied queued runs or timer wakes while worktree scheduling is suppressed",
+     "duration": 26523.837276999984,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "heartbeat worktree suppression"
+     ],
+     "fullName": "heartbeat worktree suppression skips pre-cutoff system wakes but allows user wakes in an armed worktree",
+     "status": "passed",
+     "title": "skips pre-cutoff system wakes but allows user wakes in an armed worktree",
+     "duration": 730.0091320000356,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "heartbeat worktree suppression"
+     ],
+     "fullName": "heartbeat worktree suppression still creates live-plane assignment runs when suppression is not active",
+     "status": "passed",
+     "title": "still creates live-plane assignment runs when suppression is not active",
+     "duration": 2387.914506000001,
+     "failureMessages": [],
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    }
+   ],
+   "startTime": 1795106034971,
+   "endTime": 1795106094688.7644,
+   "status": "failed",
+   "message": "",
+   "name": "/home/runner/work/paperclip/paperclip/server/src/__tests__/heartbeat-worktree-suppression.test.ts"
+  }
+ ]
+}

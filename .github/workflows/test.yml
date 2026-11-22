@@ -1,6 +1,7 @@
-# The fork's CI (hard-fork step 3a, round 2): typecheck, and the thorough test tier split into
-# shards. Upstream's 38 workflows were removed; they're readable at the tag `upstream-freeze`.
-# Design and numbers: fork/test-suite-audit/results-ci.md.
+# The fork's CI (hard-fork step 3a, round 2): typecheck, ui-new's tests, build and mocked e2e, the
+# thorough test tier split into shards, and the Docker image deploy.sh builds, when a push changes
+# what it's built from. Upstream's 38 workflows were removed; they're readable at the tag
+# `upstream-freeze`. Design and numbers: fork/test-suite-audit/results-ci.md.
 #
 # Runs on every push to any branch. Pull requests run it only when they come from another
 # repository: a branch in this one has already been tested by its push.
@@ -30,7 +31,7 @@ env:
 
 jobs:
   typecheck:
-    name: Typecheck, ui-new and runner tests
+    name: Typecheck and CI script tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -71,13 +72,92 @@ jobs:
       - name: Typecheck
         run: corepack pnpm typecheck
 
-      - name: ui-new tests
-        run: corepack pnpm --filter @paperclipai/ui-new test
-
       # The runner's own tests (node --test), including a dry run that checks the shards cover
       # the tier.
       - name: Test runner tests
         run: corepack pnpm test:runner
+
+      # The script behind the thorough job's run summary, on trimmed reports from real runs.
+      - name: Run summary script tests
+        run: node --test scripts/__tests__/summarize-reports.test.mjs
+
+  # ui-new on its own runner, so its tests and build aren't on the typecheck job's critical path.
+  # Its typecheck stays in `corepack pnpm typecheck` above. Each check after setup runs even when
+  # an earlier one failed, so one run shows them all.
+  ui-new:
+    name: ui-new unit tests, build and e2e
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Enable corepack (pnpm from package.json's packageManager)
+        run: corepack enable && corepack pnpm --version
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      # The id marks the end of setup: the checks below run if it got this far.
+      - name: Build the plugin SDK
+        id: setup
+        run: corepack pnpm --filter @paperclipai/plugin-sdk build
+
+      - name: ui-new unit tests
+        run: corepack pnpm --filter @paperclipai/ui-new test
+
+      # The production build deploy/Dockerfile makes, into ui-new/dist.
+      - name: ui-new build
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: corepack pnpm --filter @paperclipai/ui-new build
+
+      # The Chromium headless shell the suite runs in, at the version the root's @playwright/test
+      # expects, with its system libraries.
+      - name: Install Playwright's Chromium
+        id: browser
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: corepack pnpm exec playwright install --with-deps --only-shell chromium
+
+      # The mocked smoke suite (ui-new/playwright.config.ts): it builds the app, serves it with
+      # `vite preview` and answers every /api request from e2e/fixtures, so no server runs. CI=true
+      # gives it 2 workers, forbidOnly and the list reporter; the html reporter is added so that a
+      # failure leaves a report with its traces and screenshots.
+      - name: ui-new e2e (mocked API)
+        id: e2e
+        if: ${{ !cancelled() && steps.browser.outcome == 'success' }}
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/ui-new/e2e/.report
+          PLAYWRIGHT_HTML_OPEN: never
+        run: corepack pnpm --filter @paperclipai/ui-new test:e2e --reporter=list,html
+
+      - name: Upload the Playwright report
+        if: ${{ failure() && steps.e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: ui-new/e2e/.report/
+          if-no-files-found: ignore
+          retention-days: 14
 
   thorough:
     name: Thorough tier, shard ${{ matrix.shard }}/${{ matrix.count }}
@@ -135,7 +215,17 @@ jobs:
 
       # Workers default to the machine: half of the runner's 4 cores, so 2 (scripts/test.mjs).
       - name: Run shard ${{ matrix.shard }} of the thorough tier
+        id: tests
         run: node scripts/test.mjs --tier thorough --shard ${{ matrix.shard }}/${{ matrix.count }} --report-dir test-reports
+
+      # Each failed test's file, name and error on the run's page, so a red run reads without
+      # opening the log. Passing the step's outcome lets it tell "no failures" from a failure
+      # outside any test (a coverage check, a crashed worker).
+      - name: Summarize the shard's results
+        if: always() && steps.tests.outcome != 'skipped'
+        env:
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+        run: node scripts/ci/summarize-reports.mjs test-reports --outcome "$TEST_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save the Vitest module cache
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -153,3 +243,149 @@ jobs:
           path: test-reports/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Whether this run builds the Docker image: when the push changed what the image is built from.
+  # The gate is a job, not workflow-level `paths`, because deploy.sh needs a green run for every
+  # commit; a skipped job inside a green run is fine (it ignores skipped jobs).
+  changes:
+    name: What the push changed
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      image: ${{ steps.paths.outputs.image }}
+    steps:
+      # Plain git with a blobless fetch, so no checkout: it needs commits and trees, not files.
+      # - push: the files changed between the branch's previous tip (`before`) and this commit;
+      #   for a new branch (`before` all zeros) or a `before` that can't be fetched (a force push
+      #   that GitHub has collected), the files changed since the merge base with main.
+      # - any other event (workflow_dispatch, a pull request from another repository): build.
+      # Anything unexpected also builds, so the gate can only cost minutes, never skip a build.
+      - name: Decide whether to build the image
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          # decide true|false <reason...>: sets the output, writes the reason to the run summary.
+          decide() {
+            local image=$1
+            shift
+            echo "image=$image" >> "$GITHUB_OUTPUT"
+            local heading=skip
+            [ "$image" = true ] && heading=build
+            printf '### Docker image: %s\n\n%s\n' "$heading" "$*" >> "$GITHUB_STEP_SUMMARY"
+            echo "image=$image: $*"
+            exit 0
+          }
+          trap 'decide true "Line $LINENO of the gate failed unexpectedly, so it builds."' ERR
+          [ "$EVENT" = push ] || decide true "A $EVENT run always builds it."
+          work=$PWD
+          # Each attempt starts from an empty repository, so a failed fetch leaves nothing behind.
+          fetch() {
+            cd "$work" && rm -rf repo && git init -q repo && cd repo \
+              && git remote add origin "$REPO_URL" \
+              && git fetch -q --no-tags --filter=blob:none origin "$@"
+          }
+          has_before=false
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            has_before=true
+          fi
+          if $has_before && fetch --depth=1 "$BEFORE" "$SHA"; then
+            base=$BEFORE
+            since="the branch's previous tip (${BEFORE:0:10})"
+          elif fetch "$SHA" "+refs/heads/main:refs/remotes/origin/main" \
+              && base=$(git merge-base origin/main "$SHA"); then
+            since="the merge base with main (${base:0:10})"
+            # A commit already on main is its own merge base, so there's nothing to compare: fine
+            # for a new branch made from main (main's own run decided), but after a `before` that
+            # couldn't be fetched it says nothing, so build.
+            if [ "$base" = "$SHA" ] && $has_before; then
+              decide true "The branch's previous tip (${BEFORE:0:10}) couldn't be fetched" \
+                "and the commit is on main, so it builds."
+            fi
+          else
+            decide true "Couldn't tell what the push changed, so it builds."
+          fi
+          files() { if [ "$1" = 1 ]; then echo "1 file"; else echo "$1 files"; fi; }
+          changed=$(git diff --name-only --no-renames "$base" "$SHA") \
+            || decide true "git diff $base $SHA failed, so it builds."
+          # What the two builds read beyond the source: their Dockerfiles and context rules,
+          # deploy/, every package manifest, the lockfile and what the install reads with it
+          # (workspace, .npmrc, patches/), the Node version, and this workflow.
+          hits=$(printf '%s\n' "$changed" | while IFS= read -r path; do
+            case "$path" in
+              Dockerfile | */Dockerfile | .dockerignore | deploy/* \
+                | package.json | */package.json | pnpm-lock.yaml | pnpm-workspace.yaml \
+                | .npmrc | patches/* | .nvmrc | .github/workflows/test.yml)
+                echo "$path" ;;
+            esac
+          done)
+          total=$(printf '%s' "$changed" | grep -c '^' || true)
+          if [ -n "$hits" ]; then
+            count=$(printf '%s' "$hits" | grep -c '^')
+            listed=$(printf '%s' "$hits" | head -n 10 | sed 's/.*/`&`/' | paste -sd ' ' -)
+            decide true "Compared with $since, $(files "$total") changed." \
+              "Image inputs among them ($count): $listed"
+          fi
+          decide false "Compared with $since, $(files "$total") changed, none of them an image input."
+
+  # The two builds deploy.sh makes, in the same order and with the same arguments: the core image
+  # from the root Dockerfile (target production), then deploy/Dockerfile on top of it with ui-new.
+  # deploy.sh builds the second through `docker compose build server`, whose build section is this
+  # command. Build only: nothing is pushed, and no secret or registry login is used.
+  #
+  # No layer cache: the image's stages hold several GB (node_modules twice, the Runner's Rust
+  # build, the agent CLIs), the repository's 10 GB Actions cache already holds ~7 GB of pnpm and
+  # Vitest entries, and a gha cache would need the Docker actions and their builder, which can't
+  # see the core image the second build starts FROM. So each build is cold; the gate keeps them
+  # rare.
+  image:
+    name: Docker image build
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The builds need tens of GB. The runner had 87 GB free when this was written (run
+      # 44977462841), so nothing is freed; a runner image with much less fails here, by name,
+      # instead of somewhere inside a build.
+      - name: Check free disk space
+        run: |
+          df -h /
+          free_gb=$(df --output=avail -BG / | tail -n 1 | tr -dc '0-9')
+          if [ "$free_gb" -lt 30 ]; then
+            echo "::error::Only ${free_gb} GB free on /; the image builds need about 30. Free some (the runner's unused SDKs: /usr/share/dotnet, /usr/local/lib/android, /opt/ghc) before the builds."
+            exit 1
+          fi
+          echo "${free_gb} GB free on /"
+
+      # deploy.sh passes the ISO week, so the agent CLIs' layer moves forward weekly.
+      # PAPERCLIP_BUILD_COMMIT is left out as deploy.sh does: it would also build the remote
+      # provider pack this setup doesn't use.
+      - name: Build the core image (root Dockerfile, target production)
+        run: |
+          docker build --target production \
+            --build-arg CLI_TOOLS_CACHE_EPOCH="$(date -u +%G-W%V)" \
+            -t "paperclip-core:$GITHUB_SHA" .
+
+      - name: Build the fork image (deploy/Dockerfile, with ui-new)
+        run: |
+          docker build -f deploy/Dockerfile \
+            --build-arg BASE_IMAGE="paperclip-core:$GITHUB_SHA" \
+            --build-arg PAPERCLIP_UI_COMMIT="$GITHUB_SHA" \
+            -t paperclip-fork:ci .
+
+      - name: Image sizes and disk left
+        if: always()
+        run: |
+          docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep '^paperclip-' || true
+          df -h /
