@@ -3,7 +3,9 @@
 # $STUB_STATE/calls.log. STUB_GH_AUTH=no fails `gh auth status`. STUB_CI is a
 # comma-separated list of run states, one per `gh run list` (the last repeats):
 # none, success, failure, cancelled, in_progress, queued. Prints what
-# deploy.sh's --jq expression would.
+# deploy.sh's --jq expression would. The extended tier's nightly run (a `gh run
+# list` for extended-nightly.yml) answers from STUB_EXTENDED instead, without
+# using up a STUB_CI state: success (the default), failure, none or error.
 set -euo pipefail
 state=${STUB_STATE:?}
 printf 'gh %s\n' "$*" >> "$state/calls.log"
@@ -13,6 +15,15 @@ case "$1 $2" in
     [ "${STUB_GH_AUTH:-yes}" = yes ] || { echo "You are not logged into any GitHub hosts." >&2; exit 1; }
     ;;
   "run list")
+    if [[ " $* " == *" extended-nightly.yml "* ]]; then
+      url=https://github.com/test-owner/test-repo/actions/runs/202
+      case "${STUB_EXTENDED:-success}" in
+        none) ;;
+        error) echo "HTTP 502" >&2; exit 1 ;;
+        *) echo "${STUB_EXTENDED:-success} 2026-11-23T05:17:00Z abcdef0123 202 $url" ;;
+      esac
+      exit 0
+    fi
     n=$(cat "$state/gh_run_list_calls" 2>/dev/null || echo 0)
     echo $((n + 1)) > "$state/gh_run_list_calls"
     IFS=, read -r -a seq <<<"${STUB_CI:-success}"
@@ -26,7 +37,11 @@ case "$1 $2" in
     esac
     ;;
   "run view")
-    echo "  - Thorough tier, shard 1/10: failure"
+    if [ "$3" = 202 ]; then
+      echo "  - Extended tier, shard 2/6: failure"
+    else
+      echo "  - Core tier, shard 1/3: failure"
+    fi
     ;;
   *)
     echo "stub gh: unhandled: $*" >&2

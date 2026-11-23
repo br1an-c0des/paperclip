@@ -8,6 +8,8 @@
 #   deploy/deploy.sh --dry-run         report what each stage would do; changes nothing
 #   deploy/deploy.sh --rebuild         rebuild the core image even if one exists for this commit
 #   deploy/deploy.sh --wait-ci         wait for HEAD's CI run to finish instead of stopping
+#                                      (CI's Test workflow gates; main's nightly extended
+#                                      test run only warns when red)
 #   deploy/deploy.sh --skip-ci         deploy without a green CI run (prints a warning)
 #   deploy/deploy.sh --backed-up       you took your own backup: skip the automatic one
 #   deploy/deploy.sh --skip-rehearsal  don't rehearse new migrations on a copy of the database
@@ -323,6 +325,45 @@ ci_gate() {
   die "$problem"$'\n\n'"To deploy anyway (for example when the failure is a known flaky test), run again with --skip-ci."
 }
 
+# Reports main's latest finished run of the extended test tier
+# (.github/workflows/extended-nightly.yml). It never stops a deploy: the extended
+# tier reports, it doesn't gate (fork/test-core-proposal.md). A red run gets a
+# warning naming its failed shards, so you can check they're not about what
+# you're deploying.
+extended_report() {
+  local line conclusion created sha id url
+  if [ -z "${ci_repo:-}" ]; then
+    echo "Extended:   not checked (gh or the GitHub repository isn't available; see CI above)"
+    return 0
+  fi
+  if ! line=$(gh run list -R "$ci_repo" --workflow extended-nightly.yml --branch main --status completed --limit 1 \
+      --json conclusion,createdAt,headSha,databaseId,url \
+      --jq '.[0] | select(.) | [(if (.conclusion // "") == "" then "-" else .conclusion end), .createdAt, .headSha[0:10], (.databaseId | tostring), .url] | join(" ")' \
+      2>/dev/null); then
+    echo "Extended:   couldn't check main's nightly extended run (gh run list failed); not a blocker"
+    return 0
+  fi
+  if [ -z "$line" ]; then
+    echo "Extended:   no finished nightly run on main yet"
+    return 0
+  fi
+  read -r conclusion created sha id url <<<"$line"
+  if [ "$conclusion" = success ]; then
+    echo "Extended:   main's last nightly run passed ($created, commit $sha)"
+    return 0
+  fi
+  {
+    echo "Extended:   WARNING: main's last nightly extended run didn't pass ($conclusion, $created, commit $sha):"
+    echo "            $url"
+    gh run view "$id" -R "$ci_repo" --json jobs \
+      --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "") | "  - \(.name): \(.conclusion)"' \
+      2>/dev/null | sed 's/^/          /' || true
+    echo "            Deploying anyway: the extended tier warns, it doesn't gate. Check the failures"
+    echo "            aren't about what you're deploying."
+  } >&2
+  return 0
+}
+
 # --- Backup ------------------------------------------------------------------
 
 # Fails unless the backup directory's disk has room for a dump of the whole
@@ -634,6 +675,7 @@ fi
 
 echo "Commit:     $commit"
 ci_gate
+extended_report
 
 if $rebuild; then
   build_core=true
