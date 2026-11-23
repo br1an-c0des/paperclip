@@ -4,7 +4,11 @@
 // shares that setting, and each uses the hook in its own checkout).
 //
 // Before a push it runs, in order, stopping at the first failure:
-//   1. `corepack pnpm typecheck`: the whole workspace, dormant packages included.
+//   1. A typecheck of the packages the pushed range changes and the packages that depend on them:
+//      `corepack pnpm -r --filter "...[<base>]" typecheck`. The whole workspace (`corepack pnpm
+//      typecheck`, ~6.5 GB and the Runner's `cargo check`) only when a root file every package
+//      reads changes (package.json, pnpm-lock.yaml, pnpm-workspace.yaml, tsconfig*.json) or a range
+//      has no base. CI typechecks the whole workspace on every push either way.
 //   2. `node scripts/test.mjs --tier quick --changed <base>`: the tests the pushed range touches.
 // The base is where the pushed range starts, worked out per ref from git's pre-push input:
 //   - a deletion is skipped;
@@ -72,6 +76,12 @@ export function isMarkdown(file) {
   return /\.md$/i.test(file);
 }
 
+/** Root files every package's typecheck reads: a change to one typechecks the whole workspace. */
+const wholeWorkspaceFiles = /^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|tsconfig[^/]*\.json)$/;
+export function needsWholeTypecheck(files) {
+  return files.some((file) => wholeWorkspaceFiles.test(file));
+}
+
 export function bypassRequested(env) {
   return ["1", "true"].includes(String(env.PAPERCLIP_SKIP_PREPUSH ?? "").trim().toLowerCase());
 }
@@ -136,7 +146,7 @@ export function planPush(updates, repo, env) {
   for (const range of ranges) {
     const changed = range.base ? repo.changedFiles(range.base, range.local) : null;
     if (changed && changed.every(isMarkdown)) markdownFiles += changed.length;
-    else needChecks.push(range);
+    else needChecks.push({ ...range, changed });
   }
   if (needChecks.length === 0 && markdownFiles === 0) {
     plan.notes.push("No files change in the pushed range: nothing to check.");
@@ -160,8 +170,10 @@ export function planPush(updates, repo, env) {
     plan.warnings.push(`The working tree has uncommitted changes to tracked files (${listed}). `
       + `The checks test the working tree as it is, those changes included, not exactly the pushed commit ${short(head)}.`);
   }
-  plan.checks.push({ name: "typecheck", command: "corepack", args: ["pnpm", "typecheck"] });
   const bases = [...new Set(atHead.map((range) => range.base).filter(Boolean))];
+  const whole = atHead.some((range) => !range.base || needsWholeTypecheck(range.changed ?? []));
+  plan.checks.push({ name: "typecheck", command: "corepack", args: whole ? ["pnpm", "typecheck"]
+    : ["pnpm", "-r", ...bases.flatMap((base) => ["--filter", `...[${base}]`]), "typecheck"] });
   for (const range of atHead.filter((item) => !item.base)) {
     plan.warnings.push(`No base for ${range.ref}: neither main nor origin/main shares history with it, `
       + "so test:quick can't tell what changed. Running the typecheck only.");

@@ -60,24 +60,43 @@ set up for one person running Claude agents.
 
 ## Tests
 
-The suite runs in tiers through `scripts/test.mjs`; `scripts/test-tiers.json` says which files are
-opt-in ([doc/test-infrastructure.md](doc/test-infrastructure.md#test-tiers), step 3a).
+The suite runs in tiers through `scripts/test.mjs`. Only the **core** tier gates; the rest report
+([doc/test-infrastructure.md](doc/test-infrastructure.md#test-tiers),
+[fork/test-core-proposal.md](fork/test-core-proposal.md), adopted 2026-11-23).
 
-- **Before pushing:** `corepack pnpm test:quick` runs the tests your change touches since its merge
-  base with `main` (`--changed <ref>` for another base). A few minutes at most. `ui-new` has its
-  own `typecheck` and `test` (Common commands).
-- **CI** (`.github/workflows/test.yml`) runs the thorough tier, `corepack pnpm test`, on every push
-  to any branch: a typecheck and 10 shards in parallel. Locally the same tier takes about 21 min, so
-  leave it to CI unless you're checking a fix for a CI failure.
+- **Tiers:**
+  - **Core** (`corepack pnpm test`, ~365 files, about 3½ min locally): every test file that isn't
+    opt-in or listed in `scripts/test-extended.txt`.
+  - **Extended** (`corepack pnpm test:extended`, ~1,100 files): upstream's slower and flakier
+    integration tests. It runs nightly on `main` (`.github/workflows/extended-nightly.yml`) and
+    gates nothing.
+  - **Opt-in** (`corepack pnpm test:optin`): dormant halves, the Runner, other adapters, the CLI,
+    plugins, chat channels. On demand only (`.github/workflows/optin.yml`).
+- **Before pushing:** `corepack pnpm test:quick` runs the core tests your change touches since its
+  merge base with `main` (`--changed <ref>` for another base). The pre-push hook runs it after a
+  typecheck of the packages the push changed. `ui-new` has its own `typecheck` and `test` (Common
+  commands).
+- **CI** (`.github/workflows/test.yml`) runs on every push to any branch: a typecheck of the whole
+  workspace, `ui-new`, and core in 3 shards, about 7 min.
 - **Before merging into `main`:** the branch's latest push is green in CI. Push the branch, wait for
-  the run, then merge with `--no-ff`. Fix a red run on the branch, not on `main`.
-- **On demand:** `corepack pnpm test:optin` runs the opt-in tier (dormant halves, the Runner,
-  other adapters, the CLI, plugins, chat channels). Run it, or the files concerned, when a change
-  reaches into those areas.
-- **New test files** land in thorough unless an `optIn` glob matches them. A server test file that
-  leaves module state behind for the next file in its worker goes in `ISOLATED_BY_NAME` in
+  the run, then merge with `--no-ff`. Fix a red run on the branch, not on `main`. For a branch that
+  changes the run lifecycle, heartbeat, workspaces or recovery, also run extended on it once
+  (`gh workflow run extended-nightly.yml -R br1an-c0des/paperclip --ref <branch>`). Read the
+  result; don't chase it.
+- **A red nightly extended run:** about ten minutes.
+  - **A product bug:** fix it, and delete the file's line from `scripts/test-extended.txt` so core
+    runs it.
+  - **A test problem** (timing, load, a leak, drift): move the file to opt-in with a one-line reason,
+    or delete it. Don't investigate it unless it covers code you're changing.
+  - **No bug-list entry** for test-only problems in extended or opt-in.
+  - `deploy.sh` warns when the latest nightly run is red, but deploys anyway.
+- **Core stays deterministic:** a core flake gets fixed the same day or moves to extended, and a file
+  that flakes twice is out. A core file over 15 s on CI needs a reason.
+- **Opt-in tests** get fixed only when that area is being woken up.
+- **New test files land in core.** The extended list only shrinks. A server test file that leaves
+  module state behind for the next file in its worker goes in `ISOLATED_BY_NAME` in
   `server/vitest.config.ts` ([results-leaks.md](fork/test-suite-audit/results-leaks.md)).
-- **Full local runs** (thorough, opt-in, or a long file set) take the machine lock so two don't
+- **Full local runs** (core, extended, opt-in, or a long file set) take the machine lock so two don't
   share the machine: `flock /tmp/paperclip-test-bench.lock corepack pnpm test`.
 
 ## UI text

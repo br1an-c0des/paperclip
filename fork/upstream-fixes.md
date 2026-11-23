@@ -5,6 +5,10 @@ Since the hard fork (2026-11-17) they're fixed in our own tree, on a branch merg
 file kept its old name, `upstream-fixes.md`, so links still work. Until then it listed fixes to send
 to `paperclipai/paperclip`; entries from that time keep their history (branches, pull requests).
 
+**Not test-only problems in the extended or opt-in tiers** (since 2026-11-23): a file there that
+fails for test reasons moves to opt-in with a one-line reason in `scripts/test-tiers.json`, or is
+deleted ([CLAUDE.md](../CLAUDE.md#tests)). A product bug a test finds still goes here.
+
 **Only bugs belong here:** something that's wrong. New behaviour, new API fields or filters and
 other additions are feature ideas in the build plan
 ([3.17](../ui-new/docs/build-plan.md#317-smaller-feature-ideas) and the other stage 3 entries).

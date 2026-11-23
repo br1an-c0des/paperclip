@@ -202,7 +202,7 @@ if selected "dry-run migrations"; then
   run STUB_CI=failure -- --dry-run
   expect_exit 0
   expect_out "CI for $commit_c didn't pass (failure)"
-  expect_out "Thorough tier, shard 1/10: failure"
+  expect_out "Core tier, shard 1/3: failure"
   expect_out "--skip-ci"
   expect_out "0002_b.sql"
   expect_out "would dump the database"
@@ -218,7 +218,7 @@ if selected "ci failure"; then
   run STUB_CI=failure --
   expect_exit 1
   expect_out "didn't pass (failure): https://github.com/test-owner/test-repo/actions/runs/101"
-  expect_out "Thorough tier, shard 1/10"
+  expect_out "Core tier, shard 1/3"
   expect_out "run again with --skip-ci"
   expect_call "^gh run view 101 -R test-owner/test-repo"
   expect_read_only
@@ -231,6 +231,41 @@ if selected "ci failure"; then
   expect_out "(cancelled)"
   expect_read_only
   end
+fi
+
+if selected "extended"; then
+  begin "extended nightly green: says so"
+  fresh "$commit_b"
+  run -- --dry-run
+  expect_exit 0
+  expect_out "Extended:   main's last nightly run passed (2026-11-23T05:17:00Z, commit abcdef0123)"
+  expect_call "^gh run list -R test-owner/test-repo --workflow extended-nightly.yml --branch main --status completed"
+  expect_read_only
+  end
+
+  begin "extended nightly red: warns with its failed shards, and the deploy goes on"
+  fresh "$commit_b"
+  run STUB_EXTENDED=failure -- --dry-run
+  expect_exit 0
+  expect_out "WARNING: main's last nightly extended run didn't pass (failure"
+  expect_out "Extended tier, shard 2/6: failure"
+  expect_out "Deploying anyway"
+  expect_out "CI:         passed"
+  expect_call "^gh run view 202 -R test-owner/test-repo"
+  expect_read_only
+  end
+
+  begin "extended nightly missing or gh failing: says so and goes on"
+  fresh "$commit_b"
+  run STUB_EXTENDED=none -- --dry-run
+  expect_exit 0
+  expect_out "no finished nightly run on main yet"
+  fresh "$commit_b"
+  run STUB_EXTENDED=error -- --dry-run
+  expect_exit 0
+  expect_out "couldn't check main's nightly extended run"
+  end
+
 fi
 
 if selected "ci none"; then

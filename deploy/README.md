@@ -330,6 +330,17 @@ the failing job first (`gh run view <id> -R br1an-c0des/paperclip --log-failed`)
 (`gh run rerun <id> --failed -R br1an-c0des/paperclip`) and deploy with `--wait-ci`. A docs-only
 commit gets a CI run like any other push, so it's gated too.
 
+The Test workflow runs the core test tier. The extended tier runs nightly on `main`
+(`.github/workflows/extended-nightly.yml`) and doesn't gate. After the CI gate, `deploy.sh` reads
+`main`'s latest finished extended run:
+
+- **Passed:** it prints one line.
+- **Red:** it prints a warning with the run's URL and its failed shards, then goes on. Check the
+  failures aren't about what you're deploying.
+- **No run yet, or `gh` failing:** it says so and goes on.
+
+See [CLAUDE.md](../CLAUDE.md#tests) for what to do with a red extended run.
+
 ### Automatic backups
 
 Migrations run when the server starts and don't run backwards, so restoring a backup is the only

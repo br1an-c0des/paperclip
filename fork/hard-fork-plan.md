@@ -371,6 +371,23 @@ The work, each part measured before and after:
    opt-in), when to run each (before pushing, in CI, before merging into `main`), in CLAUDE.md and
    the `/pm` agent briefs, and a time budget checked when tests are added.
 
+**Follow-up, 2026-11-23: a small core gates, the rest reports**
+([test-core-proposal.md](test-core-proposal.md)). Once the suite ran, most of its cost was red runs
+that weren't bugs: in the week to 2026-11-22, none of CI's ten red runs was a product bug. So the
+thorough tier was split:
+
+- **Core** (365 files, 3m17s locally) gates merges and deploys. It's made of:
+  - the package tests;
+  - the server tests the fork wrote;
+  - the fast, never-flaky server tests the fork had to edit;
+  - four guards and proven catches.
+- **Extended** (1,102 files, `scripts/test-extended.txt`) runs nightly. It only reports, and
+  `deploy.sh` warns when it's red.
+- **Opt-in** lost its weekly schedule.
+- **New test files land in core,** and the extended list only shrinks.
+- **The pre-push hook typechecks only the packages a push changes** (and the packages that depend
+  on them).
+
 ### 4. Make runs Claude-native
 
 **Direction changed 2026-11-18** ([decision 8](#decisions)). The proposal was a run that behaves
@@ -537,7 +554,7 @@ in whatever order matters most ([The build plan after the hard fork](#the-build-
 | Repo map and `claude_local` trace | Done 2026-11-17: [repo-map.md](repo-map.md) (ours, shared core, dormant, the seams, tests) and [claude-local-run.md](claude-local-run.md) (one run from wake to finish, both engines, with the change points for steps 4 and 5). |
 | 2. Take the fixes already written | Done 2026-11-19. Our three pull requests are in `main`; 24 of upstream's open pull requests taken in the 2026-11-17 watch ([upstream-watch.md](upstream-watch.md)); the deployment builds from source (no patches) and deploys resumed 2026-11-19. The bug list carries on in [upstream-fixes.md](upstream-fixes.md). |
 | 3. Leave unused code | Ongoing, as decided. |
-| 3a. Renovate the test suite | **Done 2026-11-19**, added 2026-11-17. The full suite took ~6 hours serially; the goal was 10–20 minutes (30 at most). Audit: [test-suite-audit.md](test-suite-audit.md); plan and results: [step-3a-plan.md](step-3a-plan.md). Rounds 1 and 2 merged 2026-11-18: tiers (quick, thorough, opt-in), the thorough tier at **21 min** locally with 0 failures, a CI workflow in 10 shards, and the workflow in `CLAUDE.md`. CI's first run on `main` (2026-11-19) was green in 11.5 min. |
+| 3a. Renovate the test suite | **Done 2026-11-19**, added 2026-11-17. The full suite took ~6 hours serially; the goal was 10–20 minutes (30 at most). Audit: [test-suite-audit.md](test-suite-audit.md); plan and results: [step-3a-plan.md](step-3a-plan.md). Rounds 1 and 2 merged 2026-11-18: tiers (quick, thorough, opt-in), the thorough tier at **21 min** locally with 0 failures, a CI workflow in 10 shards, and the workflow in `CLAUDE.md`. CI's first run on `main` (2026-11-19) was green in 11.5 min. 2026-11-23: split into core (gates, 3 shards) and extended (nightly, reports); see [test-core-proposal.md](test-core-proposal.md). |
 | 4. Make runs Claude-native | Split in two. 4a (Paperclip over MCP, agent permissions): designed and planned 2026-11-17 ([design](step-4a-mcp-and-permissions.md), [plan](step-4a-plan.md)); building on `feat/step-4a`: wave 1 merged there; regression runs wait for 3a, building continues; handed off to a manager session on server1 on 2026-11-18 ([handoff](step-4a-handoff.md)). Wave 2 and the follow-up fixes merged on `feat/step-4a` on 2026-11-18; the real run passed on server1's dev instance; the regression after 3a found bugs 58–61, fixed. **4a merged into `main` 2026-11-19** (`549e76036`, CI green), deployed to server1 the same day (backup `paperclip-2026-11-19-1215.dump`). 4b (Claude-native runs): next; part 1 designed ([design](step-4b-sealed-runs.md), approved 2026-11-18, updated for 4a on 2026-11-19); implementation plan written 2026-11-19 ([plan](step-4b-plan.md)); revised and **approved 2026-11-20** (skills in `paperclip`, `company` and per-run `project` plugins; the repo's own skills behind a project switch). Building on `feat/step-4b`: agent 0 (contracts) started 2026-11-20. **4b part 1 built 2026-11-20** on `feat/step-4b` (agents 0 and A–F): sealed CLI runs, CLI the default engine, the classic runner the default for new agents, the run manifest, GitHub only through a connection with the agent as commit author; real runs 1–6 on the desktop's dev instance ([results](step-4b-sealed-runs.md#real-run-check-2026-11-20-rollout-step-2)). **Merged into `main` 2026-11-21** (`b12b95be6f`, CI green); not yet deployed to server1 (check its agents' GitHub first). Parts 2 and 3 (what an agent's runs get; worktrees by default, with upstream's cleanup sweep behind a switch, off by default) designed 2026-11-21 ([design](step-4b-parts-2-3.md)), revised the same day to one worktree cleanup setting for the whole reaper, Off until chosen. Built 2026-11-21 on `feat/step-4b-p23` (agents G, H, I): the run preview read and the agent's "What runs get" card, which matches a worktree run; per-task worktrees by default for a project whose checkout is a git repository with a commit; the cleanup setting in App settings → Features; the dead isolated-workspace gates removed. Real run checked 2026-11-22 on the desktop's dev instance (TES-42): own worktree, exclude line, preview matched the run, apart from bugs 75 and 76. **Merged into `main` 2026-11-22** (`97902f72ae`, CI green); not yet deployed. Part 4 (live sessions on the CLI) evaluated 2026-11-22 and moved to step 6 ([notes](live-sessions-on-the-cli.md)), so **4b is complete with parts 1 to 3**; the recovery handoff's content and server-side live events wait for step 5 or 6. |
 | 5–7 | Not started. |
 

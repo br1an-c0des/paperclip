@@ -75,7 +75,8 @@ Agents start cold, so the brief carries everything. Include:
 3. **The work:** the goal, the boards and plan sections to read, the files it owns, and what to leave
    alone.
 4. **Tests:** run `corepack pnpm test:quick` before finishing, plus the specific files it changed
-   or added. Don't run the whole thorough tier (about 21 min; CI runs it). Any full local run takes
+   or added. Don't run the whole core tier unless asked (CI runs it), and never extended or
+   thorough (extended runs nightly). Any full local run takes
    the machine lock: `flock /tmp/paperclip-test-bench.lock …`. A change that reaches into opt-in
    areas (dormant halves, the Runner, other adapters, plugins, chat channels) runs those files too.
 5. **Finish:** commit on its branch with clear messages; don't push, don't merge, don't edit the
@@ -88,8 +89,11 @@ Agents start cold, so the brief carries everything. Include:
 1. Check the branch is based on `main` and stays inside its files.
 2. Review the diff, and run `corepack pnpm test:quick` from its worktree (plus
    `corepack pnpm --filter @paperclipai/ui-new typecheck` and `test` for UI work).
-3. Push the branch so CI runs the thorough tier (`.github/workflows/test.yml`), and wait for it to
-   be green: that's the gate before `main`. Failures go back to the agent, on the branch.
+3. Push the branch so CI runs the core tier (`.github/workflows/test.yml`), and wait for it to
+   be green: that's the gate before `main`. Failures go back to the agent, on the branch. A branch
+   that changes the run lifecycle, heartbeat, workspaces or recovery also gets one extended run
+   (`gh workflow run extended-nightly.yml -R br1an-c0des/paperclip --ref <branch>`). Read it; send
+   back only failures that are about the branch's change.
 4. When it's clean and green, merge into `main` with `--no-ff` and a message like
    `Merge the run modal (M2, boards 16-18)`.
 5. Record it: capability statuses and notes, new API gaps in `decisions.md`, milestone progress in

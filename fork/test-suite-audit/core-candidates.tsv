@@ -1,0 +1,366 @@
+file	ci_seconds	why_core
+packages/adapter-utils/src/acpx-engine/accounting-model.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/ephemeral-session-environment.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/execute-identity.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/execute.test.ts	38.4	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/filesystem-protocol.test.ts	5.7	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/local-process-control.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/operator-stop.test.ts	17.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/run-contracts.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/run-coordinator.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/run-fault-matrix.test.ts	2.1	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/run-resource-ledger.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/run-site-host.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/session-reuse-store.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/settlement-sequence.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/spawn-smoke.test.ts	7.5	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/startup-cancellation.test.ts	0.4	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/startup-timing.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/stock-runtime-options.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/terminal-session-failure.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/acpx-engine/turn-sequence.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/agent-observability.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/api-billing-type.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/billing.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/command-managed-runtime.test.ts	2.3	package test (unit-level, no CI failures)
+packages/adapter-utils/src/command-redaction.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapter-utils/src/connection-failure.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/env-bindings.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/execution-phase.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/execution-target.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/git-shallow-import-budget.test.ts	0.3	package test (unit-level, no CI failures)
+packages/adapter-utils/src/git-workspace-sync.test.ts	20.8	package test (unit-level, no CI failures)
+packages/adapter-utils/src/github-launcher-sealed.test.ts	0.7	package test (unit-level, no CI failures)
+packages/adapter-utils/src/mcp-isolation.integration.test.ts	2.1	package test (unit-level, no CI failures)
+packages/adapter-utils/src/prompt-sections.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/provider-stopped-boundary.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/published-exports.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/runtime-progress.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/server-utils-env.test.ts	0.2	package test (unit-level, no CI failures)
+packages/adapter-utils/src/server-utils.test.ts	6.4	package test (unit-level, no CI failures)
+packages/adapter-utils/src/skill-library-manifest.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/skills-staging-follow-symlinks.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapter-utils/src/startup-reuse.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/usage-checkpoint.test.ts	0.3	package test (unit-level, no CI failures)
+packages/adapter-utils/src/workspace-git-stream.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapter-utils/src/workspace-manifest.test.ts	0.3	package test (unit-level, no CI failures)
+packages/adapter-utils/src/workspace-restore-diagnostics.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/workspace-restore-merge.test.ts	0.4	package test (unit-level, no CI failures)
+packages/adapter-utils/src/workspace-restore-result.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/workspace-restore-teardown.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapter-utils/src/workspace-restore-unchanged.test.ts	1.4	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/index.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/acp.auth.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/acp.quota.test.ts	27.4	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/acp.test.ts	11.1	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/agent-config-dir.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/claude-config.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/claude-md.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/cli-capabilities.test.ts	5.1	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/engine-availability.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/execute.acp-fallback.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/execute.max-turns-classification.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/model-order.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/parse.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/permissions.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/preview.test.ts	0.3	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/probe-diagnostics.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/probe-env.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/probe-redaction.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/prompt-cache.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/quota-keychain.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/repo-skills.test.ts	0.1	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/run-manifest-github.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/run-manifest.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/sealed-env.test.ts	0.0	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/server/test.probe.test.ts	0.5	package test (unit-level, no CI failures)
+packages/adapters/claude-local/src/ui/build-config.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/adapter-auth-sessions-schema.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/agent-chat-messages-migration.test.ts	0.8	package test (unit-level, no CI failures)
+packages/db/src/agent-chat-migration.test.ts	1.3	package test (unit-level, no CI failures)
+packages/db/src/agent-config-read-grants-migration.test.ts	0.9	package test (unit-level, no CI failures)
+packages/db/src/agent-instruction-migration.test.ts	1.3	package test (unit-level, no CI failures)
+packages/db/src/agent-wakeup-requests-schema.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/backup-lib-binary.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/backup-lib.test.ts	20.4	package test (unit-level, no CI failures)
+packages/db/src/better-auth-account-issuer-migration.test.ts	0.8	package test (unit-level, no CI failures)
+packages/db/src/case-handoff-migration.test.ts	3.2	package test (unit-level, no CI failures)
+packages/db/src/check-migration-safety.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/checkpoint-pool.test.ts	0.1	package test (unit-level, no CI failures)
+packages/db/src/client-disconnect-replay.test.ts	1.2	package test (unit-level, no CI failures)
+packages/db/src/client-options.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/client-teardown-registry.test.ts	2.1	package test (unit-level, no CI failures)
+packages/db/src/client.test.ts	28.5	package test (unit-level, no CI failures)
+packages/db/src/company-secret-proposals-migration.test.ts	0.6	package test (unit-level, no CI failures)
+packages/db/src/connection-grants-phase2-migration.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/connection-grants-phase4-migration.test.ts	2.1	package test (unit-level, no CI failures)
+packages/db/src/connection-reuse-census.test.ts	2.6	package test (unit-level, no CI failures)
+packages/db/src/connections-v3-schema-core-migration.test.ts	0.9	package test (unit-level, no CI failures)
+packages/db/src/decision-queue-migrations.test.ts	0.3	package test (unit-level, no CI failures)
+packages/db/src/dedicated-connection-admission.test.ts	9.2	package test (unit-level, no CI failures)
+packages/db/src/embedded-postgres-error.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/embedded-postgres-lifecycle.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/execution-admission-migration.test.ts	2.0	package test (unit-level, no CI failures)
+packages/db/src/external-objects-schema.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/heartbeat-context-snapshot-index-migration.test.ts	0.2	package test (unit-level, no CI failures)
+packages/db/src/heartbeat-run-issue-privacy-migration.test.ts	4.3	package test (unit-level, no CI failures)
+packages/db/src/heartbeat-workspace-companion-index.test.ts	0.9	package test (unit-level, no CI failures)
+packages/db/src/inbox-archive-agent-policies-migration.test.ts	1.1	package test (unit-level, no CI failures)
+packages/db/src/issue-comment-derived-attribution-migration.test.ts	3.3	package test (unit-level, no CI failures)
+packages/db/src/issue-comment-on-behalf-migration.test.ts	0.7	package test (unit-level, no CI failures)
+packages/db/src/issue-thread-interaction-resolver-policy-migration.test.ts	0.4	package test (unit-level, no CI failures)
+packages/db/src/lazy-transaction-queries.test.ts	0.4	package test (unit-level, no CI failures)
+packages/db/src/migration-compatibility.test.ts	0.5	package test (unit-level, no CI failures)
+packages/db/src/migration-snapshot-drift.test.ts	1.4	package test (unit-level, no CI failures)
+packages/db/src/nested-skill-folders-migration.test.ts	0.6	package test (unit-level, no CI failures)
+packages/db/src/pipelines-schema.test.ts	0.1	package test (unit-level, no CI failures)
+packages/db/src/postgres-connection-recovery.test.ts	2.3	package test (unit-level, no CI failures)
+packages/db/src/postgres-queue-pool.test.ts	3.0	package test (unit-level, no CI failures)
+packages/db/src/postgres-queue.test.ts	6.5	package test (unit-level, no CI failures)
+packages/db/src/postgres-receive-buffer.test.ts	7.9	package test (unit-level, no CI failures)
+packages/db/src/prepared-queries-postgres.test.ts	0.7	package test (unit-level, no CI failures)
+packages/db/src/private-task-draft-assets-migration.test.ts	0.7	package test (unit-level, no CI failures)
+packages/db/src/project-environment-overlap-migration.test.ts	1.1	package test (unit-level, no CI failures)
+packages/db/src/project-skill-sources-migration.test.ts	0.6	package test (unit-level, no CI failures)
+packages/db/src/prompt-injection-prevention-migration.test.ts	2.1	package test (unit-level, no CI failures)
+packages/db/src/question-response-delivery-migration.test.ts	0.4	package test (unit-level, no CI failures)
+packages/db/src/question-response-history-migration.test.ts	1.1	package test (unit-level, no CI failures)
+packages/db/src/response-capture-bundle.test.ts	0.3	package test (unit-level, no CI failures)
+packages/db/src/response-capture-postgres.test.ts	0.7	package test (unit-level, no CI failures)
+packages/db/src/response-capture.test.ts	0.2	package test (unit-level, no CI failures)
+packages/db/src/run-event-payload.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/run-identity-migration.test.ts	0.5	package test (unit-level, no CI failures)
+packages/db/src/runtime-config.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/session-goal-migration.test.ts	0.3	package test (unit-level, no CI failures)
+packages/db/src/status-card-migrations.test.ts	0.4	package test (unit-level, no CI failures)
+packages/db/src/status-card-reason-upgrade.test.ts	1.9	package test (unit-level, no CI failures)
+packages/db/src/summary-slots-schema.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/task-list-activity-index-migration.test.ts	1.1	package test (unit-level, no CI failures)
+packages/db/src/test-postgres-owner-process.test.ts	5.5	package test (unit-level, no CI failures)
+packages/db/src/test-postgres-owner.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/user-workspace-preferences-migration.test.ts	0.4	package test (unit-level, no CI failures)
+packages/db/src/work-signal-debug.test.ts	0.0	package test (unit-level, no CI failures)
+packages/db/src/work-signals.test.ts	2.2	package test (unit-level, no CI failures)
+packages/db/src/workspace-defaults-migration.test.ts	1.3	package test (unit-level, no CI failures)
+packages/shared/src/account-handle.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/adapter-agnostic-keys.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/adapter-auth-check-code.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/adapter-types.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/agent-access.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/agent-appearance.test.ts	0.2	package test (unit-level, no CI failures)
+packages/shared/src/agent-commentary.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/agent-eligibility.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/agent-observability.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/agent-runner.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/app-definitions-url.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/app-definitions.test.ts	0.1	package test (unit-level, no CI failures)
+packages/shared/src/attention-audience.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/attention-card-type.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/case-handoffs.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/claude-run-manifest.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/config-schema.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/connection-instructions.test.ts	0.3	package test (unit-level, no CI failures)
+packages/shared/src/connection-intent-guidance.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/connection-routing.test.ts	0.1	package test (unit-level, no CI failures)
+packages/shared/src/connection-search.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/connection-setup-state.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/crash-points.test.ts	1.6	package test (unit-level, no CI failures)
+packages/shared/src/decision.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/document-anchors.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/env-file.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/environment-support.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/external-objects.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/feature-catalog.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/frontmatter.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/gitignore-runtime.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/home-paths.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/humanize-connection.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/issue-activity-identity.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/issue-attribution.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/issue-creation-source.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/issue-references.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/issue-thread-interactions.test.ts	0.1	package test (unit-level, no CI failures)
+packages/shared/src/issue-write-denial.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/link-preview.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/markdown-work-products.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/mcp-icons.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/oauth-endpoint-url.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/project-mentions.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/provider-rate-limits.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/public-mcp.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/resource-memberships.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/responsible-user-denial.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/routine-variables.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/run-failure-cause.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/runtime-exposure/loopback-bind.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/runtime-exposure/ports.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/setting-defaults.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/settings-visibility-catalog-growth.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/settings-visibility.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/summary-slot.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/telemetry/client-types.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/telemetry/client.test.ts	0.1	package test (unit-level, no CI failures)
+packages/shared/src/telemetry/readme-contract.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/telemetry/retention.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/telemetry/server-started-event.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/types/agent.adapter-auth-session.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/access.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/adapter-registry.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/agent.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/approval.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/artifact.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/asset.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/claude-setup-token-session.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/company-skill.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/company.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/connection-intent.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/instance.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/issue-chat-bootstrap.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/issue.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/plugin.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/routine.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/secret.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/skill-policy.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/status-card.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/tool-access.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/trust-policy.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/validators/work-product.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/work-product.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/workspace-commands.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/workspace-file-resource.test.ts	0.0	package test (unit-level, no CI failures)
+packages/shared/src/worktree-port-registry.test.ts	7.3	package test (unit-level, no CI failures)
+packages/shared/src/worktree-seed-source.test.ts	0.0	package test (unit-level, no CI failures)
+server/src/__tests__/adapter-auth-signal-routes.test.ts	8.9	covers code the fork changed; fast; no flake history
+server/src/__tests__/adapter-cost-failure-paths.test.ts	6.9	covers code the fork changed; fast; no flake history
+server/src/__tests__/adapter-models.test.ts	0.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/adapter-routes.test.ts	0.2	covers code the fork changed; fast; no flake history
+server/src/__tests__/adapter-session-codecs.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-access-authorization.test.ts	0.5	written in the fork (steps 4a/4b)
+server/src/__tests__/agent-access-migration.test.ts	0.1	written in the fork (steps 4a/4b)
+server/src/__tests__/agent-adapter-validation-routes.test.ts	10.7	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-auth-middleware.test.ts	0.3	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-avatars.test.ts	7.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-conversation-delivery.test.ts	0.6	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-conversations.test.ts	9.6	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-default-configure-grants.test.ts	0.5	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-file-checkpoint-locking.test.ts	2.2	caught a real bug (bug 61)
+server/src/__tests__/agent-file-restore-locking.test.ts	0.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-harness-verification-provider-api.test.ts	3.7	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-hire-auth-inheritance-routes.test.ts	2.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-hire-idempotency-routes.test.ts	1.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-instruction-save-history.test.ts	0.2	written in the fork (steps 4a/4b)
+server/src/__tests__/agent-instruction-working-copies.test.ts	15.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-instructions-routes.test.ts	0.3	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-interaction-mutations.test.ts	0.6	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-interaction-permissions.test.ts	12.5	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-permissions-routes.test.ts	0.7	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-route-policy.test.ts	0.5	written in the fork (steps 4a/4b)
+server/src/__tests__/agent-skills-routes.test.ts	1.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/agent-task-hierarchy-depth-routes.test.ts	1.4	covers code the fork changed; fast; no flake history
+server/src/__tests__/agents-pending-approval-config.test.ts	0.9	covers code the fork changed; fast; no flake history
+server/src/__tests__/app-hmr-port.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/approval-routes-idempotency.test.ts	0.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/assistant-connections-guidance.test.ts	0.2	covers code the fork changed; fast; no flake history
+server/src/__tests__/authorization-service.test.ts	2.3	covers code the fork changed; fast; no flake history
+server/src/__tests__/authz-existence-oracle-guard.test.ts	0.0	guard: access check before existence check
+server/src/__tests__/board-skill-ui-guidance.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/claude-local-execute.test.ts	9.3	covers code the fork changed; fast; no flake history
+server/src/__tests__/claude-local-sealed-run.test.ts	3.2	written in the fork (steps 4a/4b)
+server/src/__tests__/cleanup-removal-service.test.ts	0.6	covers code the fork changed; fast; no flake history
+server/src/__tests__/cli-invocation-safety.test.ts	1.6	covers code the fork changed; fast; no flake history
+server/src/__tests__/company-model-service-settings-guidance.test.ts	0.3	covers code the fork changed; fast; no flake history
+server/src/__tests__/costs-service.test.ts	1.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/decision-target-work.test.ts	6.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/decisions-service.test.ts	7.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/dev-watch-ignore.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/docker-build-stamp.test.ts	0.3	covers code the fork changed; fast; no flake history
+server/src/__tests__/documents-service.test.ts	0.9	covers code the fork changed; fast; no flake history
+server/src/__tests__/environment-runtime.test.ts	0.7	covers code the fork changed; fast; no flake history
+server/src/__tests__/error-handler.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/execution-lock-orphan-cleanup.test.ts	0.9	covers code the fork changed; fast; no flake history
+server/src/__tests__/execution-workspace-policy.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/heartbeat-archived-company-guard.test.ts	0.7	covers code the fork changed; fast; no flake history
+server/src/__tests__/heartbeat-cancel-active-for-agent.test.ts	1.4	written in the fork (steps 4a/4b)
+server/src/__tests__/heartbeat-claude-run-context.test.ts	10.2	written in the fork (steps 4a/4b)
+server/src/__tests__/heartbeat-context-summary.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/heartbeat-run-disposition.test.ts	4.8	written in the fork (steps 4a/4b)
+server/src/__tests__/heartbeat-run-privacy-routes.test.ts	4.3	covers code the fork changed; fast; no flake history
+server/src/__tests__/heartbeat-run-summary.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/heartbeat-task-session-reset.test.ts	0.2	covers code the fork changed; fast; no flake history
+server/src/__tests__/heartbeat-undispatched-execution-wait.test.ts	2.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/hiring-operational-examples.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/inbox-archive-routes.test.ts	3.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/instance-settings-cache.test.ts	2.2	covers code the fork changed; fast; no flake history
+server/src/__tests__/instance-settings-managed-overlay.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/instance-settings-routes.test.ts	0.5	covers code the fork changed; fast; no flake history
+server/src/__tests__/instance-settings-service.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-agent-mutation-ownership-routes.test.ts	1.5	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-checkout-deadlock-retry.test.ts	1.2	written in the fork (steps 4a/4b)
+server/src/__tests__/issue-comment-attribution-audit-routes.test.ts	5.5	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-comment-redaction.test.ts	1.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-confirm-run-stopped-routes.test.ts	2.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-creation-source-routes.test.ts	2.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-detail-statements.test.ts	1.8	guard: issue detail query count (golden)
+server/src/__tests__/issue-display-status.test.ts	8.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-execution-policy-persistence.test.ts	0.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-execution-policy-routes.test.ts	0.5	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-execution-policy.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-list-assignee-filter-routes.test.ts	10.2	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-reassignment-queued-run.test.ts	0.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-runtime-workspace-binding.test.ts	0.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-stalled-review-decision-routes.test.ts	1.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-status-version-route-service.test.ts	0.7	covers code the fork changed; fast; no flake history
+server/src/__tests__/issue-watchdogs-routes.test.ts	6.3	covers code the fork changed; fast; no flake history
+server/src/__tests__/issues-access-routes.test.ts	1.1	written in the fork (steps 4a/4b)
+server/src/__tests__/onboarding-seed-route.test.ts	2.1	covers code the fork changed; fast; no flake history
+server/src/__tests__/openapi-routes.test.ts	2.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/owner-chat-instruction-authority.test.ts	3.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/paperclip-mcp-route.test.ts	3.5	written in the fork (steps 4a/4b)
+server/src/__tests__/paperclip-skill-tools.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/__tests__/permission-request-replay.test.ts	0.5	written in the fork (steps 4a/4b)
+server/src/__tests__/permissions-upgrade-boundary-routes.test.ts	0.9	covers code the fork changed; fast; no flake history
+server/src/__tests__/person-only-page-guidance.test.ts	0.4	covers code the fork changed; fast; no flake history
+server/src/__tests__/plugin-access-authorization-host-services.test.ts	0.9	covers code the fork changed; fast; no flake history
+server/src/__tests__/project-claude-md-switch.test.ts	3.8	written in the fork (steps 4a/4b)
+server/src/__tests__/project-routes-env.test.ts	8.5	covers code the fork changed; fast; no flake history
+server/src/__tests__/recovery-stale-issue-lock-sweep.test.ts	3.4	covers code the fork changed; fast; no flake history
+server/src/__tests__/routines-service.test.ts	11.6	covers code the fork changed; fast; no flake history
+server/src/__tests__/run-preview-route.test.ts	0.5	written in the fork (steps 4a/4b)
+server/src/__tests__/run-preview.test.ts	12.8	written in the fork (steps 4a/4b)
+server/src/__tests__/run-trust-preset.test.ts	0.8	covers code the fork changed; fast; no flake history
+server/src/__tests__/sealed-run-github.test.ts	1.5	written in the fork (steps 4a/4b)
+server/src/__tests__/task-workspace-admission.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/__tests__/tool-policy-list-authz.integration.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/__tests__/worktree-cleanup-sweep.test.ts	8.5	written in the fork (steps 4a/4b)
+server/src/adapters/registry.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/mcp/caller.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/mcp/catalog-deps.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/mcp/catalog/api.test.ts	1.1	written in the fork (steps 4a/4b)
+server/src/mcp/catalog/catalog.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/mcp/catalog/labels.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/mcp/catalog/run.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/modules/agent-lifecycle/__tests__/environment-plugins.test.ts	0.9	covers code the fork changed; fast; no flake history
+server/src/modules/agent-lifecycle/__tests__/lifecycle.test.ts	5.2	covers code the fork changed; fast; no flake history
+server/src/modules/agent-lifecycle/__tests__/setup.test.ts	0.6	covers code the fork changed; fast; no flake history
+server/src/services/agent-access.test.ts	0.1	written in the fork (steps 4a/4b)
+server/src/services/agent-interaction-delivery.test.ts	0.7	covers code the fork changed; fast; no flake history
+server/src/services/agent-invented-host-links.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/services/agent-runner-selection.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/services/heartbeat/paperclip-run-mcp.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/services/heartbeat/run-disposition.test.ts	0.1	written in the fork (steps 4a/4b)
+server/src/services/heartbeat/run-output.test.ts	8.5	covers code the fork changed; fast; no flake history
+server/src/services/heartbeat/run-preparation.wake-window.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/services/heartbeat/runtime-selection.test.ts	0.6	covers code the fork changed; fast; no flake history
+server/src/services/heartbeat/task-markdown.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/services/legacy-explicit-continuation-recovery.test.ts	1.3	covers code the fork changed; fast; no flake history
+server/src/services/legacy-preparation-retry-hold.test.ts	3.0	covers code the fork changed; fast; no flake history
+server/src/services/new-agent-access.test.ts	0.4	written in the fork (steps 4a/4b)
+server/src/services/permission-requests.test.ts	0.3	written in the fork (steps 4a/4b)
+server/src/services/quarantined-task-retry.test.ts	6.2	covers code the fork changed; fast; no flake history
+server/src/services/run-cost-accounting.test.ts	11.4	covers code the fork changed; fast; no flake history
+server/src/services/run-evidence-migration.integration.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/services/secret-named-env-redaction.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/services/task-interruption-presentation.test.ts	0.0	covers code the fork changed; fast; no flake history
+server/src/services/task-retry.test.ts	14.7	covers code the fork changed; fast; no flake history
+server/src/services/worktree-cleanup.test.ts	0.0	written in the fork (steps 4a/4b)
+server/src/services/worktree-default.test.ts	0.4	written in the fork (steps 4a/4b)
