@@ -1249,14 +1249,16 @@ Found 2026-11-20 by step 4b's agent E; confirmed on `feat/step-4b` before E's me
   portability call's extra `access` field is intended: since `b14355472a` an imported CEO's hiring
   denial also sets `agents:create` to false (`withAccessOverride`, `company-portability.ts`), and the
   expectation now includes it. Both files 203 of 203, three runs.
-- **Tier question, still open:** the 17 files under the `ai-*` and `*ai-connection*` opt-in globs
+- **Tier question, decided 2026-11-22:** the 13 live files moved to thorough (below; done on
+  `ci/ai-connection-tier`). the 17 files under the `ai-*` and `*ai-connection*` opt-in globs
   take ~90 s with one worker (485 tests, all passing). Thirteen cover what server1's `claude_local`
   runs use (credential resolution, rotation, write-back, hiring with an inherited connection,
   Claude's limits and logins: ~40 s, among them `ai-connections` and `agent-hire-ai-connections`).
   Four are dormant: `ai-connection-router` (pools, off), `antigravity-ai-connections.integration`,
   `ai-provider-routing` (Pi, OpenRouter, Hermes) and `services/local-ai-browser-login` (Codex). The
-  suggestion: replace the broad globs in `scripts/test-tiers.json` with those four files, so the
-  rest join the thorough tier. Being opt-in is why CI never caught this bug.
+  broad globs in `scripts/test-tiers.json` became explicit entries for the first three (the fourth
+  stays opt-in under the `*antigravity*` glob), so the rest are in the thorough tier: 13 files, 387
+  tests, ~51 s at 2 workers. Being opt-in is why CI never caught this bug.
 
 ### 70. Find the bundled skills folder from a nested worktree
 
