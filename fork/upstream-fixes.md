@@ -117,6 +117,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 80 | [Give `nested-clone-migration`'s expire-and-restore test room on a loaded CI runner](#80-give-nested-clone-migrations-expire-and-restore-test-room-on-a-loaded-ci-runner) | fixed (`fc9c76393b`) | | | 2026-11-22 | | |
 | 81 | [Make `paperclip-skill-utils` read the skills folder from the repo, not the current directory](#81-make-paperclip-skill-utils-read-the-skills-folder-from-the-repo-not-the-current-directory) | candidate | | | 2026-11-22 | | |
 | 82 | [Time test waits on the monotonic clock: the desktop's wall clock jumps](#82-time-test-waits-on-the-monotonic-clock-the-desktops-wall-clock-jumps) | candidate | | | 2026-11-22 | | |
+| 83 | [Stop the runtime service `workspace-runtime`'s sibling test leaves running](#83-stop-the-runtime-service-workspace-runtimes-sibling-test-leaves-running) | candidate | | | 2026-11-23 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1477,3 +1478,25 @@ Found 2026-11-22 by the CI/DevOps session's agent A (bugs 72 and 74).
 - **Likely fix:** move elapsed-time bounds to `performance.now()` as they come up, starting with the
   tight ones (a margin under ~2 s). Not the deadlines that compare against stored timestamps, which
   need the wall clock.
+
+### 83. Stop the runtime service `workspace-runtime`'s sibling test leaves running
+
+Found 2026-11-23 by the CI/DevOps session, listing background processes on the desktop.
+
+- **Problem:** two `node -e "require('node:http').createServer(...)"` servers had been running for
+  ~18 h, orphaned (parent `init`), on 127.0.0.1:39829 and :44259, their working folders under
+  `/tmp/pt-*/t/paperclip-runtime-sibling-*/project-extended/service` deleted. Their environment
+  (`npm_lifecycle_event=test:quick`, `VITEST_WORKER_ID` 149 and 152, `OLDPWD` an agent worktree)
+  puts them in step 4b agents' quick runs on the evening of 2026-11-21. They come from
+  `server/src/__tests__/workspace-runtime.test.ts`, "does not stop services in sibling directories
+  when matching by workspace cwd" (~:5260): it starts a `lifecycle: "shared"` service with
+  `stopPolicy: { type: "manual" }` for `execution-workspace-sibling` and ends with only
+  `releaseRuntimeServicesForRun`, which doesn't stop a manual-stop shared service. The file's
+  `afterEach` then calls `resetRuntimeServicesForTests()` without `terminateProcesses`, which
+  clears the registry and leaves the process running. Usually it dies with the vitest worker; these
+  two outlived theirs. Stopped by hand on 2026-11-23. Harmless apart from a port and ~40 MB each,
+  but they pile up on a machine that runs many quick checks.
+- **Likely fix:** end the test by stopping its own service
+  (`stopRuntimeServicesForExecutionWorkspace` for `execution-workspace-sibling`, in a `finally`),
+  and have the `afterEach` pass `{ terminateProcesses: true }` so no test in the file can leave one.
+  Then check the file's other manual-stop services the same way.
