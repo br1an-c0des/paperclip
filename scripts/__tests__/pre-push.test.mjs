@@ -118,13 +118,35 @@ test("planPush: a push of Markdown only runs nothing", () => {
   assert.deepEqual(plan.warnings, []);
 });
 
-test("planPush: a code change runs the workspace typecheck, then quick since the range's base", () => {
+test("planPush: a code change typechecks the changed packages and their dependents, then quick since the range's base", () => {
   const plan = planPush([update("refs/heads/feat", C, "refs/heads/feat", zero)], fakeRepo(), {});
   assert.deepEqual(plan.checks.map((check) => [check.command, ...check.args]), [
-    ["corepack", "pnpm", "typecheck"],
+    ["corepack", "pnpm", "-r", "--filter", `...[${A}]`, "typecheck"],
     [process.execPath, "scripts/test.mjs", "--tier", "quick", "--changed", A],
   ]);
   assert.deepEqual(plan.warnings, []);
+});
+
+test("planPush: a change to a root file every package reads typechecks the whole workspace", () => {
+  for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.base.json", "tsconfig.json"]) {
+    const repo = fakeRepo({ changedFiles: () => ["server/src/app.ts", file] });
+    const plan = planPush([update("refs/heads/feat", C, "refs/heads/feat", zero)], repo, {});
+    assert.deepEqual(plan.checks[0].args, ["pnpm", "typecheck"], file);
+  }
+  for (const file of ["server/package.json", "packages/db/tsconfig.json", "Dockerfile"]) {
+    const repo = fakeRepo({ changedFiles: () => [file] });
+    const plan = planPush([update("refs/heads/feat", C, "refs/heads/feat", zero)], repo, {});
+    assert.deepEqual(plan.checks[0].args, ["pnpm", "-r", "--filter", `...[${A}]`, "typecheck"], file);
+  }
+});
+
+test("planPush: two refs with different bases typecheck the union of their changes", () => {
+  const repo = fakeRepo({ head: C, changedFiles: () => ["server/src/app.ts"] });
+  const plan = planPush([
+    update("refs/heads/feat", C, "refs/heads/feat", zero),
+    update("refs/heads/feat", C, "refs/heads/other", B),
+  ], repo, {});
+  assert.deepEqual(plan.checks[0].args, ["pnpm", "-r", "--filter", `...[${A}]`, "--filter", `...[${B}]`, "typecheck"]);
 });
 
 test("planPush: pushing main after a merge tests the merged range", () => {
@@ -389,7 +411,7 @@ test("hook: a passing push runs both checks, quick since the merge base with mai
     assert.equal(result.status, 0, result.stderr);
     const lines = stub.ran().trim().split("\n");
     assert.equal(lines.length, 2);
-    assert.match(lines[0], /^typecheck corepack pnpm typecheck$/);
+    assert.match(lines[0], new RegExp(`^typecheck corepack pnpm -r --filter \\.\\.\\.\\[${mainSha}\\] typecheck$`));
     assert.match(lines[1], new RegExp(`^test:quick .*scripts/test\\.mjs --tier quick --changed ${mainSha}$`));
   } finally {
     repo.cleanup();
