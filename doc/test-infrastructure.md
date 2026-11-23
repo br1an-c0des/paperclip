@@ -4,16 +4,20 @@ Internals of the local and CI test tooling, plus the benchmarks and live smoke t
 
 ## Test tiers
 
-Hard-fork step 3a (2026-11-18) split the suite into tiers. The workflow (when to run which) is in
+Hard-fork step 3a (2026-11-18) split the suite into tiers. On 2026-11-23 the old thorough tier was
+split into core, which gates, and extended, which reports
+([fork/test-core-proposal.md](../fork/test-core-proposal.md)). The workflow (when to run which) is in
 [CLAUDE.md](../CLAUDE.md#tests); the measurements behind it are in
 [fork/step-3a-plan.md](../fork/step-3a-plan.md) and [fork/test-suite-audit/](../fork/test-suite-audit/).
 
 | Tier | Command | What runs |
 | --- | --- | --- |
-| quick | `pnpm test:quick [--changed <ref>]` | The thorough-tier tests a change touches since its merge base with `main` (default), plus untracked files: changed test files, test files named after or importing a changed source file (names too generic to mean anything, such as `index`, `test` or `config`, match by import only: `genericNames` in `scripts/test.mjs`), and small directories' tests. Unless the change is only Markdown, also the `alwaysQuick` files in `scripts/test-tiers.json`: whole-app checks (OpenAPI route coverage, the issue-detail golden file, the route access scan) that no other rule selects. |
-| thorough | `pnpm test` | Every test file except `optIn` ones. CI runs it on every push. |
+| quick | `pnpm test:quick [--changed <ref>]` | The core-tier tests a change touches since its merge base with `main` (default), plus untracked files: changed test files, test files named after or importing a changed source file (names too generic to mean anything, such as `index`, `test` or `config`, match by import only: `genericNames` in `scripts/test.mjs`), and small directories' tests. Unless the change is only Markdown, also the `alwaysQuick` files in `scripts/test-tiers.json`: whole-app checks (OpenAPI route coverage, the issue-detail golden file, the route access scan) that no other rule selects. |
+| core | `pnpm test` | Every test file except `optIn` ones and those listed in `scripts/test-extended.txt` (`extendedList` in `scripts/test-tiers.json`). CI runs it on every push; it gates merges and deploys. New test files land here. |
+| extended | `pnpm test:extended` | The files in `scripts/test-extended.txt`: upstream's slower and flakier integration tests, 1,102 files on 2026-11-23. The list only shrinks; its header says when a file leaves. Nightly in CI; reports only. |
+| thorough | `pnpm test:thorough` | core and extended together: every test file except `optIn` ones (the old default). |
 | optin | `pnpm test:optin` | Files matching `optIn` globs in `scripts/test-tiers.json`, each with its reason: dormant halves of split files (`*.dormant.test.ts`), the Runner, other adapters, the CLI, plugins, chat channels, cloud and sandbox code. On demand only. |
-| all | `pnpm test:all` | thorough, then optin. |
+| all | `pnpm test:all` | thorough (core and extended), then optin. |
 
 `scripts/test.mjs` runs a tier as a few `vitest run` invocations from the repo root (server files
 in parallel, then `serialServer` files one at a time, then every other project), runs every phase
@@ -32,21 +36,30 @@ in `scripts/test-weights.json`, then `fork/test-suite-audit/classification.csv`,
 - a typecheck job, which also runs the `node --test` script tests (`corepack pnpm test:runner`);
 - a ui-new job: its unit tests, `vite build` and the mocked Playwright suite (report uploaded on
   failure);
-- the thorough tier in 10 shards, each with `--report-dir`, and a summary of each shard's failed
+- the core tier in 3 shards, each with `--report-dir`, and a summary of each shard's failed
   tests on the run's page (`scripts/ci/summarize-reports.mjs`). Vitest's module cache is restored
   from `main`'s last run;
 - the Docker images `deploy.sh` builds (root `Dockerfile`, then `deploy/Dockerfile`), only when the
   push changes what they're built from (a `Dockerfile`, `deploy/`, a `package.json`, the lockfile,
   `.nvmrc`, `.npmrc`, `patches/`, the workflow). A job gates it, so every commit still gets a run.
 
-`.github/workflows/optin-weekly.yml` runs the opt-in tier in 10 shards every Monday, and by hand.
-It only reports: dormant code drifts, failures there are expected, and it never gates a deploy.
+`.github/workflows/extended-nightly.yml` runs the extended tier in 6 shards daily at 05:17 UTC on
+`main`, and on any branch by hand (`gh workflow run extended-nightly.yml -R br1an-c0des/paperclip
+--ref <branch>`). It only reports. `deploy.sh` reads `main`'s latest finished run and warns when it's
+red, without stopping. Its artifacts are named like `test.yml`'s, so `node
+scripts/refresh-shard-weights.mjs --run <Test run> --run <extended run>` keeps both tiers' weights.
+
+`.github/workflows/optin.yml` runs the opt-in tier in 10 shards, by hand only (it ran weekly until
+2026-11-23). It only reports: dormant code drifts, failures there are expected, and it never gates
+a deploy.
 `node scripts/ci-flakes.mjs [--since <date>]` lists every re-run and red run with the tests that
 failed, since a re-run that passes hides the failure in the run list.
 
 **Pre-push hook.** `corepack pnpm hooks:install` sets `core.hooksPath` to `.githooks`, for every
-worktree of the clone. Before a push, `scripts/pre-push.mjs` runs the workspace typecheck and
-`test:quick` on the pushed range, unless only Markdown changed, holding the machine lock (`/tmp/paperclip-test-bench.lock`) while they run so parallel pushes take turns. Bypass with `git push --no-verify`
+worktree of the clone. Before a push, `scripts/pre-push.mjs` typechecks the packages the pushed
+range changes and the packages that depend on them (`pnpm -r --filter "...[<base>]" typecheck`;
+the whole workspace when a root `package.json`, lockfile, `pnpm-workspace.yaml` or `tsconfig*.json`
+changes), then runs `test:quick` on the pushed range, unless only Markdown changed, holding the machine lock (`/tmp/paperclip-test-bench.lock`) while they run so parallel pushes take turns. Bypass with `git push --no-verify`
 or `PAPERCLIP_SKIP_PREPUSH=1`. See [fork/green-push.md](../fork/green-push.md).
 
 **Server projects.** `server/vitest.config.ts` splits the server's files into two Vitest projects:

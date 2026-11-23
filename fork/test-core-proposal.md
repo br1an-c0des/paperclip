@@ -1,6 +1,14 @@
-# Proposal: a small core that gates, the rest reports
+# A small core that gates, the rest reports
 
-**2026-11-23. Status: proposal, not adopted.** Follows step 3a
+**2026-11-23. Status: adopted 2026-11-23, built on `test/core-tier`.** The user's choices:
+
+- **Extended** runs nightly and on demand. The schedule may be lengthened if it gets annoying: one
+  cron line in `extended-nightly.yml`.
+- **Opt-in** runs on demand only, with no schedule.
+- **`deploy.sh`** warns when `main`'s latest nightly extended run is red, without blocking.
+
+Step 6 below (skipping CI for Markdown-only pushes) was left out; the note there says why. Follows
+step 3a
 ([hard-fork-plan.md](hard-fork-plan.md#3a-renovate-the-test-suite)). Step 3a made the suite fast
 enough to run. This proposal is about how much of it should be able to stop work.
 
@@ -44,7 +52,7 @@ Three tiers instead of today's two, and the merge gate is the smallest one.
 | --- | --- | --- | --- |
 | **core** | ~365 files (below) | Every push; pre-push (the files a change touches) | Merging into `main`, deploys |
 | **extended** | The rest of today's thorough tier, ~1,100 files | Nightly on `main`, and on demand on any branch | Nothing: it reports |
-| **opt-in** | Unchanged (dormant halves, Runner, other adapters, CLI, plugins, channels) | Monthly, and on demand | Nothing |
+| **opt-in** | Unchanged (dormant halves, Runner, other adapters, CLI, plugins, channels) | On demand only | Nothing |
 
 **Measured:** the candidate core ran green locally in 3m17s (8 workers) under the test lock: 365
 files and 6,082 tests, 10.3 minutes of CI time run one at a time (see [the runs](#the-local-runs)).
@@ -135,15 +143,19 @@ agent. The runner already has the parts: tiers, `--files`, shards and weights.
    Refresh the shard weights from the first run (`refresh-shard-weights` already does this).
 4. **A new `.github/workflows/extended-nightly.yml`:** a copy of `optin-weekly.yml`, with a daily
    cron and `workflow_dispatch` (so `gh workflow run extended-nightly.yml --ref <branch>` works for
-   the before-merge rule). Change `optin-weekly.yml`'s schedule to monthly. `deploy.sh` reads only
+   the before-merge rule). `optin-weekly.yml` becomes `optin.yml`, with no schedule. `deploy.sh` reads only
    `test.yml`, so neither can block a deploy.
 5. **The pre-push hook (`scripts/pre-push.mjs`):** typecheck only the packages the push changed
    and the packages that depend on them (`corepack pnpm -r --filter "...[<base>]" typecheck`), not
    the whole workspace (~6.5 GB, the Runner's `cargo check` included). CI still typechecks
    everything. Then `quick`, as now.
-6. **Markdown-only pushes:** add `paths-ignore: ["**/*.md"]` to `test.yml`'s push trigger. Then
+6. **Not done: Markdown-only pushes.** add `paths-ignore: ["**/*.md"]` to `test.yml`'s push trigger. Then
    teach `deploy.sh`'s CI lookup to accept the newest green run on an ancestor when every commit
    since touches only `*.md`. Today a bug-list commit like `82d6d1e8fa` runs the whole suite.
+   - **Why it was left out:** doing it safely means `deploy.sh` walking back to the newest run that
+     ran the tests, and checking that only Markdown changed since. Otherwise a docs push on top of a
+     red one would read as green. With core, a run takes about 7 minutes of free CI time and nobody
+     waits on a docs push, so the saving isn't worth that logic.
 7. **Docs:**
    - `CLAUDE.md`'s Tests section.
    - `doc/test-infrastructure.md`.
@@ -161,13 +173,11 @@ agent. The runner already has the parts: tiers, `--files`, shards and weights.
 `package.json` for releases, the Runner and canaries. Removing it is a cleanup worth asking about
 on its own.
 
-## Open questions
+## Questions, answered 2026-11-23
 
-1. **When extended runs:** nightly, or only on demand and before big merges? The recommendation is
-   nightly: it's free on a public repo, and it puts a date on when something drifted.
-2. **The opt-in schedule:** monthly, or on demand only? The recommendation is monthly.
-3. **Should `deploy.sh` warn when `main`'s latest nightly extended run is red?** The recommendation
-   is to warn without blocking.
+1. **When extended runs:** nightly, and on demand.
+2. **The opt-in schedule:** none; on demand only.
+3. **`deploy.sh` and a red extended run:** it warns, and the deploy goes on.
 
 ## The local runs
 
