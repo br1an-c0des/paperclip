@@ -89,8 +89,8 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 48 | [Cover every write of an approved multi-write tool call](#48-cover-every-write-of-an-approved-multi-write-tool-call) | fixed on `feat/step-4a` (`70b8d7198`) | | | 2026-11-18 | | |
 | 49 | [Check the act-as agent's level on outside-connection file uploads](#49-check-the-act-as-agents-level-on-outside-connection-file-uploads) | fixed on `feat/step-4a` (`867374de7`) | | | 2026-11-18 | | |
 | 50 | [Check access on plugin-origin agent configure and edit calls](#50-check-access-on-plugin-origin-agent-configure-and-edit-calls) | fixed on `feat/step-4a` (`5c499f719`) | | | 2026-11-18 | | |
-| 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | fixed on `feat/step-4a` (`846bc008d`) | | | 2026-11-18 | | |
-| 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | fixed on `feat/step-4a` (`1137643cc`) | | | 2026-11-18 | | |
+| 51 | [Give runs a title tool now that project-tools is gone](#51-give-runs-a-title-tool-now-that-project-tools-is-gone) | fixed (`846bc008d`, in `main` with 4a) | | | 2026-11-18 | | |
+| 52 | [Use the MCP tool names in the chat directive](#52-use-the-mcp-tool-names-in-the-chat-directive) | fixed (`1137643cc`, in `main` with 4a) | | | 2026-11-18 | | |
 | 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | fixed (`b30f07d57f`, `b4d5ecbe9e`) | | | 2026-11-18 | | |
 | 54 | [Check access on the other plugin-origin agent writes](#54-check-access-on-the-other-plugin-origin-agent-writes) | candidate | | | 2026-11-18 | | |
 | 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
@@ -122,6 +122,12 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 81 | [Make `paperclip-skill-utils` read the skills folder from the repo, not the current directory](#81-make-paperclip-skill-utils-read-the-skills-folder-from-the-repo-not-the-current-directory) | candidate | | | 2026-11-22 | | |
 | 82 | [Time test waits on the monotonic clock: the desktop's wall clock jumps](#82-time-test-waits-on-the-monotonic-clock-the-desktops-wall-clock-jumps) | candidate | | | 2026-11-22 | | |
 | 83 | [Stop the runtime service `workspace-runtime`'s sibling test leaves running](#83-stop-the-runtime-service-workspace-runtimes-sibling-test-leaves-running) | candidate | | | 2026-11-23 | | |
+| 84 | [Don't send the string "null" as a no-task run's task brief](#84-dont-send-the-string-null-as-a-no-task-runs-task-brief) | candidate | | | 2026-11-23 | | |
+| 85 | [Say which approval an approval wake is about](#85-say-which-approval-an-approval-wake-is-about) | candidate | | | 2026-11-23 | | |
+| 86 | [Send the chat directive once per chat session, not every turn](#86-send-the-chat-directive-once-per-chat-session-not-every-turn) | candidate | | | 2026-11-23 | | |
+| 87 | [Store a run's whole prompt, not the first 16,384 characters](#87-store-a-runs-whole-prompt-not-the-first-16384-characters) | candidate | | | 2026-11-23 | | |
+| 88 | [Give `claude_local` runs the instruction working-copy guidance](#88-give-claude_local-runs-the-instruction-working-copy-guidance) | candidate | | | 2026-11-23 | | |
+| 89 | [Stop prompt texts naming Runner tools and curl recipes runs don't use](#89-stop-prompt-texts-naming-runner-tools-and-curl-recipes-runs-dont-use) | candidate | | | 2026-11-23 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1504,3 +1510,78 @@ Found 2026-11-23 by the CI/DevOps session, listing background processes on the d
   (`stopRuntimeServicesForExecutionWorkspace` for `execution-workspace-sibling`, in a `finally`),
   and have the `afterEach` pass `{ terminateProcesses: true }` so no test in the file can leave one.
   Then check the file's other manual-stop services the same way.
+
+### 84. Don't send the string "null" as a no-task run's task brief
+
+Found 2026-11-23 by the step 5 research ([step-5-research.md](step-5-research.md#311-other-findings)).
+
+- **Problem:** a run with no task (an unscoped timer heartbeat, `on_demand` without an issue, an
+  approval with no linked task) gets a task-brief section that reads `null`.
+  `buildPaperclipTaskMarkdown` returns `null` without an issue (`server/src/services/heartbeat/task-markdown.ts:130`),
+  and `task-context.ts:335-351` concatenates it with the prefix and `chatCompletionInstruction`,
+  which turns it into the truthy string `"null"`, stored as all four brief variants. Reproduced
+  with `tsx`, not seen in a real run. Affects every adapter's no-task runs.
+- **Likely fix:** build each variant only when `buildPaperclipTaskMarkdown` returns a string, and
+  add a test for a no-task context.
+
+### 85. Say which approval an approval wake is about
+
+Found 2026-11-23 by the step 5 research.
+
+- **Problem:** `approval_approved` and `approval_cancelled` wakes (`server/src/routes/approvals.ts:235-253, 541-562`)
+  put `approvalId` and `approvalStatus` on the run context, but the wake renderer
+  (`packages/adapter-utils/src/server-utils.ts:2343-3312`) has no approval section, so the prompt
+  shows only `- reason: approval_approved`. The approval's id, type and decision note never reach
+  the agent. With no linked task it's a no-task run (bug 84). Read from the code.
+- **Likely fix:** render an approval section (id, type, decision, note) in the wake. Step 5's
+  wake renderer may take it instead; bug 78 (denied permission requests wake no one) is related.
+
+### 86. Send the chat directive once per chat session, not every turn
+
+Found 2026-11-23 by the step 5 research.
+
+- **Problem:** a hidden-task chat turn's brief carries the 28.6k-character `AGENT_CHAT_DIRECTIVE`
+  (`server/src/services/heartbeat/task-markdown.ts:240`). The compact brief used on resumed turns
+  doesn't drop it (it doesn't depend on `includeDescription`), so every chat message re-sends
+  about 29k characters into a session that already has them.
+- **Likely fix:** leave the directive out of the compact variants, or move it to the system prompt
+  of chat sessions. Step 5 (prompt builder) or step 6 (first-class chat) may take it instead.
+
+### 87. Store a run's whole prompt, not the first 16,384 characters
+
+Found 2026-11-23 by the step 5 research.
+
+- **Problem:** `boundHeartbeatRunEventPayloadForStorage` (`server/src/services/heartbeat/run-log.ts:6-98`)
+  cuts every string in a run event's payload at 16,384 characters, including the `adapter.invoke`
+  event's `prompt`. A chat turn's prompt (30k and up) is stored cut, so the run view's Input
+  (`ui-new/src/runs/RunInput.tsx`) shows only part of what the run received.
+- **Likely fix:** exempt `prompt` from the string cap (or give it a larger one), or store the
+  rendered prompt as its own run artifact. Decided in step 5's past-run preview.
+
+### 88. Give `claude_local` runs the instruction working-copy guidance
+
+Found 2026-11-23 by the step 5 research.
+
+- **Problem:** the instruction working-copy guidance ("Your persistent agent directory is …",
+  where the agent can edit its own instruction files) is appended only to `paperclipTaskMarkdown`
+  and `paperclipTaskMarkdownCompact` (`server/src/services/heartbeat/instruction-working-copy.ts:221-224`).
+  `selectPaperclipTaskMarkdown` prefers the Assignment variants (`server-utils.ts:2272-2275`), so
+  runs on a task never get it. The only test (`heartbeat-instruction-working-copy.test.ts:115`,
+  extended tier) checks the non-Assignment key. Read from the code.
+- **Likely fix:** append it to all four variants, or move it into the prompt builder (step 5).
+
+### 89. Stop prompt texts naming Runner tools and curl recipes runs don't use
+
+Found 2026-11-23 by the step 5 research.
+
+- **Problem:** since step 4a, runs work through the `paperclip_*` MCP tools, but several prompt
+  texts still describe other tools:
+  - the fresh-session handoff tells the agent to use `get_task_history`, `get_task_context`,
+    `list_documents` and `read_document` (`native-session-handoff.ts:28`), the Runner's tool
+    names;
+  - the rejected-plan steps, the plan-truncation note, the attachment directive, the chat
+    directive's "direct HTTP equivalent" paragraphs and the wake's `GET /api/issues/{id}/comments`
+    teach REST and curl;
+  - the execution-stage reviewer text names "the Paperclip Runner" (`server-utils.ts:3056`).
+- **Likely fix:** point each at the `paperclip_*` tool that does the same thing. Mostly step 5's
+  template work; the handoff text could be fixed on its own.
