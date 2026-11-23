@@ -1,0 +1,113 @@
+# The extended test tier, nightly on main and on demand on any branch: upstream's slower and
+# flakier integration tests, listed in scripts/test-extended.txt. Pushes run only the core tier
+# (test.yml); this catches what the core doesn't cover, a day later at most.
+#
+# It reports; it doesn't gate. `deploy/deploy.sh` warns when main's latest run of this workflow is
+# red but deploys anyway, and nothing else reads it. Reading a red run (fork/test-core-proposal.md):
+# - a product bug: fix it, and take the file off scripts/test-extended.txt so core runs it;
+# - a test problem (timing, load, a leak, drift): move the file to opt-in with a one-line reason,
+#   or delete it. Don't investigate it unless it covers code you're changing that week.
+#
+# Before merging a branch that changes the run lifecycle, heartbeat, workspaces or recovery,
+# dispatch it on the branch once:
+#   gh workflow run extended-nightly.yml -R br1an-c0des/paperclip --ref <branch>
+# GitHub offers a manual run only once this file is on the default branch (main), and runs
+# `schedule` only from main.
+#
+# To run it less often, change the cron below (say, "17 5 * * 1,4" for Mondays and Thursdays).
+#
+# Setup steps are test.yml's, with the same pinned actions; keep the two in step.
+name: Extended tier (nightly)
+
+on:
+  schedule:
+    # Daily, 05:17 UTC (off the hour, when GitHub's scheduler is busiest).
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+# The repo is public and the jobs need nothing but a read of the code: no secrets are used.
+permissions:
+  contents: read
+
+# Its own group, so it never cancels or waits on a `Test` run. A newer run of this workflow on the
+# same ref (say, a dispatch during the scheduled one) replaces the older.
+concurrency:
+  group: extended-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_UPDATE_NOTIFIER: "false"
+
+jobs:
+  extended:
+    name: Extended tier, shard ${{ matrix.shard }}/${{ matrix.count }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      # Every shard runs to the end, so one run shows every failing file.
+      fail-fast: false
+      matrix:
+        # 6 shards of ~184 files and ~22 expected worker-minutes each, about 11 minutes on 2 workers
+        # (`node scripts/test.mjs --dry-run --tier extended --shard 1/6 --workers 2`).
+        # To change the shard count, change `count` and list 1..count in `shard`.
+        count: [6]
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Enable corepack (pnpm from package.json's packageManager)
+        run: corepack enable && corepack pnpm --version
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build the plugin SDK
+        run: corepack pnpm --filter @paperclipai/plugin-sdk build
+
+      # No Vitest module cache: test.yml's entries are per core shard, and saving one per extended
+      # shard every night would crowd them out.
+
+      # Workers default to the machine: half of the runner's 4 cores, so 2 (scripts/test.mjs).
+      - name: Run shard ${{ matrix.shard }} of the extended tier
+        id: tests
+        run: node scripts/test.mjs --tier extended --shard ${{ matrix.shard }}/${{ matrix.count }} --report-dir test-reports
+
+      - name: Summarize the shard's results
+        if: always() && steps.tests.outcome != 'skipped'
+        env:
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+        run: node scripts/ci/summarize-reports.mjs test-reports --outcome "$TEST_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+
+      # Named like test.yml's, so `node scripts/refresh-shard-weights.mjs --run <core run> --run
+      # <this run>` refreshes the weights of both tiers' files.
+      - name: Upload the test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-reports-shard-${{ matrix.shard }}-of-${{ matrix.count }}
+          path: test-reports/
+          if-no-files-found: ignore
+          retention-days: 14

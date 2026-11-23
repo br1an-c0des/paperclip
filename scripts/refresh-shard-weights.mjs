@@ -7,6 +7,11 @@
 //   node scripts/refresh-shard-weights.mjs --run <id> [--run <id> …]   # these runs, averaged per file
 //   node scripts/refresh-shard-weights.mjs --from <dir>    # reports already downloaded (gh run download)
 //
+// Since 2026-11-23 the Test workflow runs only the core tier; the extended tier runs in
+// extended-nightly.yml, whose artifacts have the same names. A refresh replaces the whole file, so
+// to keep both tiers' weights pass a run of each: --run <Test run> --run <extended run>. Files
+// missing from the runs fall back to classification.csv.
+//
 // Options: --repo <owner/name> (default br1an-c0des/paperclip), --branch <name> (default main),
 // --out <file> (default scripts/test-weights.json), --root <prefix> (a checkout path to strip from
 // report paths besides CI's workspace and this checkout).

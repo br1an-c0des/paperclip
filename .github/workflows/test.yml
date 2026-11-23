@@ -1,6 +1,7 @@
 # The fork's CI (hard-fork step 3a, round 2): typecheck, ui-new's tests, build and mocked e2e, the
-# thorough test tier split into shards, and the Docker image deploy.sh builds, when a push changes
-# what it's built from. Upstream's 38 workflows were removed; they're readable at the tag
+# core test tier split into shards, and the Docker image deploy.sh builds, when a push changes
+# what it's built from. The extended tier runs nightly instead (extended-nightly.yml), and the
+# opt-in tier only on demand (optin.yml): fork/test-core-proposal.md. Upstream's 38 workflows were removed; they're readable at the tag
 # `upstream-freeze`. Design and numbers: fork/test-suite-audit/results-ci.md.
 #
 # Runs on every push to any branch. Pull requests run it only when they come from another
@@ -156,18 +157,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  thorough:
-    name: Thorough tier, shard ${{ matrix.shard }}/${{ matrix.count }}
+  core:
+    name: Core tier, shard ${{ matrix.shard }}/${{ matrix.count }}
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     strategy:
       # Every shard runs to the end, so one run shows every failing file.
       fail-fast: false
       matrix:
-        # To change the shard count, change `count` and list 1..count in `shard`.
-        count: [10]
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        # To change the shard count, change `count` and list 1..count in `shard`. Three shards of
+        # ~5 expected worker-minutes each finish inside the typecheck and ui-new jobs' time.
+        count: [3]
+        shard: [1, 2, 3]
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -211,9 +213,9 @@ jobs:
           restore-keys: vitest-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-shard-${{ matrix.shard }}-of-${{ matrix.count }}-
 
       # Workers default to the machine: half of the runner's 4 cores, so 2 (scripts/test.mjs).
-      - name: Run shard ${{ matrix.shard }} of the thorough tier
+      - name: Run shard ${{ matrix.shard }} of the core tier
         id: tests
-        run: node scripts/test.mjs --tier thorough --shard ${{ matrix.shard }}/${{ matrix.count }} --report-dir test-reports
+        run: node scripts/test.mjs --tier core --shard ${{ matrix.shard }}/${{ matrix.count }} --report-dir test-reports
 
       # Each failed test's file, name and error on the run's page, so a red run reads without
       # opening the log. Passing the step's outcome lets it tell "no failures" from a failure
