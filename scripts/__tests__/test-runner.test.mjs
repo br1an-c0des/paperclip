@@ -18,6 +18,7 @@ import {
   maxDefaultWorkers,
   mergeExpectedSeconds,
   parseArgs,
+  parseExtendedList,
   parseExpectedSeconds,
   parseShardWeights,
   removeRunRoot,
@@ -375,6 +376,89 @@ test("quick is thorough restricted to the selected files", () => {
   assert.deepEqual(plan("quick", { files: [] }), []);
 });
 
+// Extended: a listed file per tier. a.test.ts and d.test.ts stay core; c.test.ts (isolated project)
+// and b-routes (serial) are extended.
+const withExtended = {
+  ...tiers,
+  extended: ["server/src/services/c.test.ts", "server/src/__tests__/b-routes.test.ts", "cli/src/f.test.ts"],
+};
+
+test("core leaves out opt-in and extended files, and lists its files when it has the inventory", () => {
+  const phases = plan("core", { tiers: withExtended });
+  assert.deepEqual(phases.map((phase) => phase.name), ["server", "packages"]);
+  assert.deepEqual(phases[0].files, [abs("server/src/__tests__/a.test.ts")]);
+  assert.deepEqual(phases[1].files, [abs("packages/db/src/d.test.ts")]);
+  assert.ok(phases[0].args.includes("--fileParallelism"));
+});
+
+test("core without an inventory excludes the extended files in its args", () => {
+  const phases = buildPlan("core", withExtended, { root, workers: 6 });
+  assert.deepEqual(phases.map((phase) => phase.name), ["server", "packages"]);
+  assert.equal(phases[0].files, null);
+  for (const file of withExtended.extended) assert.ok(excludes(phases[0].args).includes(abs(file)), file);
+  assert.ok(excludes(phases[1].args).includes(abs("cli/src/f.test.ts")));
+});
+
+test("core with no extended list is thorough with explicit files", () => {
+  const core = plan("core").map((phase) => [phase.name, phase.files]);
+  assert.deepEqual(core, [
+    ["server", [abs("server/src/__tests__/a.test.ts"), abs("server/src/services/c.test.ts")]],
+    ["server-serial", [abs("server/src/__tests__/b-routes.test.ts")]],
+    ["packages", [abs("packages/db/src/d.test.ts"), abs("cli/src/f.test.ts")]],
+  ]);
+});
+
+test("extended runs only its listed files, serial ones in its serial phase", () => {
+  const phases = plan("extended", { tiers: withExtended });
+  assert.deepEqual(phases.map((phase) => [phase.name, phase.files]), [
+    ["extended-server", [abs("server/src/services/c.test.ts")]],
+    ["extended-server-serial", [abs("server/src/__tests__/b-routes.test.ts")]],
+    ["extended-packages", [abs("cli/src/f.test.ts")]],
+  ]);
+  assert.deepEqual(plan("extended"), []);
+  assert.deepEqual(plan("extended", { tiers: withExtended, files: ["server/src/__tests__/a.test.ts"] }), []);
+});
+
+test("thorough is core and extended together; quick restricts core and never runs extended", () => {
+  const all = (tier, extra = {}) => plan(tier, { tiers: withExtended, ...extra }).flatMap((phase) => phase.files ?? []);
+  const thoroughFiles = plan("thorough", { tiers: withExtended, files: inventory.map((entry) => entry.file) })
+    .flatMap((phase) => phase.files);
+  assert.deepEqual(new Set(thoroughFiles), new Set([...all("core"), ...all("extended")]));
+  const quick = plan("quick", { tiers: withExtended, files: ["server/src/__tests__/a.test.ts", "server/src/services/c.test.ts"] });
+  assert.deepEqual(quick.map((phase) => phase.files), [[abs("server/src/__tests__/a.test.ts")]]);
+});
+
+test("parseExtendedList skips blank lines and comments", () => {
+  assert.deepEqual(parseExtendedList("# header\n\nserver/a.test.ts\n  packages/b.test.ts  # why\n"), ["server/a.test.ts", "packages/b.test.ts"]);
+});
+
+test("loadTiers reads extendedList relative to the tiers file, and an empty list without it", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "test-tiers-extended-"));
+  writeFileSync(path.join(dir, "ext.txt"), "# made by hand\nserver/src/services/c.test.ts\n");
+  writeFileSync(path.join(dir, "with.json"), JSON.stringify({ ...emptyTiers, extendedList: "ext.txt" }));
+  writeFileSync(path.join(dir, "without.json"), JSON.stringify(emptyTiers));
+  writeFileSync(path.join(dir, "bad.json"), JSON.stringify({ ...emptyTiers, extendedList: 3 }));
+  assert.deepEqual(loadTiers(path.join(dir, "with.json")).extended, ["server/src/services/c.test.ts"]);
+  assert.deepEqual(loadTiers(path.join(dir, "without.json")).extended, []);
+  assert.throws(() => loadTiers(path.join(dir, "bad.json")), /extendedList must be a path/);
+});
+
+test("checkTiers refuses an extended path that's missing, listed twice or opt-in, and an alwaysQuick file in extended", () => {
+  assert.doesNotThrow(() => checkTiers(withExtended, inventory));
+  const check = (extended, extra = {}) => () => checkTiers({ ...tiers, extended, ...extra }, inventory);
+  assert.throws(check(["server/src/__tests__/gone.test.ts"]), /extended path is not a test file .*gone\.test\.ts/);
+  assert.throws(check(["server/src/services/c.test.ts", "server/src/services/c.test.ts"]), /extended path is listed twice/);
+  assert.throws(check(["server/src/services/native-runtime/n.test.ts"]), /extended path is also opt-in/);
+  assert.throws(check(["server/src/__tests__/a.test.ts"], { alwaysQuick: [{ file: "server/src/__tests__/a.test.ts", reason: "x" }] }),
+    /alwaysQuick path is in extended/);
+});
+
+test("the real extended list holds only test files that aren't opt-in", () => {
+  const real = loadTiers();
+  assert.ok(real.extended.length > 0);
+  for (const file of real.extended) assert.match(file, /\.test\.[cm]?[jt]sx?$/, file);
+});
+
 test("an unknown tier is an error", () => {
   assert.throws(() => plan("everything"), /Unknown tier/);
 });
@@ -412,7 +496,7 @@ test("runPhases starts no new phase once interrupted", async () => {
 
 test("parseArgs reads tiers, workers, files, changed and passthrough args", () => {
   assert.deepEqual(parseArgs([]), {
-    tier: "thorough", workers: null, changed: null, filesList: null, shard: null, reportDir: null, dryRun: false,
+    tier: "core", workers: null, changed: null, filesList: null, shard: null, reportDir: null, dryRun: false,
     skipPreflight: false, vitestArgs: [],
   });
   assert.deepEqual(parseArgs(["--shard", "2/8"]).shard, { index: 2, count: 8 });
@@ -569,6 +653,20 @@ test("--dry-run lists the thorough phases with file counts and checks coverage",
   assert.match(result.stdout, /server\s+\d+ files/);
   assert.match(result.stdout, /packages\s+\d+ files/);
   assert.match(result.stdout, /coverage: every one of \d+ test files is in exactly one phase/);
+});
+
+test("--dry-run covers core and extended, which share no file", () => {
+  const run = (tier) => spawnSync(process.execPath, [path.join(repoRoot, "scripts", "test.mjs"), "--dry-run", "--tier", tier, "--workers", "2"], {
+    cwd: repoRoot, encoding: "utf8",
+  });
+  const counts = {};
+  for (const tier of ["core", "extended", "thorough"]) {
+    const result = run(tier);
+    assert.equal(result.status, 0, `${tier}: ${result.stderr}${result.stdout}`);
+    counts[tier] = Number(/coverage: every one of (\d+) test files is in exactly one phase/.exec(result.stdout)?.[1]);
+  }
+  assert.ok(counts.core > 0 && counts.extended > 0, JSON.stringify(counts));
+  assert.equal(counts.core + counts.extended, counts.thorough, JSON.stringify(counts));
 });
 
 test("--dry-run --shard lists one shard's phases, every shard's size, and checks the shards cover the tier", () => {

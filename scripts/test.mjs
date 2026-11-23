@@ -2,14 +2,17 @@
 // The fork's test runner (hard-fork step 3a). Runs a tier of the suite as a few `vitest run`
 // invocations from the repo root:
 //
-//   node scripts/test.mjs [--tier quick|thorough|optin|all] [--workers N] [--changed <ref>]
+//   node scripts/test.mjs [--tier core|extended|thorough|quick|optin|all] [--workers N] [--changed <ref>]
 //                         [--files <listfile>] [--shard i/n] [--report-dir <dir>] [--dry-run]
 //                         [--skip-preflight] [-- <vitest args>]
 //
-// - thorough (the default, `pnpm test`): server files in parallel, then the `serialServer` files
-//   one at a time, then every non-server project in a single run. `optIn` files are left out.
+// - core (the default, `pnpm test`): the files that gate a merge and a deploy. Server files in
+//   parallel, then the `serialServer` files one at a time, then every non-server project in a
+//   single run. `optIn` files and the files listed in `extendedList` are left out.
+// - extended: only the files in `extendedList` (upstream's slower and flakier integration tests,
+//   run nightly and on demand; they report, they don't gate). thorough: core and extended together.
 // - optin: only the files matching `optIn` globs. all: thorough, then optin.
-// - quick: thorough restricted to the tests a change touches (see selectChangedTests).
+// - quick: core restricted to the tests a change touches (see selectChangedTests).
 // - --shard i/n: only the i-th of n slices of the tier (CI runs one shard per job). Each phase's
 //   files are split by expected time (assignShards), the same way on every machine.
 // - --workers: by default, from the machine's cores and free memory (defaultWorkerCount).
@@ -34,7 +37,7 @@ const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptsDir, "..");
 
 export const tiersFile = path.join(scriptsDir, "test-tiers.json");
-export const tierNames = ["quick", "thorough", "optin", "all"];
+export const tierNames = ["core", "extended", "thorough", "quick", "optin", "all"];
 // Server projects are selected by name, so the server config can be split into several projects.
 export const serverProjectFilter = "@paperclipai/server*";
 const serverProjectPattern = /^@paperclipai\/server/;
@@ -82,7 +85,7 @@ function parseShard(value) {
 
 export function parseArgs(argv) {
   const options = {
-    tier: "thorough", workers: null, changed: null, filesList: null, shard: null, reportDir: null, dryRun: false,
+    tier: "core", workers: null, changed: null, filesList: null, shard: null, reportDir: null, dryRun: false,
     skipPreflight: false, vitestArgs: [],
   };
   const valueOf = (index, name) => {
@@ -131,11 +134,38 @@ export function loadTiers(file = tiersFile) {
     throw new Error(`${file}: optIn must be an array of { glob, reason } with a reason for each.`);
   }
   tiers.alwaysQuick ??= [];
+  if (tiers.extendedList !== undefined) {
+    if (typeof tiers.extendedList !== "string" || !tiers.extendedList.trim()) {
+      throw new Error(`${file}: extendedList must be a path, relative to ${path.basename(file)}, of a file listing the extended tier.`);
+    }
+    tiers.extended = readExtendedList(path.resolve(path.dirname(file), tiers.extendedList));
+  }
+  tiers.extended ??= [];
   if (!Array.isArray(tiers.alwaysQuick) || !tiers.alwaysQuick.every((entry) =>
     typeof entry?.file === "string" && typeof entry?.reason === "string" && entry.reason.trim())) {
     throw new Error(`${file}: alwaysQuick must be an array of { file, reason } with a reason for each.`);
   }
   return tiers;
+}
+
+/**
+ * The extended tier's files from its list: one repo-relative path per line; blank lines and
+ * `#` comments are ignored.
+ */
+export function readExtendedList(file) {
+  return parseExtendedList(readFileSync(file, "utf8"));
+}
+
+export function parseExtendedList(text) {
+  return text.split("\n").map((line) => line.replace(/#.*/, "").trim()).filter(Boolean);
+}
+
+const extendedSets = new WeakMap();
+function isExtended(file, tiers) {
+  if (!tiers.extended?.length) return false;
+  let set = extendedSets.get(tiers);
+  if (!set) extendedSets.set(tiers, set = new Set(tiers.extended));
+  return set.has(file);
 }
 
 function isServerFile(file, projectOf) {
@@ -351,12 +381,15 @@ function buildUnsharded(tier, tiers, options) {
     : ["--fileParallelism", `--maxWorkers=${workers}`]), ...cacheArgs];
   const serialArgs = ["--no-file-parallelism", "--maxWorkers=1", ...cacheArgs];
 
-  function phases(prefix, files, { excludeOptIn }) {
-    const optInExcludes = excludeOptIn ? tiers.optIn.map(({ glob }) => absolute(glob)) : [];
+  function phases(prefix, files, { excludeOptIn, excludeExtended = false }) {
+    // Only when the files aren't listed (no inventory): the args then select the tier's files.
+    const extendedExcludes = excludeExtended && files === null ? (tiers.extended ?? []).map(absolute) : [];
+    const optInExcludes = [...(excludeOptIn ? tiers.optIn.map(({ glob }) => absolute(glob)) : []), ...extendedExcludes];
     const isServer = (file) => isServerFile(file, projectOf);
     const pick = (predicate) => files === null ? null : files.filter(predicate).map(absolute);
     const serialFiles = (files ?? tiers.serialServer)
-      .filter((file) => serial.has(file) && isServer(file) && !(excludeOptIn && isOptIn(file, tiers)));
+      .filter((file) => serial.has(file) && isServer(file) && !(excludeOptIn && isOptIn(file, tiers))
+        && !(excludeExtended && isExtended(file, tiers)));
     const result = [
       {
         name: `${prefix}server`,
@@ -383,14 +416,27 @@ function buildUnsharded(tier, tiers, options) {
     return phases("", files === null ? null : files.filter((file) => !isOptIn(file, tiers)), { excludeOptIn: true });
   }
 
+  function core(files) {
+    const candidates = files ?? inventory?.map((entry) => entry.file) ?? null;
+    return phases("", candidates === null ? null : candidates.filter((file) => !isOptIn(file, tiers) && !isExtended(file, tiers)),
+      { excludeOptIn: true, excludeExtended: true });
+  }
+
+  function extended(files) {
+    const candidates = files ?? (inventory ? inventory.map((entry) => entry.file) : tiers.extended ?? []);
+    return phases("extended-", candidates.filter((file) => isExtended(file, tiers) && !isOptIn(file, tiers)), { excludeOptIn: false });
+  }
+
   function optin(files) {
     if (tiers.optIn.length === 0) return [];
     const candidates = files ?? (inventory ?? []).map((entry) => entry.file);
     return phases("optin-", candidates.filter((file) => isOptIn(file, tiers)), { excludeOptIn: false });
   }
 
+  if (tier === "core") return core(restrictTo);
+  if (tier === "extended") return extended(restrictTo);
   if (tier === "thorough") return thorough(restrictTo);
-  if (tier === "quick") return thorough(restrictTo ?? []);
+  if (tier === "quick") return core(restrictTo ?? []);
   if (tier === "optin") return optin(restrictTo);
   if (tier === "all") return [...thorough(restrictTo), ...optin(restrictTo)];
   throw new Error(`Unknown tier "${tier}".`);
@@ -682,6 +728,16 @@ export function checkTiers(tiers, inventory) {
     if (!byFile.has(file)) problems.push(`alwaysQuick path is not a test file: ${file}`);
     else if (isOptIn(file, tiers)) problems.push(`alwaysQuick path is opt-in, so quick would never run it: ${file}`);
   }
+  const extendedSeen = new Set();
+  for (const file of tiers.extended ?? []) {
+    if (extendedSeen.has(file)) problems.push(`extended path is listed twice: ${file}`);
+    extendedSeen.add(file);
+    if (!byFile.has(file)) problems.push(`extended path is not a test file (moved or deleted? take it off the list): ${file}`);
+    else if (isOptIn(file, tiers)) problems.push(`extended path is also opt-in: ${file}`);
+  }
+  for (const { file } of tiers.alwaysQuick ?? []) {
+    if (isExtended(file, tiers)) problems.push(`alwaysQuick path is in extended, so quick would never run it: ${file}`);
+  }
   for (const { glob } of tiers.optIn) {
     if (!inventory.some((entry) => path.posix.matchesGlob(entry.file, glob))) log(`warning: optIn glob matches no test file: ${glob}`);
   }
@@ -704,7 +760,9 @@ function listPhases(phases, expected, env, runRoot) {
 
 function expectedFiles(tier, tiers, inventory, files) {
   const pool = files === null ? inventory.map((entry) => entry.file) : files.filter((file) => inventory.some((entry) => entry.file === file));
-  if (tier === "thorough" || tier === "quick") return new Set(pool.filter((file) => !isOptIn(file, tiers)));
+  if (tier === "core" || tier === "quick") return new Set(pool.filter((file) => !isOptIn(file, tiers) && !isExtended(file, tiers)));
+  if (tier === "extended") return new Set(pool.filter((file) => isExtended(file, tiers) && !isOptIn(file, tiers)));
+  if (tier === "thorough") return new Set(pool.filter((file) => !isOptIn(file, tiers)));
   if (tier === "optin") return new Set(pool.filter((file) => isOptIn(file, tiers)));
   return new Set(pool);
 }
@@ -798,7 +856,9 @@ async function main() {
       const always = tiers.alwaysQuick.map((entry) => entry.file);
       files = selectChangedTests(changed, testFiles, (file) => readFileSync(path.join(repoRoot, file), "utf8"), { always }).files
         .filter((file) => files === null || files.includes(file));
-      log(`quick: ${changed.length} files changed since ${options.changed}, ${files.length} test files selected`);
+      const left = files.filter((file) => isExtended(file, tiers) || isOptIn(file, tiers));
+      log(`quick: ${changed.length} files changed since ${options.changed}, ${files.length} test files selected`
+        + (left.length > 0 ? `, ${left.length} of them extended or opt-in and not run (test:extended and test:optin run them)` : ""));
     }
     if (files !== null) {
       const known = new Set(inventory.map((entry) => entry.file));

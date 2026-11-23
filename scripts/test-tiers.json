@@ -1,5 +1,6 @@
 {
   "serialServer": [],
+  "extendedList": "test-extended.txt",
   "alwaysQuick": [
     {
       "file": "server/src/__tests__/openapi-routes.test.ts",
