@@ -376,16 +376,16 @@
       "reason": "Non-local environment drivers, leases and probes: dormant; environment-execution-target itself stays"
     },
     {
-      "glob": "server/**/ai-*.test.*",
-      "reason": "Claude Managed and managed AI connections: dormant"
+      "glob": "server/src/__tests__/ai-connection-router.test.ts",
+      "reason": "AI connection pools, behind enableAiConnectionRouters (off): dormant. The other AI connection tests cover what claude_local runs use and stay in thorough (bug 69)"
     },
     {
-      "glob": "server/**/*ai-connection*.test.*",
-      "reason": "Claude Managed and managed AI connections: dormant"
+      "glob": "server/src/__tests__/ai-provider-routing.test.ts",
+      "reason": "Provider routing for Pi, OpenRouter and Hermes: dormant adapters"
     },
     {
-      "glob": "server/**/local-ai-*.test.*",
-      "reason": "Claude Managed and managed AI connections: dormant"
+      "glob": "server/src/services/local-ai-browser-login.test.ts",
+      "reason": "Codex CLI browser login: dormant adapter"
     },
     {
       "glob": "server/src/**/managed-config*.test.*",
