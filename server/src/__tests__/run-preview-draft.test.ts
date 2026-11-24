@@ -149,7 +149,8 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview of a task being
 
     // The same task, created as the New task dialog creates it (a person, the parent kept).
     const created = await issueService(db).create(seeded.companyId, {
-      ...draft, status: "todo", assigneeAgentId: seeded.agentId, createdByUserId: seeded.userId,
+      title: draft.title, description: draft.description, parentId: draft.parentId, priority: draft.priority, workMode: draft.workMode,
+      status: "todo", assigneeAgentId: seeded.agentId, createdByUserId: seeded.userId,
       parentDepthPolicy: "allow_nested",
     });
     expect(created.projectId).toBe(seeded.projectId);

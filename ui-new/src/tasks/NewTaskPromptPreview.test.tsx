@@ -133,7 +133,8 @@ describe("NewTaskPromptPreview", () => {
     expect(api.runPreviewDraft).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    fireEvent.click(screen.getByRole("button", { name: "Preview the prompt" }));
+    // The page is hidden from the accessibility tree until the dialog has gone.
+    fireEvent.click(await screen.findByRole("button", { name: "Preview the prompt" }));
     await waitFor(() => expect(api.runPreviewDraft).toHaveBeenCalledTimes(2));
     expect(api.runPreviewDraft.mock.calls[1]![1]).toEqual({ title: "Second" });
   });
