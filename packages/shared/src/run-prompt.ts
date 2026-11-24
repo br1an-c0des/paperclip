@@ -6,6 +6,9 @@
  * they never change the sent text.
  */
 
+import type { IssuePriority, IssueStatus } from "./constants.js";
+import type { IssueExecutionWorkspaceSettings } from "./types/workspace-runtime.js";
+
 /** Where a section goes: the system prompt or the first user message. */
 export type RunPromptPlacement = "system" | "first_message";
 
@@ -91,6 +94,32 @@ export interface RunPromptPreview {
   firstMessage: RunPromptSection[];
   firstMessageChars: number;
 }
+
+/**
+ * A task still being written in the New task dialog, for a preview of the prompt its assignee
+ * would get (`POST /api/agents/:id/run-preview/draft`, fork/task-prompt-preview.md). The fields
+ * are the create request's, as the dialog sends them; validated by `runPromptDraftSchema`, which
+ * reuses issue creation's rules. A title or a description is needed, as for creating the task.
+ */
+export interface RunPromptDraft {
+  title?: string;
+  description?: string | null;
+  projectId?: string | null;
+  parentId?: string | null;
+  goalId?: string | null;
+  /** Defaults as creation does: `todo` (the draft is assigned to the agent). */
+  status?: IssueStatus;
+  priority?: IssuePriority;
+  workMode?: RunPromptDraftWorkMode;
+  /** The workspace choice, as the dialog sends it on create. */
+  projectWorkspaceId?: string | null;
+  executionWorkspaceId?: string | null;
+  executionWorkspacePreference?: string | null;
+  executionWorkspaceSettings?: IssueExecutionWorkspaceSettings | null;
+}
+
+/** The work modes the New task dialog offers: do the work, answer a question, plan first. */
+export type RunPromptDraftWorkMode = "standard" | "ask" | "planning";
 
 /** A stored `adapter.prompt` payload this version understands. */
 export function isRunPromptRecord(value: unknown): value is RunPromptRecord {

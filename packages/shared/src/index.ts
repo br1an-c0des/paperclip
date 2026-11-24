@@ -2031,6 +2031,8 @@ export {
   type CompanySearchExtractQuery,
   type CompanySearchQuery,
   createIssueSchema,
+  runPromptDraftSchema,
+  type RunPromptDraftInput,
   issueSummariesQuerySchema,
   issueChatBootstrapQuerySchema,
   setIssueTitleSchema,

@@ -236,12 +236,20 @@ export async function buildExecutionContinuation(input: {
   summary: string | null;
   exposeLowTrustRaw: boolean;
   prospectiveTaskStatus?: "todo";
+  /**
+   * The task, when it isn't in the database: the New task dialog's prompt preview drafts a task
+   * not created yet (run-preview-draft.ts). Otherwise its row is read.
+   */
+  unsavedIssue?: Pick<typeof issues.$inferSelect,
+    "id" | "assigneeAgentId" | "status" | "title" | "description" | "executionRunId" | "responsibleUserId">;
 }): Promise<ExecutionContinuationEnvelope> {
   const { db, companyId, issueId } = input;
-  const [issue] = await db
-    .select()
-    .from(issues)
-    .where(and(eq(issues.companyId, companyId), eq(issues.id, issueId)));
+  const [issue] = input.unsavedIssue
+    ? [input.unsavedIssue]
+    : await db
+      .select()
+      .from(issues)
+      .where(and(eq(issues.companyId, companyId), eq(issues.id, issueId)));
   if (
     !issue ||
     issue.assigneeAgentId !== input.agentId ||

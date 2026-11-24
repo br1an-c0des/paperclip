@@ -15,6 +15,7 @@ import {
   type ClaudeRunPreviewBlocker,
   type ClaudeRunPreviewCheckout,
   type ClaudeRunPreviewManifest,
+  type RunPromptDraft,
   type RunPromptPreviewKind,
 } from "@paperclipai/shared";
 import type { AdapterRuntimeMcpServer } from "@paperclipai/adapter-utils";
@@ -50,6 +51,7 @@ import {
 } from "./heartbeat/run-preparation.js";
 import { resolveRunGitHub } from "./heartbeat/sealed-run-github.js";
 import { previewProjectCheckout, stripWorkspaceRuntimeFromExecutionRunConfig } from "./heartbeat/workspaces.js";
+import { resolveDraftPromptTarget } from "./run-preview-draft.js";
 import { buildRunPreviewPrompt, resolvePreviewPromptTarget } from "./run-preview-prompt.js";
 import { previewTaskWorktree, type PreviewedTaskWorktree } from "./run-preview-worktree.js";
 
@@ -273,6 +275,11 @@ export function runPreviewService(db: Db) {
       issueId?: string | null;
       /** The kind of wake the draft is for; the default follows `issueId` (run-preview-prompt.ts). */
       kind?: RunPromptPreviewKind | null;
+      /**
+       * A task not created yet (the New task dialog), in place of `issueId`: the prompt is its
+       * assignment's, as if it had just been created (run-preview-draft.ts).
+       */
+      draft?: RunPromptDraft | null;
     },
   ): Promise<ClaudeRunPreview> {
     if (agent.adapterType === "paperclip_runner") return { supported: false, reason: "runner" };
@@ -287,7 +294,9 @@ export function runPreviewService(db: Db) {
     const blockers: ClaudeRunPreviewBlocker[] = [];
     const { responsibleUserId } = input;
     // The wake the prompt draft is for (422 when the task can't have it), and its task's project.
-    const promptTarget = await resolvePreviewPromptTarget(db, agent, { issueId: input.issueId ?? null, kind: input.kind ?? null });
+    const promptTarget = input.draft
+      ? await resolveDraftPromptTarget(db, agent, input.draft, { userId: responsibleUserId })
+      : await resolvePreviewPromptTarget(db, agent, { issueId: input.issueId ?? null, kind: input.kind ?? null });
     const projectId = promptTarget.issue ? promptTarget.issue.projectId : input.projectId;
 
     // The project, and where a run on its task would read the repo from.
@@ -309,6 +318,7 @@ export function runPreviewService(db: Db) {
           companyId: agent.companyId,
           agentConfig: adapterConfig,
           projectPolicy: project.executionWorkspacePolicy,
+          issueSettings: promptTarget.issue?.executionWorkspaceSettings ?? null,
           checkoutPath: checkout.path,
           workspace: { cwd: checkout.workspace.cwd, repoUrl: checkout.workspace.repoUrl, repoRef: checkout.workspace.repoRef },
           hasGitSource: await projectHasGitSource(agent.companyId, project.id),

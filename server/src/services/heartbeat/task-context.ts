@@ -89,6 +89,12 @@ export interface HeartbeatTaskContextInput {
     issueContext: IssueContext | null;
     context: Record<string, unknown>;
     taskSession: Pick<typeof agentTaskSessions.$inferSelect, "lastRunId"> | null;
+    /**
+     * The task isn't in the database: a prompt preview of a task still being written (the New
+     * task dialog). Reads that need its row use `issueContext` instead; the rest find nothing,
+     * as for a task just created.
+     */
+    unsaved?: boolean;
   };
   policy: {
     recovering?: boolean;
@@ -200,6 +206,7 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
           previousContextRunId: taskSession?.lastRunId,
           summary: safeContinuationSummary?.body ?? null,
           exposeLowTrustRaw,
+          ...(input.task.unsaved && issueContext ? { unsavedIssue: { ...issueContext, executionRunId: null } } : {}),
         })
       : null;
   context.executionContinuation = executionContinuation;

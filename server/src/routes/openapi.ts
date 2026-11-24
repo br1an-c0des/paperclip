@@ -85,6 +85,7 @@ import {
   qualifyAgentRunnerSchema,
   // Issue
   createIssueSchema,
+  runPromptDraftSchema,
   setIssueTitleSchema,
   updateIssueSchema,
   stalledReviewDecisionSchema,
@@ -4231,6 +4232,30 @@ registry.registerPath({
       issueId: z.string().optional(),
       kind: z.enum(["assignment", "comment", "chat_turn", "no_task"]).optional(),
     }),
+  },
+  responses: {
+    200: r.ok(claudeRunPreviewSchema), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound,
+    422: r.unprocessable,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/agents/{id}/run-preview/draft",
+  tags: ["agents"],
+  summary: "Preview the prompt a task being written would give the agent",
+  description:
+    "Board only. The same preview as `GET /api/agents/{id}/run-preview`, for a task not created yet (the New task dialog): " +
+    "`prompt` is the assignment's, as if the task had just been created with these fields and assigned to this agent " +
+    "(a fresh session, so the system prompt is included), with what creation would default or inherit applied " +
+    "(the title from the description, the status, the parent's project, the workspace settings). The task's id and " +
+    "identifier, and the branch a new worktree gets, are marked `pending`. Read-only: it creates nothing. " +
+    "The body takes issue creation's fields and limits; a title or a description is needed. 404 for a project, parent, " +
+    "goal or workspace outside the agent's company, or a parent the user can't read. " +
+    "422 with `code` `no_wake` for a status whose task doesn't wake its assignee (backlog, done, cancelled).",
+  request: {
+    params: z.object({ id: z.string() }),
+    body: jsonBody(runPromptDraftSchema),
   },
   responses: {
     200: r.ok(claudeRunPreviewSchema), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound,
