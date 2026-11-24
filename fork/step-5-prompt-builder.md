@@ -1,6 +1,6 @@
 # Step 5: one prompt builder
 
-**Status: approved 2026-11-23. Scope: phase 1 only** (seeing the prompt). Phase 2 (changing it) is
+**Status: phase 1 built and merged into `main` 2026-11-24** (`5c3cea6c21`; [plan](step-5-plan.md); results [below](#built-2026-11-24)). **Scope: phase 1 only** (seeing the prompt). Phase 2 (changing it) is
 to be decided once the current prompts can be seen. Hard-fork plan [step 5](hard-fork-plan.md#5-one-prompt-builder).
 The baseline it's built on is [step-5-research.md](step-5-research.md) (how the prompt is built
 today, with file references). Bugs found on the way are 84–90 in [upstream-fixes.md](upstream-fixes.md).
@@ -319,6 +319,42 @@ here as the options discussed, so the decision starts from them.
 - How to split the work into agent-sized branches. The builder and the record, the preview read
   and the `ui-new` views are separable once the section and preview types in `packages/shared`
   are settled.
+
+## Built (2026-11-24)
+
+Built on `feat/step-5` by four agents (contracts; builder and wiring; record and run view; preview)
+and merged into `main` as `5c3cea6c21`, after the local checks passed (GitHub Actions went off that
+day; CLAUDE.md "Tests").
+
+**Real-run check** (desktop dev instance, agent "M7 test sealed runner", task TES-43):
+
+| Run | Session | Record | Matched the sent prompt |
+| --- | --- | --- | --- |
+| `7eb33da7` (assignment) | fresh | 6 first-message sections, 2 system-prompt sections, 7,959 characters | yes, byte for byte |
+| `65fe29b9` (comment, reopened) | resumed | 3 sections, no system prompt, 8,791 characters | yes, byte for byte |
+
+**Found and fixed during the check:** the preview's system prompt listed the whole company skill
+library, while a real run lists only the agent's own skills. The preview now selects skills the way
+the run does, and a test compares its system prompt with a real run's. The run's narrower list is
+itself bug 92 (left as is: fixing it changes every agent's system prompt).
+
+**Decided while building:**
+- **Deleting a connection's content keeps a run's `adapter.prompt` record,** like `adapter.invoke`
+  (the user, 2026-11-24).
+- **The task brief's parts and the builder's plan live on the context as non-enumerable
+  properties,** so the run's saved context snapshot and the `adapter.invoke` context never carry
+  them.
+- **A resume that fails and retries fresh records both attempts.** The run view shows the last one,
+  the attempt that ran.
+- **Template files wait** for the first change to what the prompt says (plan decision 4).
+
+**Known gaps in the preview:**
+- skills a task's text mentions, which a run adds;
+- the shared-workspace "concurrently held" note, which depends on live runs;
+- connection instructions, marked "filled in at launch".
+
+**Follow-ups:** bugs 84–86 and 88–92 in the bug list; changing the prompt is to be decided
+([below](#later-changing-the-prompt-to-be-decided)).
 
 ## Calls made in this design
 

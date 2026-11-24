@@ -125,7 +125,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 84 | [Don't send the string "null" as a no-task run's task brief](#84-dont-send-the-string-null-as-a-no-task-runs-task-brief) | candidate | | | 2026-11-23 | | |
 | 85 | [Say which approval an approval wake is about](#85-say-which-approval-an-approval-wake-is-about) | candidate | | | 2026-11-23 | | |
 | 86 | [Send the chat directive once per chat session, not every turn](#86-send-the-chat-directive-once-per-chat-session-not-every-turn) | candidate | | | 2026-11-23 | | |
-| 87 | [Store a run's whole prompt, not the first 16,384 characters](#87-store-a-runs-whole-prompt-not-the-first-16384-characters) | candidate | | | 2026-11-23 | | |
+| 87 | [Store a run's whole prompt, not the first 16,384 characters](#87-store-a-runs-whole-prompt-not-the-first-16384-characters) | fixed (step 5, `5c3cea6c21`) | | | 2026-11-23 | | |
 | 88 | [Give `claude_local` runs the instruction working-copy guidance](#88-give-claude_local-runs-the-instruction-working-copy-guidance) | candidate | | | 2026-11-23 | | |
 | 89 | [Stop prompt texts naming Runner tools and curl recipes runs don't use](#89-stop-prompt-texts-naming-runner-tools-and-curl-recipes-runs-dont-use) | candidate | | | 2026-11-23 | | |
 | 90 | [Keep the agent's instructions after Claude compacts a session](#90-keep-the-agents-instructions-after-claude-compacts-a-session) | candidate | | | 2026-11-23 | | |
@@ -1552,7 +1552,7 @@ Found 2026-11-23 by the step 5 research.
 
 ### 87. Store a run's whole prompt, not the first 16,384 characters
 
-Found 2026-11-23 by the step 5 research.
+Found 2026-11-23 by the step 5 research. **Fixed** in step 5 (merged as `5c3cea6c21`, 2026-11-24): a `claude_local` CLI run's prompt is stored as its own `adapter.prompt` run event, with each section and part kept whole up to 256 KiB, and the run's Input tab reads it. `adapter.invoke`'s `prompt` is still cut at 16 KiB (bug 91 covers the Transcript card that reads it).
 
 - **Problem:** `boundHeartbeatRunEventPayloadForStorage` (`server/src/services/heartbeat/run-log.ts:6-98`)
   cuts every string in a run event's payload at 16,384 characters, including the `adapter.invoke`
