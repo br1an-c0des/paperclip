@@ -75,6 +75,7 @@ import {
   buildTriggerPayloads,
   clearDraft,
   defaultWorkspaceMode,
+  draftHasContent,
   draftProblem,
   draftRepeats,
   recurringDraftProblem,
@@ -90,6 +91,7 @@ import {
   type ReusedWorkspace,
   type WorkspaceMode,
 } from "./new-task";
+import { NewTaskPromptPreview, draftFromPayload, promptPreviewAvailability } from "./NewTaskPromptPreview";
 import { TaskPicker, taskName } from "./TaskPicker";
 import { casesApi } from "@/api/cases";
 import { NewTaskCase } from "@/cases/NewTaskCase";
@@ -1023,6 +1025,28 @@ function NewTaskForm(props: { onConnect: (next: { target: ConnectTarget; crumb: 
             />
           </Popover.Content>
         </Popover>
+
+        <NewTaskPromptPreview
+          availability={promptPreviewAvailability({
+            assignee: draft.assignee,
+            agent: assigneeAgent(),
+            repeating: repeating(),
+            status: draft.status,
+            hasContent: draftHasContent(draft),
+          })}
+          draft={() =>
+            draftFromPayload(
+              buildCreatePayload(unwrap(draft), {
+                adapterType: assigneeAgent()?.adapterType ?? null,
+                project: project(),
+                isolatedWorkspacesEnabled: isolatedWorkspaces(),
+                idempotencyKey: "prompt-preview",
+                startCase: startingCase(),
+              }),
+            )
+          }
+          offline={() => connectivity.status() === "offline"}
+        />
 
         <Show when={!repeating()}>
         <RolePill

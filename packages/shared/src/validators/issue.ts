@@ -941,6 +941,29 @@ export const createIssueSchema = withCreateIssueStatusDefault(
   }),
 ).superRefine(requireBlockedStatusForUnblockDescriptor).superRefine(requireTitleOrDescription);
 
+/**
+ * `POST /api/agents/:id/run-preview/draft`'s body (`RunPromptDraft`): the fields of a task being
+ * written that its prompt reads, with issue creation's own rules and limits. The work modes are
+ * the ones the New task dialog offers.
+ */
+export const runPromptDraftSchema = createIssueBaseSchema.pick({
+  description: true,
+  projectId: true,
+  parentId: true,
+  goalId: true,
+  priority: true,
+  projectWorkspaceId: true,
+  executionWorkspaceId: true,
+  executionWorkspacePreference: true,
+  executionWorkspaceSettings: true,
+}).extend({
+  title: z.string().optional(),
+  status: createIssueBaseSchema.shape.status.optional(),
+  workMode: z.enum(["standard", "ask", "planning"]).optional().default("standard"),
+}).superRefine(requireTitleOrDescription);
+
+export type RunPromptDraftInput = z.input<typeof runPromptDraftSchema>;
+
 export const setIssueTitleSchema = z.object({
   title: z.string().trim().min(1).max(240),
   onlyIfProvisional: z.boolean().optional().default(false),

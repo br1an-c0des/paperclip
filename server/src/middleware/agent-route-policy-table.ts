@@ -42,6 +42,8 @@ export const AGENT_ROUTE_POLICY: ReadonlyArray<AgentRoutePolicyEntry> = [
     "PUT /agents/:id/instructions-bundle/file",
     "POST /agents/:id/instructions-bundle/restore",
     "PATCH /agents/:id/instructions-path",
+    // The New task dialog's prompt preview: a read sent as a POST, for the board only.
+    "POST /agents/:id/run-preview/draft",
     "POST /agents/:id/skills/sync",
     "POST /agents/:id/wakeup",
     "POST /approvals/:id/approve",

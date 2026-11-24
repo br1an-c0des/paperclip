@@ -50,6 +50,10 @@ import type { TrustPresetResolution } from "./trust-preset-resolver.js";
  *
  * It decrypts the issue's registered secrets, on the server only, to redact task text as a run
  * does (`redactForIssue`, inside `prepareHeartbeatTaskContext` and the handoff loader).
+ *
+ * The task can also be a draft not created yet (the New task dialog, run-preview-draft.ts): the
+ * same build, for the assignment creating it makes, with its stand-in id and predicted identifier
+ * marked pending wherever the prompt holds them.
  */
 
 type IssueContext = NonNullable<Awaited<ReturnType<ReturnType<typeof createHeartbeatRunPreparation>["getIssueExecutionContext"]>>>;
@@ -59,6 +63,12 @@ export interface PreviewPromptTarget {
   kind: RunPromptPreviewKind;
   issue: IssueContext | null;
   wakeCommentId: string | null;
+  /**
+   * The task isn't created yet: `issue` is a draft from the New task dialog
+   * (run-preview-draft.ts), with a stand-in id and the identifier the next task would get.
+   * Its wake is the assignment creating it makes.
+   */
+  draft?: { identifier: string | null } | null;
 }
 
 /**
@@ -128,11 +138,16 @@ function wakeRequest(target: PreviewPromptTarget) {
         contextSnapshot: { source: "scheduler", reason: "interval_elapsed" },
       };
     case "assignment":
-      // issue-assignment-wakeup.ts: assigning the task to the agent.
-      return {
-        reason: "issue_assigned", source: "assignment" as const, payload: { issueId, mutation: "update" },
-        contextSnapshot: { issueId, source: "issue.update" },
-      };
+      // issue-assignment-wakeup.ts: assigning the task to the agent, or creating it assigned.
+      return target.draft
+        ? {
+          reason: "issue_assigned", source: "assignment" as const, payload: { issueId, mutation: "create" },
+          contextSnapshot: { issueId, source: "issue.create" },
+        }
+        : {
+          reason: "issue_assigned", source: "assignment" as const, payload: { issueId, mutation: "update" },
+          contextSnapshot: { issueId, source: "issue.update" },
+        };
     case "comment":
     case "chat_turn":
       // routes/issues.ts: a comment on the assignee's task (a chat message is one too).
@@ -168,6 +183,7 @@ export interface RunPreviewPromptInput {
 }
 
 const PENDING = {
+  identity: "The task's id and identifier are given when it's created; the identifier shown is the next one, which another task can take first.",
   checkout: "The harness checks the task out when the run starts; predicted from the task's status and assignee.",
   status: "The status after the harness checks the task out; predicted.",
   branch: "The run names the branch when it makes the task's worktree.",
@@ -241,16 +257,25 @@ export async function buildRunPreviewPrompt(db: Db, input: RunPreviewPromptInput
     : null;
 
   // Reads only: no checkout, no run row, no writes (run-preview.test.ts checks the transaction id).
+  // A draft has no row: the reads that need one take it from the draft, and the rest find
+  // nothing, as for a task just created (run-preview-draft.ts).
   const runPreparation = createHeartbeatRunPreparation(db);
+  const issuesSvc = issueService(db);
   await prepareHeartbeatTaskContext(db, {
     run: { id: PREVIEW_CONTEXT_RUN_ID },
     agent: { id: agent.id, companyId: agent.companyId, adapterType: agent.adapterType },
-    task: { issueRef, issueContext: issueRef, context, taskSession },
+    task: { issueRef, issueContext: issueRef, context, taskSession, unsaved: Boolean(target.draft) },
     policy: {
       trustPreset: input.trustPreset,
       experimentalInstanceSettings: workflowCase ? { ...experimental, enableCases: false } : experimental,
     },
-    services: { issuesSvc: issueService(db), getPinnedSkillTestContext: runPreparation.getPinnedSkillTestContext },
+    services: {
+      issuesSvc: {
+        // The chain from the task's parent, which the task (draft or not) already carries.
+        getAncestors: (issueId) => issuesSvc.getAncestors(issueId, issueId === issue?.id ? { parentId: issue.parentId } : undefined),
+      },
+      getPinnedSkillTestContext: runPreparation.getPinnedSkillTestContext,
+    },
   });
 
   // Later stages' patches to the wake (execution configuration, workspace realization).
@@ -293,6 +318,7 @@ export async function buildRunPreviewPrompt(db: Db, input: RunPreviewPromptInput
   });
 
   const firstMessage = markPending(plan.fresh, {
+    identity: target.draft && issue ? [issue.id, ...(target.draft.identifier ? [target.draft.identifier] : [])] : [],
     checkout: checkoutPredicted,
     status: checkoutPredicted && issue?.status !== "in_progress",
     branch: Boolean(branchName),
@@ -303,15 +329,23 @@ export async function buildRunPreviewPrompt(db: Db, input: RunPreviewPromptInput
   });
   return {
     kind: target.kind,
-    issueId: issue?.id ?? null,
+    // A draft has no id yet.
+    issueId: target.draft ? null : issue?.id ?? null,
     systemPrompt: input.systemPrompt,
     firstMessage,
     firstMessageChars: joinRunPromptSections(firstMessage).length,
   };
 }
 
-/** Marks what the launch fills in, on the parts that hold it or on the section. */
-function markPending(sections: RunPromptSection[], flags: Record<keyof typeof PENDING, boolean>): RunPromptSection[] {
+/**
+ * Marks what the launch fills in, on the parts that hold it or on the section. `identity`: a
+ * draft's stand-in id and predicted identifier, marked wherever the text holds them.
+ */
+function markPending(
+  sections: RunPromptSection[],
+  flags: Record<Exclude<keyof typeof PENDING, "identity">, boolean> & { identity: string[] },
+): RunPromptSection[] {
+  const holdsIdentity = (text: string) => flags.identity.some((value) => text.includes(value));
   const partPending: Record<string, string | null> = {
     "wake.checkout_line": flags.checkout ? PENDING.checkout : null,
     "wake.checkout_note": flags.checkout ? PENDING.checkout : null,
@@ -325,11 +359,12 @@ function markPending(sections: RunPromptSection[], flags: Record<keyof typeof PE
     task_brief: flags.workflowCase ? PENDING.workflowCase : null,
   };
   return sections.map((section) => {
-    const pending = sectionPending[section.id] ?? null;
     const parts = section.parts?.map((part): RunPromptPart => {
-      const why = partPending[part.id] ?? null;
+      const why = partPending[part.id] ?? (holdsIdentity(part.text) ? PENDING.identity : null);
       return why ? { ...part, pending: why } : part;
     });
+    // A section without parts is marked as a whole.
+    const pending = sectionPending[section.id] ?? (!parts && holdsIdentity(section.text) ? PENDING.identity : null);
     return { ...section, ...(parts ? { parts } : {}), ...(pending ? { pending } : {}) };
   });
 }

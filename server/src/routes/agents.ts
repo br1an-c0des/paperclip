@@ -95,7 +95,9 @@ import {
   type AgentSkillAssignmentMode,
   type AgentSkillSnapshot,
   type InstanceSchedulerHeartbeatAgent,
+  type RunPromptDraft,
   type RunPromptPreviewKind,
+  runPromptDraftSchema,
   upsertAgentInstructionsFileSchema,
   restoreAgentInstructionSchema,
   resolveAgentInstructionCandidateSchema,
@@ -4267,15 +4269,43 @@ export function agentRoutes(
     res.json(redactAgentConfiguration(agent));
   });
 
+  /** The agent a run preview is for: the board, behind the agent read's checks. Null once answered. */
+  async function readPreviewAgent(req: Request, res: Response) {
+    assertBoard(req);
+    const agent = await getAccessibleResource(req, res, svc.getById(req.params.id as string), "Agent not found");
+    if (!agent) return null;
+    if (!(await assertAgentReadAllowed(req, res, agent))) return null;
+    await assertCanReadAgent(req, agent);
+    return agent;
+  }
+
+  /** A task whose text a preview shows must be one the user asking can read: 404 otherwise. */
+  async function assertPreviewIssueReadable(req: Request, companyId: string, issueId: string) {
+    if (!isUuidLike(issueId)) throw notFound("Issue not found");
+    const [issue] = await db
+      .select({
+        id: issuesTable.id, companyId: issuesTable.companyId, projectId: issuesTable.projectId, parentId: issuesTable.parentId,
+        assigneeAgentId: issuesTable.assigneeAgentId, assigneeUserId: issuesTable.assigneeUserId, status: issuesTable.status,
+      })
+      .from(issuesTable)
+      .where(and(eq(issuesTable.id, issueId), eq(issuesTable.companyId, companyId)));
+    const decision = issue ? await access.decide({
+      actor: req.actor,
+      action: "issue:read",
+      resource: {
+        type: "issue", companyId: issue.companyId, issueId: issue.id, projectId: issue.projectId,
+        parentIssueId: issue.parentId, assigneeAgentId: issue.assigneeAgentId, assigneeUserId: issue.assigneeUserId,
+        status: issue.status,
+      },
+    }) : null;
+    if (!decision?.allowed) throw notFound("Issue not found");
+  }
+
   // What the agent's next sealed run would get, for tasks in `projectId` or in no project
   // (fork/step-4b-parts-2-3.md, part 2). Read-only: starts, writes and mints nothing.
   router.get("/agents/:id/run-preview", async (req, res) => {
-    assertBoard(req);
-    const id = req.params.id as string;
-    const agent = await getAccessibleResource(req, res, svc.getById(id), "Agent not found");
+    const agent = await readPreviewAgent(req, res);
     if (!agent) return;
-    if (!(await assertAgentReadAllowed(req, res, agent))) return;
-    await assertCanReadAgent(req, agent);
     const query = (name: string) => (typeof req.query[name] === "string" ? (req.query[name] as string).trim() : "");
     const rawKind = query("kind");
     if (rawKind && !isRunPromptPreviewKind(rawKind)) {
@@ -4283,32 +4313,30 @@ export function agentRoutes(
     }
     // The prompt draft is for a task the user asking can read; its text reaches them.
     const issueId = query("issueId") || null;
-    if (issueId) {
-      if (!isUuidLike(issueId)) throw notFound("Issue not found");
-      const [issue] = await db
-        .select({
-          id: issuesTable.id, companyId: issuesTable.companyId, projectId: issuesTable.projectId, parentId: issuesTable.parentId,
-          assigneeAgentId: issuesTable.assigneeAgentId, assigneeUserId: issuesTable.assigneeUserId, status: issuesTable.status,
-        })
-        .from(issuesTable)
-        .where(and(eq(issuesTable.id, issueId), eq(issuesTable.companyId, agent.companyId)));
-      const decision = issue ? await access.decide({
-        actor: req.actor,
-        action: "issue:read",
-        resource: {
-          type: "issue", companyId: issue.companyId, issueId: issue.id, projectId: issue.projectId,
-          parentIssueId: issue.parentId, assigneeAgentId: issue.assigneeAgentId, assigneeUserId: issue.assigneeUserId,
-          status: issue.status,
-        },
-      }) : null;
-      if (!decision?.allowed) throw notFound("Issue not found");
-    }
+    if (issueId) await assertPreviewIssueReadable(req, agent.companyId, issueId);
     const preview = await runPreview.previewAgentRun(agent, {
       projectId: query("projectId") || null,
       // A run on a task the user asking creates would be theirs.
       responsibleUserId: req.actor.userId ?? null,
       issueId,
       kind: rawKind ? (rawKind as RunPromptPreviewKind) : null,
+    });
+    res.json(preview);
+  });
+
+  // The same preview for a task still being written in the New task dialog, as its assignment to
+  // this agent once created (fork/task-prompt-preview.md). A POST only because a description can
+  // be too long for a URL: read-only like the GET, it creates nothing.
+  router.post("/agents/:id/run-preview/draft", validate(runPromptDraftSchema), async (req, res) => {
+    const agent = await readPreviewAgent(req, res);
+    if (!agent) return;
+    const draft = req.body as RunPromptDraft;
+    // The parent's chain reaches the prompt: the user asking must be able to read it.
+    if (draft.parentId) await assertPreviewIssueReadable(req, agent.companyId, draft.parentId);
+    const preview = await runPreview.previewAgentRun(agent, {
+      projectId: null,
+      responsibleUserId: req.actor.userId ?? null,
+      draft,
     });
     res.json(preview);
   });

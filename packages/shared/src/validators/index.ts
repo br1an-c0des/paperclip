@@ -425,6 +425,8 @@ export {
 
 export {
   createIssueSchema,
+  runPromptDraftSchema,
+  type RunPromptDraftInput,
   issueSummariesQuerySchema,
   issueChatBootstrapQuerySchema,
   setIssueTitleSchema,

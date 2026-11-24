@@ -10,6 +10,7 @@ import { resolveHomeAwarePath } from "../home-paths.js";
 import {
   applyDefaultIsolatedExecutionWorkspacePolicy,
   buildExecutionWorkspaceAdapterConfig,
+  parseIssueExecutionWorkspaceSettings,
   resolveEffectiveWorkspaceStrategyType,
   resolveExecutionWorkspaceMode,
 } from "./execution-workspace-policy.js";
@@ -139,6 +140,8 @@ export async function previewTaskWorktree(db: Db, input: {
   companyId: string;
   agentConfig: Record<string, unknown>;
   projectPolicy: unknown;
+  /** The task's own workspace settings (its mode: a new worktree or the shared checkout), if any. */
+  issueSettings?: unknown;
   checkoutPath: string;
   workspace: { cwd: string | null; repoUrl: string | null; repoRef: string | null };
   /** Whether any of the project's workspaces has a repo URL (the heartbeat's `hasGitSource`). */
@@ -149,9 +152,10 @@ export async function previewTaskWorktree(db: Db, input: {
     defaultIsolatedWorkspacesEnabled: await checkoutSupportsWorktrees(input.workspace),
     hasProjectWorkspace: true,
   });
-  const mode = resolveExecutionWorkspaceMode({ projectPolicy, issueSettings: null, legacyUseProjectWorkspace: null });
+  const issueSettings = parseIssueExecutionWorkspaceSettings(input.issueSettings ?? null);
+  const mode = resolveExecutionWorkspaceMode({ projectPolicy, issueSettings, legacyUseProjectWorkspace: null });
   const config = buildExecutionWorkspaceAdapterConfig({
-    agentConfig: input.agentConfig, projectPolicy, issueSettings: null, mode, legacyUseProjectWorkspace: null,
+    agentConfig: input.agentConfig, projectPolicy, issueSettings, mode, legacyUseProjectWorkspace: null,
   });
   if (resolveEffectiveWorkspaceStrategyType(mode, config) !== "git_worktree") return null;
 

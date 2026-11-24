@@ -29,6 +29,7 @@ import type {
   EnvironmentProbeResult,
   ResolveAgentInstructionCandidate,
   ResourceMembershipUpdateResult,
+  RunPromptDraft,
   RunPromptPreviewKind,
   ToolProfileEffectiveSummary,
   UpdateResourceMembership,
@@ -311,6 +312,13 @@ export const agentsApi = {
    */
   runPreview: (id: string, query: RunPreviewQuery, companyId?: string, signal?: AbortSignal) =>
     api.get<ClaudeRunPreview>(agentPath(id, companyId, `/run-preview${runPreviewSearch(query)}`), { signal }),
+  /**
+   * The same preview for a task still being written (the New task dialog): its assignment's prompt,
+   * as if it had just been created with these fields (`POST /agents/:id/run-preview/draft`). A read:
+   * it creates nothing. 422 `no_wake` for a status whose task doesn't wake its agent.
+   */
+  runPreviewDraft: (id: string, draft: RunPromptDraft, companyId?: string, signal?: AbortSignal) =>
+    api.post<ClaudeRunPreview>(agentPath(id, companyId, "/run-preview/draft"), draft, { signal }),
   /** The agent's open tasks, newest activity first (compact rows; chats aren't in the list). */
   assignedTasks: (companyId: string, agentId: string, signal?: AbortSignal) =>
     api.get<CompactIssue[]>(
