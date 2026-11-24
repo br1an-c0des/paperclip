@@ -75,5 +75,11 @@ export async function previewClaudeRun(ctx: AdapterRunPreviewContext): Promise<A
   });
   const { session: _session, setAside: _setAside, ...rest } = manifest;
   const previewManifest: ClaudeRunPreviewManifest = { ...rest, credential };
-  return { supported: true, manifest: previewManifest, blockers };
+  return {
+    supported: true,
+    manifest: previewManifest,
+    blockers,
+    systemPrompt: [], // step 5 Task 8 fills this
+    instructionsPathDirective: "", // step 5 Task 8 fills this
+  };
 }

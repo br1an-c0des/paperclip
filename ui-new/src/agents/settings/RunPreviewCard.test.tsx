@@ -50,12 +50,13 @@ const manifest: ClaudeRunPreviewManifest = {
   github: { mode: "connection", identitySource: "personal", login: "octocat" },
 };
 
-const noProject: ClaudeRunPreview = { supported: true, project: null, manifest, blockers: [] };
+const noProject: ClaudeRunPreview = { supported: true, project: null, manifest, blockers: [], prompt: null }; // step 5 Task 8 fills this
 const app: ClaudeRunPreview = {
   supported: true,
   project: { id: "p2", name: "App", checkout: { kind: "not_cloned", repoUrl: "https://github.com/acme/app" } },
   manifest: { ...manifest, claudeMd: { enabled: false, reason: "not_cloned" }, repoSkills: { enabled: false, reason: "not_cloned" } },
   blockers: [],
+  prompt: null, // step 5 Task 8 fills this
 };
 
 const site: ClaudeRunPreview = {
@@ -71,6 +72,7 @@ const site: ClaudeRunPreview = {
     repoSkills: { enabled: true, dir: "/work/site/.paperclip/worktrees/<task branch>/.claude/skills", count: 1 },
   },
   blockers: [],
+  prompt: null, // step 5 Task 8 fills this
 };
 
 function mount(props: { dirty?: boolean } = {}) {

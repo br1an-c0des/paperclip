@@ -51,13 +51,14 @@ test("the Runtime section shows what runs get, for no project and for a project"
     expect(params.agentId).toBe(AGENT_ID);
     const projectId = query.get("projectId");
     asked.push(projectId);
-    if (!projectId) return { supported: true, project: null, manifest, blockers: [] };
+    if (!projectId) return { supported: true, project: null, manifest, blockers: [], prompt: null }; // step 5 Task 8 fills this
     const project = PROJECTS.find((entry) => entry.id === projectId)!;
     return {
       supported: true,
       project: { id: project.id, name: project.name, checkout: { kind: "not_cloned", repoUrl: "https://github.com/m7-test/site" } },
       manifest: { ...manifest, credential: null, claudeMd: { enabled: false, reason: "not_cloned" }, repoSkills: { enabled: false, reason: "not_cloned" } },
       blockers: [{ code: "claude_credential_missing", message: "M7 test: no Claude credential for this agent." }],
+      prompt: null, // step 5 Task 8 fills this
     };
   });
 
@@ -94,7 +95,7 @@ test("a project whose tasks get their own worktree shows where, and reads the re
   const project = PROJECTS[0]!;
   const worktrees = "/home/m7/site/.paperclip/worktrees";
   api.get("/agents/:agentId/run-preview", ({ query }): ClaudeRunPreview => {
-    if (!query.get("projectId")) return { supported: true, project: null, manifest, blockers: [] };
+    if (!query.get("projectId")) return { supported: true, project: null, manifest, blockers: [], prompt: null }; // step 5 Task 8 fills this
     return {
       supported: true,
       project: { id: project.id, name: project.name, checkout: { kind: "local", path: "/home/m7/site", worktree: { dir: worktrees, baseRef: "origin/main" } } },
@@ -104,6 +105,7 @@ test("a project whose tasks get their own worktree shows where, and reads the re
         repoSkills: { enabled: true, dir: `${worktrees}/<task branch>/.claude/skills`, count: 2 },
       },
       blockers: [],
+      prompt: null, // step 5 Task 8 fills this
     };
   });
 
