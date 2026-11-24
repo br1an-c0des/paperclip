@@ -1,6 +1,6 @@
 # Prompt preview in the New task dialog
 
-**Approved 2026-11-24.** Follows step 5 ([step-5-prompt-builder.md](step-5-prompt-builder.md)), which
+**Approved and built 2026-11-24;** merged into `main` as `246aba6453`. Follows step 5 ([step-5-prompt-builder.md](step-5-prompt-builder.md)), which
 made a run's prompt visible on the run's Input tab and as a next-run preview in an agent's settings.
 
 ## Intent
@@ -38,3 +38,28 @@ builder and section view as step 5, so the preview and the real run agree.
 
 How the draft is turned into the brief's input; the exact icon and placement within the
 assignment row; the request's validation (it reuses issue creation's limits).
+
+## Built (2026-11-24)
+
+Built on `tasks/new-task-prompt-preview` by one agent and merged after the local checks passed. A
+look on the desktop dev instance: a draft assigned to "M7 test sealed runner" showed 2 system-prompt
+sections (809 characters) and 6 first-message sections (7.6k), with TES-45 marked "filled in at
+launch". A server test checks the draft preview against the existing-task preview of the same task
+made through `issueService.create`.
+
+**Decided while building:**
+- **Status is part of the draft:** it changes the checkout and status lines. A status that doesn't
+  wake the agent (Backlog, done, cancelled) gets 422 `no_wake`, and the button says why.
+- **The button also says "Write a title or description first"**, since creating needs one.
+- **The existing-task preview now follows the task's own workspace setting** (a task on the shared
+  checkout gets no worktree), as the heartbeat does.
+- **The workspace inheritance is worked out again in `run-preview-draft.ts`,** mirroring
+  `issueService.create`; the test above catches drift.
+
+**Where the draft preview can still differ from the run:**
+- the identifier, if another task is created first (marked);
+- fields not sent: labels, blockers (they change the checkout), reviewer and approver (the trust
+  preset), watchdog, model and effort overrides, visibility (a private task with no project moves
+  into a personal project), attachments;
+- a case started or joined from the dialog (the run's brief carries its context);
+- step 5's gaps: skills the task's text mentions, the shared-workspace note, connection instructions.
