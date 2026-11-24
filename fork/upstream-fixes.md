@@ -1643,3 +1643,19 @@ traced by the preview agent.
   skills (the mount stays the agent's own), then check the preview still matches. Decide together
   with any other system-prompt change, so sessions reset once.
 
+
+### 93. A run preview on a finished task fails with a server error
+
+Found 2026-11-24 while mapping the prompt for step 5 phase 2 (desktop dev instance). Candidate.
+
+- **Problem:** `GET /api/agents/:id/run-preview?issueId=<task>&kind=assignment` (or `comment`) on
+  a task that is `done` returns 500. `buildExecutionContinuation`
+  (`server/src/services/execution-continuation.ts`) throws `StaleExecutionContinuationError`
+  (`continuation_task_ownership_changed`) for a done or cancelled task, or one no longer assigned
+  to the agent, and the preview doesn't catch it. Seen with TES-43 and "M7 test sealed runner".
+- **Effect:** the agent settings' next-run preview shows an error for any finished task instead of
+  saying why there's no preview. A real run on such a task is refused at the same point, so the
+  run itself is fine.
+- **Likely fix:** in `buildRunPreviewPrompt` (`server/src/services/run-preview-prompt.ts`), turn the
+  error into a 422 with a code (`task_not_runnable`, say) and a plain message ("This task is done,
+  so assigning it wouldn't start a run"), and show it in the preview like `no_comment`.
