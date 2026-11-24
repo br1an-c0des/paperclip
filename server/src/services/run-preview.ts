@@ -441,6 +441,7 @@ export function runPreviewService(db: Db) {
       project: project && previewCheckout ? { id: project.id, name: project.name, checkout: previewCheckout } : null,
       manifest,
       blockers: [...blockers, ...preview.blockers],
+      prompt: null, // step 5 Task 8 fills this
     };
   }
 
