@@ -1,13 +1,18 @@
-import type { AgentDetail } from "@paperclipai/shared";
+import type { AgentDetail, RunPromptPreview, RunPromptPreviewKind } from "@paperclipai/shared";
 import { createQuery, keepPreviousData } from "@tanstack/solid-query";
-import { TriangleAlert } from "lucide-solid";
-import { createEffect, createMemo, createSignal, createUniqueId, For, on, Show } from "solid-js";
-import { agentsApi } from "@/api/agents";
+import { ChevronDown, TriangleAlert } from "lucide-solid";
+import { createEffect, createMemo, createSignal, createUniqueId, For, on, onCleanup, Show } from "solid-js";
+import { agentsApi, runPreviewQueryKey } from "@/api/agents";
+import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
+import { useChatListQuery } from "@/chat/chat-index";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { AccessRow, AutoMemoryRow, GitHubRow, ManifestList, ManifestRow, McpServersRow, MonoValue, OverriddenRow, SkillsRow } from "@/runs/ManifestRows";
-import { InfoHeading } from "@/ui/Field";
+import { PromptSections } from "@/runs/PromptSections";
+import { InfoHeading, TextInput } from "@/ui/Field";
+import { InfoTip } from "@/ui/InfoTip";
+import { Popover } from "@/ui/Popover";
 import { failure } from "../shared";
 import {
   blockerLines,
@@ -15,10 +20,17 @@ import {
   chosenProject,
   claudeMdValue,
   credentialValue,
+  effectivePromptKind,
   engineValue,
   instructionsValue,
   previewManifest,
   projectChoices,
+  PROMPT_KIND_LABEL,
+  promptKinds,
+  promptNote,
+  promptPreviewView,
+  promptTaskGroups,
+  promptTaskName,
   readStoredProject,
   repoSkillsValue,
   SESSION_TEXT,
@@ -26,6 +38,7 @@ import {
   taskWorktreeValue,
   unsupportedText,
   type PreviewValue,
+  type PromptTask,
 } from "./run-preview-model";
 import "./RunPreviewCard.css";
 
@@ -39,6 +52,12 @@ import "./RunPreviewCard.css";
  * preview follows, remembered per agent on this device. The read sits under the agent's query
  * key, so saving the agent's settings (refreshAgent) refetches it; picking a project fetches that
  * project's.
+ *
+ * The Prompt part (step 5) shows a draft of the next run's prompt in the run view's sections:
+ * without a task, the run without one that the read above drafts; with a task picked (the agent's
+ * tasks first, then its chats, then any task found), a second read with `issueId` and `kind`.
+ * Values the launch fills in are marked, with why behind an "i". A 422 (no comment to wake on, not
+ * a chat) is a note beside the picker.
  */
 
 export function RunPreviewCard(props: { agent: AgentDetail; dirty?: boolean }) {
@@ -55,8 +74,8 @@ export function RunPreviewCard(props: { agent: AgentDetail; dirty?: boolean }) {
   };
 
   const preview = createQuery(() => ({
-    queryKey: queryKeys.agents.part(props.agent.id, "run-preview", projectId() ?? "__none__"),
-    queryFn: ({ signal }) => agentsApi.runPreview(props.agent.id, projectId(), company().id, signal),
+    queryKey: runPreviewQueryKey(props.agent.id, { projectId: projectId() }),
+    queryFn: ({ signal }) => agentsApi.runPreview(props.agent.id, { projectId: projectId() }, company().id, signal),
     // Switching projects keeps the last rows on screen (dimmed) until the new ones arrive.
     placeholderData: keepPreviousData,
     retry: false,
@@ -178,7 +197,224 @@ export function RunPreviewCard(props: { agent: AgentDetail; dirty?: boolean }) {
           </div>
         )}
       </Show>
+
+      <Show when={supported()}>
+        <PromptPart agent={props.agent} noTaskPrompt={preview.data?.supported ? preview.data.prompt : null} />
+      </Show>
     </section>
+  );
+}
+
+/** How many tasks the picker's search finds, beside the agent's own. */
+const SEARCH_LIMIT = 8;
+
+/**
+ * The Prompt part: the task and kind pickers, a 422's note beside them, and the draft. Without a
+ * task the draft is the card's own read's (a run without a task); a picked task reads its own.
+ */
+function PromptPart(props: { agent: AgentDetail; noTaskPrompt: RunPromptPreview | null }) {
+  const company = useCompany();
+  const [task, setTask] = createSignal<PromptTask | null>(null);
+  const [pickedKind, setPickedKind] = createSignal<RunPromptPreviewKind | null>(null);
+  createEffect(on(() => props.agent.id, () => {
+    setTask(null);
+    setPickedKind(null);
+  }, { defer: true }));
+  const kind = () => effectivePromptKind(task(), pickedKind());
+
+  const draft = createQuery(() => {
+    const picked = task();
+    const query = { issueId: picked?.id ?? null, kind: kind() };
+    return {
+      queryKey: runPreviewQueryKey(props.agent.id, query),
+      queryFn: ({ signal }: { signal: AbortSignal }) => agentsApi.runPreview(props.agent.id, query, company().id, signal),
+      enabled: Boolean(picked),
+      placeholderData: keepPreviousData,
+      retry: false,
+    };
+  });
+  const prompt = (): RunPromptPreview | null => {
+    if (!task()) return props.noTaskPrompt;
+    if (draft.isError) return null;
+    return draft.data?.supported ? draft.data.prompt : null;
+  };
+  const view = createMemo(() => {
+    const current = prompt();
+    return current ? promptPreviewView(current) : null;
+  });
+  const note = () => (task() && draft.isError ? promptNote(draft.error, task()) : null);
+  const kindId = createUniqueId();
+  const titleId = createUniqueId();
+
+  return (
+    <section class="rp-prompt" aria-labelledby={titleId}>
+      <div class="rp-prompt-head">
+        <InfoHeading
+          level={4}
+          class="disp rp-prompt-title"
+          id={titleId}
+          info="A draft of what the agent's next run would be sent on a new session, for the task and kind of wake you pick, from the same builder a run uses. Values marked “filled in at launch” are worked out when the run starts."
+        >
+          Prompt
+        </InfoHeading>
+        <div class="rp-prompt-pick">
+          <TaskChoice agent={props.agent} task={task()} onPick={(next) => setTask(next)} />
+          <label class="rp-for" for={kindId}>
+            <span>Kind</span>
+            <select
+              id={kindId}
+              class="input rp-select"
+              value={kind()}
+              disabled={!task()}
+              onChange={(event) => setPickedKind(event.currentTarget.value as RunPromptPreviewKind)}
+            >
+              <For each={promptKinds(task())}>
+                {(option) => (
+                  <option value={option} selected={option === kind()}>
+                    {PROMPT_KIND_LABEL[option]}
+                  </option>
+                )}
+              </For>
+            </select>
+          </label>
+          <Show when={note()}>
+            {(text) => (
+              <p class="rp-prompt-note" role="status">
+                {text()}
+              </p>
+            )}
+          </Show>
+        </div>
+      </div>
+      <Show when={task() && draft.isError && !note()}>
+        <p class="ps-list-note" role="alert">
+          Couldn't draft the prompt. {failure(draft.error, "")}
+        </p>
+      </Show>
+      <Show when={task() && draft.isPending && !draft.data}>
+        <p class="ps-list-note" role="status">
+          Drafting…
+        </p>
+      </Show>
+      <Show when={view()}>
+        {(shown) => (
+          <div class="rp-prompt-body" classList={{ "rp-body--stale": Boolean(task()) && draft.isPlaceholderData }} aria-busy={draft.isFetching}>
+            <PromptSections view={shown()} idPrefix="rp-prompt" headingLevel={5} renderPending={(why) => <PendingMark why={why} />} />
+          </div>
+        )}
+      </Show>
+    </section>
+  );
+}
+
+/** A value the launch fills in: the marker, and why behind an "i". */
+function PendingMark(props: { why: string }) {
+  return (
+    <span class="rp-pending">
+      filled in at launch
+      <InfoTip label="Why it's filled in at launch">{props.why}</InfoTip>
+    </span>
+  );
+}
+
+/**
+ * The task picker: "No task", the agent's open tasks, its chats with you, and, while searching,
+ * other tasks the search finds. The lists load when it opens.
+ */
+function TaskChoice(props: { agent: AgentDetail; task: PromptTask | null; onPick: (task: PromptTask | null) => void }) {
+  const company = useCompany();
+  const [open, setOpen] = createSignal(false);
+  const [query, setQuery] = createSignal("");
+  const [term, setTerm] = createSignal("");
+  createEffect(
+    on(query, (value) => {
+      const timer = window.setTimeout(() => setTerm(value.trim()), 200);
+      onCleanup(() => window.clearTimeout(timer));
+    }),
+  );
+  const assigned = createQuery(() => ({
+    queryKey: queryKeys.agents.part(props.agent.id, "assigned-tasks"),
+    queryFn: ({ signal }) => agentsApi.assignedTasks(company().id, props.agent.id, signal),
+    enabled: open(),
+  }));
+  const chats = useChatListQuery();
+  const found = createQuery(() => ({
+    queryKey: queryKeys.issues.search(company().id, term(), SEARCH_LIMIT),
+    queryFn: ({ signal }) => issuesApi.search(company().id, { q: term(), limit: SEARCH_LIMIT }, signal),
+    enabled: open() && term().length > 0,
+    placeholderData: keepPreviousData,
+  }));
+  const groups = createMemo(() =>
+    promptTaskGroups({
+      query: query(),
+      assigned: assigned.data ?? [],
+      chats: (chats.data ?? []).filter((chat) => chat.conversationAgentId === props.agent.id),
+      found: term() ? found.data ?? [] : [],
+    }),
+  );
+  const pick = (next: PromptTask | null) => {
+    setOpen(false);
+    setQuery("");
+    props.onPick(next);
+  };
+  const loading = () => assigned.isPending || (term().length > 0 && found.isFetching);
+
+  return (
+    <div class="rp-for">
+      <span>Task</span>
+      <Popover open={open()} onOpenChange={setOpen}>
+        <Popover.Trigger
+          class="input rp-select rp-task"
+          aria-label={`Task: ${promptTaskName(props.task)}. Change the task the prompt is drafted for`}
+        >
+          <span class="rp-task-name">{promptTaskName(props.task)}</span>
+          <ChevronDown size={14} aria-hidden="true" />
+        </Popover.Trigger>
+        <Popover.Content label="Task for the prompt draft" width={420} hideClose>
+          <div class="rp-picker">
+            <TextInput
+              type="search"
+              aria-label="Find a task"
+              placeholder="Find a task by title or ID"
+              value={query()}
+              onInput={(event) => setQuery(event.currentTarget.value)}
+              autofocus
+            />
+            <div class="rp-picker-list" role="listbox" aria-label="Task for the prompt draft">
+              <button type="button" class="rp-option" role="option" aria-selected={!props.task} onClick={() => pick(null)}>
+                <span class="rp-option-label">No task</span>
+              </button>
+              <For each={groups()}>
+                {(group) => (
+                  <div role="group" aria-label={group.label}>
+                    <p class="rp-picker-group cap">{group.label}</p>
+                    <For each={group.tasks}>
+                      {(entry) => (
+                        <button
+                          type="button"
+                          class="rp-option"
+                          role="option"
+                          aria-selected={props.task?.id === entry.id}
+                          onClick={() => pick(entry)}
+                        >
+                          <Show when={entry.identifier}>
+                            <span class="rp-option-id mono">{entry.identifier}</span>
+                          </Show>
+                          <span class="rp-option-label">{entry.title}</span>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                )}
+              </For>
+              <Show when={groups().length === 0}>
+                <p class="rp-picker-empty">{loading() ? "Loading…" : query().trim() ? "No tasks match." : "No open tasks or chats for this agent."}</p>
+              </Show>
+            </div>
+          </div>
+        </Popover.Content>
+      </Popover>
+    </div>
   );
 }
 

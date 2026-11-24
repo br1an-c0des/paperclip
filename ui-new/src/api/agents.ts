@@ -25,14 +25,17 @@ import type {
   AgentRuntimeSettingsPatch,
   AiRuntimeConnectionBinding,
   ClaudeRunPreview,
+  CompactIssue,
   EnvironmentProbeResult,
   ResolveAgentInstructionCandidate,
   ResourceMembershipUpdateResult,
+  RunPromptPreviewKind,
   ToolProfileEffectiveSummary,
   UpdateResourceMembership,
 } from "@paperclipai/shared";
 import type { AdapterConfigSchema } from "@paperclipai/adapter-utils";
 import { api } from "./client";
+import { queryKeys } from "./queryKeys";
 
 /*
  * Agents, as ui/src/api/agents.ts uses them. General requests (get, update, pause, resume,
@@ -201,6 +204,35 @@ export type AgentWakeRequest = {
   forceFreshSession?: boolean;
 };
 
+/**
+ * What the run preview is for (`GET /agents/:id/run-preview`): tasks in `projectId` (or none) for
+ * the manifest, and the prompt draft's task and kind of wake (step 5). With an `issueId` the server
+ * uses the task's own project; without a `kind` it drafts the task's fresh assignment, or a run
+ * without a task.
+ */
+export type RunPreviewQuery = {
+  projectId?: string | null;
+  issueId?: string | null;
+  kind?: RunPromptPreviewKind | null;
+};
+
+export function runPreviewSearch(query: RunPreviewQuery): string {
+  const params = new URLSearchParams();
+  if (query.projectId) params.set("projectId", query.projectId);
+  if (query.issueId) params.set("issueId", query.issueId);
+  if (query.kind) params.set("kind", query.kind);
+  const search = params.toString();
+  return search ? `?${search}` : "";
+}
+
+/** The run preview's query key, under the agent's, so refreshing the agent refetches it. */
+export function runPreviewQueryKey(agentId: string, query: RunPreviewQuery) {
+  return queryKeys.agents.part(agentId, "run-preview", query.projectId ?? "__none__", query.issueId ?? "__none__", query.kind ?? "__default__");
+}
+
+/** The statuses of open tasks, for the prompt draft's task picker. */
+const OPEN_TASK_STATUSES = "backlog,todo,in_progress,in_review,blocked";
+
 function withCompany(path: string, companyId?: string) {
   if (!companyId) return path;
   return `${path}${path.includes("?") ? "&" : "?"}companyId=${encodeURIComponent(companyId)}`;
@@ -272,11 +304,21 @@ export const agentsApi = {
   taskSessions: (id: string, companyId?: string, signal?: AbortSignal) =>
     api.get<AgentTaskSession[]>(agentPath(id, companyId, "/task-sessions"), { signal }),
   /**
-   * What the agent's next sealed run would get, for tasks in `projectId` or in no project
-   * (`GET /agents/:id/run-preview`, step 4b part 2). A read: it starts and writes nothing.
+   * What the agent's next sealed run would get, for tasks in a project or in none, and a draft of
+   * its prompt for a task and kind of wake (`GET /agents/:id/run-preview`, step 4b part 2 and
+   * step 5). A read: it starts and writes nothing. A kind the task can't have answers 422 with
+   * `code` `not_a_chat` or `no_comment`.
    */
-  runPreview: (id: string, projectId: string | null, companyId?: string, signal?: AbortSignal) =>
-    api.get<ClaudeRunPreview>(agentPath(id, companyId, `/run-preview${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`), { signal }),
+  runPreview: (id: string, query: RunPreviewQuery, companyId?: string, signal?: AbortSignal) =>
+    api.get<ClaudeRunPreview>(agentPath(id, companyId, `/run-preview${runPreviewSearch(query)}`), { signal }),
+  /** The agent's open tasks, newest activity first (compact rows; chats aren't in the list). */
+  assignedTasks: (companyId: string, agentId: string, signal?: AbortSignal) =>
+    api.get<CompactIssue[]>(
+      `/companies/${companyId}/issues?${new URLSearchParams({
+        view: "compact", sortField: "updated", sortDir: "desc", assigneeAgentId: agentId, status: OPEN_TASK_STATUSES, limit: "50",
+      })}`,
+      { signal },
+    ),
   /** Clears the provider session for one task, or every session when `taskKey` is null. */
   resetSession: (id: string, taskKey: string | null, companyId?: string) =>
     api.post<void>(agentPath(id, companyId, "/runtime-state/reset-session"), { taskKey }),

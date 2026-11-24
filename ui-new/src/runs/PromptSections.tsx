@@ -1,5 +1,6 @@
 import { ChevronRight, Copy } from "lucide-solid";
 import { For, Show, type JSX } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { InfoTip } from "@/ui/InfoTip";
 import { pushToast } from "@/ui/Toast";
 import type { PromptViewGroup, PromptViewPart, PromptViewSection, PromptView } from "./prompt-sections";
@@ -19,6 +20,8 @@ export type PromptSectionsProps = {
   renderPending?: (pending: string) => JSX.Element;
   /** Prefixes the headings' ids, when more than one of these is on a page. */
   idPrefix?: string;
+  /** The level of the two group headings (System prompt, First message); 3 by default. */
+  headingLevel?: 3 | 4 | 5;
 };
 
 const GROUP_INFO: Record<PromptViewGroup["placement"], string> = {
@@ -50,9 +53,9 @@ export function PromptSections(props: PromptSectionsProps) {
         {(group) => (
           <section class="ps-group" aria-labelledby={id(group.placement)}>
             <div class="ps-grouph">
-              <h3 class="disp" id={id(group.placement)}>
+              <Dynamic component={`h${props.headingLevel ?? 3}`} class="disp ps-grouptitle" id={id(group.placement)}>
                 {group.title}
-              </h3>
+              </Dynamic>
               <InfoTip label={`About ${group.title}`}>{GROUP_INFO[group.placement]}</InfoTip>
               <Show when={group.size}>
                 {(size) => (

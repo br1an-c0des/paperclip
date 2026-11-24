@@ -98,7 +98,8 @@ function viewPart(part: RunPromptPart, key: string): PromptViewPart {
     id: str(part.id),
     label: str(part.label, str(part.id)),
     source: str(part.source),
-    text,
+    // A part may start with the blank line that separates it from the one before: shown without.
+    text: text.replace(/^\n+/, ""),
     size: charsSize(typeof part.chars === "number" ? part.chars : text.length),
     pending: typeof part.pending === "string" && part.pending ? part.pending : null,
   };
