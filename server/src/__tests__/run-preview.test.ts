@@ -33,7 +33,11 @@ import { drainHeartbeatRunsToQuiescence } from "./helpers/drain-heartbeat-runs.j
 // repository; the preview reads that worktree's CLAUDE.md and skills from its base commit.
 // Step 5 Task 8 added the prompt draft: for a task and kind of wake, the first message a run sends.
 
-const captured = vi.hoisted(() => ({ manifest: null as Record<string, unknown> | null, prompt: null as string | null }));
+const captured = vi.hoisted(() => ({
+  manifest: null as Record<string, unknown> | null,
+  prompt: null as string | null,
+  systemPrompt: null as unknown[] | null,
+}));
 const minted = vi.hoisted(() => ({ runTokens: 0, runtimeToolTokens: 0 }));
 
 vi.mock("../agent-auth-jwt.js", async (importOriginal) => {
@@ -75,6 +79,7 @@ const claudeAdapter: Partial<ServerAdapterModule> = {
     onMeta: async (meta) => {
       if (meta.runManifest) captured.manifest = meta.runManifest;
       if (typeof meta.prompt === "string") captured.prompt = meta.prompt;
+      if (meta.promptRecord) captured.systemPrompt = meta.promptRecord.systemPrompt;
       await ctx.onMeta?.(meta);
     },
   }),
@@ -176,6 +181,7 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     await drainHeartbeatRunsToQuiescence(db, heartbeat);
     captured.manifest = null;
     captured.prompt = null;
+    captured.systemPrompt = null;
   });
 
   afterAll(async () => {
@@ -443,8 +449,11 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     expect(xmaxWritten).not.toBe(xmaxAfter);
   }, 60_000);
 
-  it("drafts a fresh assignment as the first message a real run on it sends", async () => {
+  it("drafts a fresh assignment as the prompt a real run on it sends: system prompt and first message", async () => {
     const seeded = await seed();
+    // The company's library, brought up to date as the Skills page would: it holds skills this
+    // agent doesn't have, which a run's skill list leaves out.
+    const library = await companySkillService(db).listRuntimeSkillEntries(seeded.companyId);
     const issueId = randomUUID();
     await db.insert(issues).values({
       id: issueId, companyId: seeded.companyId, title: "M7 test drafted task", description: "Total the March ledger.",
@@ -468,6 +477,18 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     expect((await heartbeat.getRun(run!.id))?.status).toBe("succeeded");
     expect(captured.prompt).not.toBeNull();
     expect(joinRunPromptSections(previewed.prompt!.firstMessage)).toBe(captured.prompt);
+
+    // The system prompt too: the skill list names what the run's skills are, not the whole library.
+    expect(captured.systemPrompt).not.toBeNull();
+    expect(previewed.prompt!.systemPrompt).toEqual(captured.systemPrompt);
+    const listed = previewed.prompt!.systemPrompt.find((section) => section.id === "skill_library");
+    expect(listed).toBeDefined();
+    const notTheAgents = library.filter((entry) => !previewed.manifest.skills.some((skill) => skill.key === entry.key));
+    expect(notTheAgents.length).toBeGreaterThan(0);
+    for (const entry of notTheAgents) expect(listed!.text).not.toContain(`- ${entry.key} —`);
+    // The manifest's skills agree with the run's.
+    const ran = captured.manifest as unknown as ClaudeRunManifest;
+    expect(previewed.manifest.skills).toEqual(ran.skills);
   }, 90_000);
 
   it("says so for another adapter, the ACP engine and the Runner", async () => {

@@ -18,7 +18,12 @@ import {
   type RunPromptPreviewKind,
 } from "@paperclipai/shared";
 import type { AdapterRuntimeMcpServer } from "@paperclipai/adapter-utils";
-import { readPaperclipSkillSyncPreference, type PaperclipSkillEntry } from "@paperclipai/adapter-utils/server-utils";
+import {
+  readPaperclipSkillSyncPreference,
+  resolveLegacyPaperclipDesiredSkillNames,
+  writePaperclipSkillSyncPreference,
+  type PaperclipSkillEntry,
+} from "@paperclipai/adapter-utils/server-utils";
 import { resolveClaudeExecutionEngine } from "@paperclipai/adapter-claude-local/server";
 import { findActiveServerAdapter } from "../adapters/index.js";
 import { localAgentJwtAvailable } from "../agent-auth-jwt.js";
@@ -224,18 +229,36 @@ export function runPreviewService(db: Db) {
     });
   }
 
-  /** The company's library skills as the run would mount them, and connector skills. */
+  /**
+   * The skills a run hands the adapter, and connector skills. Selected as the run selects them
+   * (heartbeat/execution-configuration.ts `prepareSkills`): only the agent's own skills, by
+   * `resolveLegacyPaperclipDesiredSkillNames`, with the skill preference rewritten to that
+   * selection. The adapter's skill library list in the system prompt is built from these entries,
+   * so the whole library would list skills the run's list leaves out. Read-only: no execution
+   * snapshot, no materialized files, no inventory refresh, and nothing saved on a run.
+   */
   async function previewSkillConfig(agent: AgentRow, config: Record<string, unknown>, betaSkills: boolean) {
     const preference = readPaperclipSkillSyncPreference(config);
+    let deliveryConfig = config;
     const entries = asRunWouldMount(await companySkills.listRuntimeSkillEntries(agent.companyId, {
       materializeMissing: false,
       // The library as it stands: reconciling it writes, and a run does that itself.
       skipInventoryRefresh: true,
       versionSelections: skillVersionSelectionMap(preference.desiredSkillEntries, { versionPinsEnabled: betaSkills }),
+      selectionConfig: config,
+      includeLegacy: true,
+      selectVersions: async (available) => {
+        const availableKeys = new Set(available.map((entry) => entry.key));
+        const selectedKeys = new Set(resolveLegacyPaperclipDesiredSkillNames(config, available).filter((key) => availableKeys.has(key)));
+        deliveryConfig = writePaperclipSkillSyncPreference(config, available
+          .filter((entry) => selectedKeys.has(entry.key))
+          .map((entry) => ({ key: entry.key, versionId: entry.versionId ?? null })));
+        return selectedKeys;
+      },
     }));
     const assignments = await resolveConnectorAssignments(db, { companyId: agent.companyId, agentId: agent.id });
     return {
-      config: await applyConnectorSkills({ ...config, paperclipRuntimeSkills: entries }, entries, assignments, { materialize: false }),
+      config: await applyConnectorSkills({ ...deliveryConfig, paperclipRuntimeSkills: entries }, entries, assignments, { materialize: false }),
       hasConnectors: assignments.length > 0,
     };
   }
