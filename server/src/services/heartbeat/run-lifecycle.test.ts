@@ -351,7 +351,7 @@ describe.skipIf(!support.supported)("heartbeat lifecycle database wiring", () =>
     for (const row of rows) expect(published.find(event => event.payload?.seq === row.seq)?.payload).toMatchObject({ runId: run.id, message: row.message });
   });
 
-  it.each(["legacy.case_handoff_cleanup_intent", "legacy.case_handoff_cleanup_verified"])(
+  it.each(["legacy.case_handoff_cleanup_intent", "legacy.case_handoff_cleanup_verified", "adapter.prompt"])(
     "does not count controller cleanup bookkeeping as agent progress (%s)", async (eventType) => {
       const { run } = await fixture({ status: "succeeded", runtimeMode: "legacy" });
       const lifecycle = createHeartbeatLifecycle(db, callbacks(db));

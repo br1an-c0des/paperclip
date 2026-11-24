@@ -996,7 +996,6 @@ server/src/services/heartbeat/run-control-reads.test.ts
 server/src/services/heartbeat/run-control.test.ts
 server/src/services/heartbeat/run-failure-cause.test.ts
 server/src/services/heartbeat/run-lifecycle.test.ts
-server/src/services/heartbeat/run-log.test.ts
 server/src/services/heartbeat/run-preparation.review-path.test.ts
 server/src/services/heartbeat/run-preparation.test.ts
 server/src/services/heartbeat/run-state.test.ts

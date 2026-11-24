@@ -8,7 +8,7 @@ import type { createAgentIdentityRedactor } from "../agent-identity-redaction.js
 import { touchHeartbeatRunRuntimeStatus } from "../heartbeat-run-runtime-status.js";
 import { publishLiveEvent } from "../live-events.js";
 import { isRunLogStoreType, type RunLogHandle, type RunLogStore } from "../run-log-store.js";
-import { appendExcerpt, canonicalNativeRunLogRedactionForms, compactRunLogChunk, redactCanonicalNativeRunLogChunk } from "./run-log.js";
+import { appendExcerpt, canonicalNativeRunLogRedactionForms, compactRunLogChunk, redactCanonicalNativeRunLogChunk, RUN_PROMPT_EVENT_TYPE } from "./run-log.js";
 import { createNativeRunLogExporter, nativeRunLogPrefixCursor } from "../native-runtime/native-run-log-export.js";
 import { createRunSecretRedactionRegistry } from "../run-secret-redaction.js";
 import {
@@ -313,13 +313,25 @@ export function createHeartbeatRunOutput(db: Db, input: HeartbeatRunOutputInput)
           if (key in meta.env) meta.env[key] = "***REDACTED***";
         }
       }
+      // The prompt record is its own event, so adapter.invoke keeps the shape its readers expect
+      // and the record's text is kept whole (bug 87). It went through identity redaction above.
+      const { promptRecord, ...invocation } = meta;
       await appendRunEvent(currentRun, {
         eventType: "adapter.invoke",
         stream: "system",
         level: "info",
         message: "adapter invocation",
-        payload: meta as unknown as Record<string, unknown>,
+        payload: invocation as unknown as Record<string, unknown>,
       });
+      if (promptRecord) {
+        await appendRunEvent(currentRun, {
+          eventType: RUN_PROMPT_EVENT_TYPE,
+          stream: "system",
+          level: "info",
+          message: "prompt sections",
+          payload: promptRecord as unknown as Record<string, unknown>,
+        });
+      }
     };
 
     const onAdapterEvent = async (event: AdapterRuntimeEvent) => {

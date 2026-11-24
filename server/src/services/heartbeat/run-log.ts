@@ -1,10 +1,14 @@
 import { appendWithByteCap, MAX_EXCERPT_BYTES, parseObject } from "../../adapters/utils.js";
-import { REDACTED_EVENT_VALUE, redactSensitiveText, sanitizeRecord } from "../../redaction.js";
+import { REDACTED_EVENT_VALUE, redactEventPayload, redactSensitiveText, sanitizeRecord } from "../../redaction.js";
 import { redactInvitationTokens } from "../../middleware/invitation-token-redaction.js";
 import { redactCurrentUserText, redactCurrentUserValue, type CurrentUserRedactionOptions } from "../../log-redaction.js";
 
 const MAX_PERSISTED_LOG_CHUNK_CHARS = 64 * 1024;
 const MAX_RUN_EVENT_PAYLOAD_STRING_CHARS = 16 * 1024;
+/** The run event that holds a run's prompt record (`RunPromptRecord`, step 5). */
+export const RUN_PROMPT_EVENT_TYPE = "adapter.prompt";
+/** A prompt record's section and part text is kept whole up to this, not cut at 16 KiB (bug 87). */
+export const MAX_RUN_PROMPT_EVENT_STRING_CHARS = 256 * 1024;
 const MAX_RUN_EVENT_PAYLOAD_ARRAY_ITEMS = 50;
 const MAX_RUN_EVENT_PAYLOAD_OBJECT_KEYS = 100;
 const MAX_RUN_EVENT_PAYLOAD_DEPTH = 6;
@@ -15,19 +19,20 @@ export function appendExcerpt(prev: string, chunk: string) {
   return appendWithByteCap(prev, chunk, MAX_EXCERPT_BYTES);
 }
 
-function truncateRunEventString(value: string) {
-  if (value.length <= MAX_RUN_EVENT_PAYLOAD_STRING_CHARS) return value;
-  const omittedChars = value.length - MAX_RUN_EVENT_PAYLOAD_STRING_CHARS;
-  return `${value.slice(0, MAX_RUN_EVENT_PAYLOAD_STRING_CHARS)}\n[truncated ${omittedChars} chars]`;
+function truncateRunEventString(value: string, maxChars: number) {
+  if (value.length <= maxChars) return value;
+  const omittedChars = value.length - maxChars;
+  return `${value.slice(0, maxChars)}\n[truncated ${omittedChars} chars]`;
 }
 
 function boundRunEventValue(
   value: unknown,
   depth: number,
   seen: WeakSet<object>,
+  maxStringChars: number,
 ): unknown {
   if (typeof value === "string") {
-    return truncateRunEventString(value);
+    return truncateRunEventString(value, maxStringChars);
   }
   if (
     value === null ||
@@ -49,7 +54,7 @@ function boundRunEventValue(
     }
     const bounded = value
       .slice(0, MAX_RUN_EVENT_PAYLOAD_ARRAY_ITEMS)
-      .map((entry) => boundRunEventValue(entry, depth + 1, seen));
+      .map((entry) => boundRunEventValue(entry, depth + 1, seen, maxStringChars));
     if (value.length > MAX_RUN_EVENT_PAYLOAD_ARRAY_ITEMS) {
       bounded.push({
         _truncated: true,
@@ -81,7 +86,7 @@ function boundRunEventValue(
     0,
     MAX_RUN_EVENT_PAYLOAD_OBJECT_KEYS,
   )) {
-    out[key] = boundRunEventValue(entryValue, depth + 1, seen);
+    out[key] = boundRunEventValue(entryValue, depth + 1, seen, maxStringChars);
   }
   if (entries.length > MAX_RUN_EVENT_PAYLOAD_OBJECT_KEYS) {
     out._truncated = true;
@@ -93,9 +98,29 @@ function boundRunEventValue(
 
 export function boundHeartbeatRunEventPayloadForStorage(
   payload: Record<string, unknown>,
+  options: { maxStringChars?: number } = {},
 ): Record<string, unknown> {
-  const bounded = boundRunEventValue(payload, 0, new WeakSet());
+  const maxStringChars = options.maxStringChars ?? MAX_RUN_EVENT_PAYLOAD_STRING_CHARS;
+  const bounded = boundRunEventValue(payload, 0, new WeakSet(), maxStringChars);
   return parseObject(bounded) ?? { _truncated: true };
+}
+
+/**
+ * A run event's payload as it's stored and published: bounded for its type (an `adapter.prompt`
+ * record's strings up to 256 KiB, every other event's up to 16 KiB), then secret-redacted by key
+ * name and value, then current-user-redacted. Bounding comes first, so redaction runs on what's kept.
+ */
+export function prepareHeartbeatRunEventPayloadForStorage(
+  eventType: string,
+  payload: Record<string, unknown>,
+  currentUserRedactionOptions?: CurrentUserRedactionOptions,
+): Record<string, unknown> {
+  const bounded = boundHeartbeatRunEventPayloadForStorage(
+    payload,
+    eventType === RUN_PROMPT_EVENT_TYPE ? { maxStringChars: MAX_RUN_PROMPT_EVENT_STRING_CHARS } : {},
+  );
+  const secretSanitized = redactEventPayload(bounded) ?? bounded;
+  return redactCurrentUserValue(secretSanitized, currentUserRedactionOptions);
 }
 
 function redactInlineBase64ImageData(chunk: string) {
