@@ -66,6 +66,7 @@ import { issueRunPresenceService } from "../services/issue-run-presence.js";
 import { returnStoppedWaitingTaskToTodo } from "../services/heartbeat/stopped-waiting-task.js";
 import { selectDashboardRunIds } from "../services/dashboard-run-selection.js";
 import { runPreviewService } from "../services/run-preview.js";
+import { isRunPromptPreviewKind } from "../services/run-preview-prompt.js";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { generateKeyPairSync, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
@@ -94,6 +95,7 @@ import {
   type AgentSkillAssignmentMode,
   type AgentSkillSnapshot,
   type InstanceSchedulerHeartbeatAgent,
+  type RunPromptPreviewKind,
   upsertAgentInstructionsFileSchema,
   restoreAgentInstructionSchema,
   resolveAgentInstructionCandidateSchema,
@@ -4274,11 +4276,39 @@ export function agentRoutes(
     if (!agent) return;
     if (!(await assertAgentReadAllowed(req, res, agent))) return;
     await assertCanReadAgent(req, agent);
-    const rawProjectId = typeof req.query.projectId === "string" ? req.query.projectId.trim() : "";
+    const query = (name: string) => (typeof req.query[name] === "string" ? (req.query[name] as string).trim() : "");
+    const rawKind = query("kind");
+    if (rawKind && !isRunPromptPreviewKind(rawKind)) {
+      throw badRequest("kind must be one of assignment, comment, chat_turn or no_task");
+    }
+    // The prompt draft is for a task the user asking can read; its text reaches them.
+    const issueId = query("issueId") || null;
+    if (issueId) {
+      if (!isUuidLike(issueId)) throw notFound("Issue not found");
+      const [issue] = await db
+        .select({
+          id: issuesTable.id, companyId: issuesTable.companyId, projectId: issuesTable.projectId, parentId: issuesTable.parentId,
+          assigneeAgentId: issuesTable.assigneeAgentId, assigneeUserId: issuesTable.assigneeUserId, status: issuesTable.status,
+        })
+        .from(issuesTable)
+        .where(and(eq(issuesTable.id, issueId), eq(issuesTable.companyId, agent.companyId)));
+      const decision = issue ? await access.decide({
+        actor: req.actor,
+        action: "issue:read",
+        resource: {
+          type: "issue", companyId: issue.companyId, issueId: issue.id, projectId: issue.projectId,
+          parentIssueId: issue.parentId, assigneeAgentId: issue.assigneeAgentId, assigneeUserId: issue.assigneeUserId,
+          status: issue.status,
+        },
+      }) : null;
+      if (!decision?.allowed) throw notFound("Issue not found");
+    }
     const preview = await runPreview.previewAgentRun(agent, {
-      projectId: rawProjectId || null,
+      projectId: query("projectId") || null,
       // A run on a task the user asking creates would be theirs.
       responsibleUserId: req.actor.userId ?? null,
+      issueId,
+      kind: rawKind ? (rawKind as RunPromptPreviewKind) : null,
     });
     res.json(preview);
   });
