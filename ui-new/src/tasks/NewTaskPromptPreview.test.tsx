@@ -17,7 +17,8 @@ const { NewTaskPromptPreview, draftFromPayload, promptPreviewAvailability, usesC
 const { ApiError } = await import("@/api/client");
 
 const cli = { id: "a1", adapterType: "claude_local", adapterConfig: { engine: "cli" } } as unknown as Agent;
-const ready = { assignee: { kind: "agent" as const, id: "a1" }, agent: cli, repeating: false, status: "todo" as const, hasContent: true };
+type AvailabilityInput = Parameters<typeof promptPreviewAvailability>[0];
+const ready: AvailabilityInput = { assignee: { kind: "agent", id: "a1" }, agent: cli, repeating: false, status: "todo", hasContent: true };
 
 const preview: ClaudeRunPreview = {
   supported: true,
@@ -71,7 +72,7 @@ describe("promptPreviewAvailability", () => {
   });
 
   it("says why it's closed", () => {
-    const reason = (patch: Partial<typeof ready>) => promptPreviewAvailability({ ...ready, ...patch });
+    const reason = (patch: Partial<AvailabilityInput>) => promptPreviewAvailability({ ...ready, ...patch });
     expect(reason({ assignee: null, agent: undefined })).toEqual({ reason: "No assignee yet" });
     expect(reason({ assignee: { kind: "user", id: "u1" }, agent: undefined })).toEqual({ reason: "Assigned to a person" });
     expect(reason({ agent: { ...cli, adapterType: "codex_local" } as Agent })).toEqual({ reason: "Only for Claude agents" });
@@ -102,8 +103,8 @@ describe("NewTaskPromptPreview", () => {
   it("is disabled with the reason beside it", () => {
     mount(promptPreviewAvailability({ ...ready, assignee: null, agent: undefined }));
     const button = screen.getByRole("button", { name: "Preview the prompt" });
-    expect(button).toBeDisabled();
-    expect(screen.getByText("No assignee yet")).toBeInTheDocument();
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("No assignee yet")).toBeTruthy();
     expect(button.getAttribute("aria-describedby")).toBe(screen.getByText("No assignee yet").id);
     fireEvent.click(button);
     expect(api.runPreviewDraft).not.toHaveBeenCalled();
@@ -112,12 +113,12 @@ describe("NewTaskPromptPreview", () => {
   it("drafts the prompt when opened, with the values filled in at launch marked", async () => {
     api.runPreviewDraft.mockResolvedValue(preview);
     mount();
-    expect(screen.getByRole("button", { name: "Preview the prompt" })).toBeEnabled();
+    expect((screen.getByRole("button", { name: "Preview the prompt" }) as HTMLButtonElement).disabled).toBe(false);
     expect(api.runPreviewDraft).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Preview the prompt" }));
-    expect(await screen.findByRole("dialog", { name: "Prompt preview" })).toBeInTheDocument();
-    expect(await screen.findByText("First message")).toBeInTheDocument();
-    expect(screen.getByText("System prompt")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Prompt preview" })).toBeTruthy();
+    expect(await screen.findByText("First message")).toBeTruthy();
+    expect(screen.getByText("System prompt")).toBeTruthy();
     expect(screen.getAllByText("filled in at launch").length).toBeGreaterThan(0);
     expect(api.runPreviewDraft).toHaveBeenCalledWith("a1", { title: "Count the ledger" }, "co1", expect.anything());
   });
@@ -144,22 +145,22 @@ describe("NewTaskPromptPreview", () => {
     api.runPreviewDraft.mockReturnValue(new Promise((_, reject) => (fail = reject)));
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Preview the prompt" }));
-    expect(await screen.findByText("Drafting the prompt…")).toBeInTheDocument();
+    expect(await screen.findByText("Drafting the prompt…")).toBeTruthy();
     fail(new ApiError("Project not found", 404, { error: "Project not found" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Project not found. Check the project, parent and goal.");
+    expect((await screen.findByRole("alert")).textContent).toContain("Project not found. Check the project, parent and goal.");
   });
 
   it("says when Paperclip can't be reached", async () => {
     api.runPreviewDraft.mockRejectedValue(new TypeError("Failed to fetch"));
     mount(promptPreviewAvailability(ready), () => ({ title: "Count" }), () => true);
     fireEvent.click(screen.getByRole("button", { name: "Preview the prompt" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Paperclip can't be reached");
+    expect((await screen.findByRole("alert")).textContent).toContain("Paperclip can't be reached");
   });
 
   it("says when there's no prompt for this agent", async () => {
     api.runPreviewDraft.mockResolvedValue({ supported: false, reason: "remote_target" } satisfies ClaudeRunPreview);
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Preview the prompt" }));
-    expect(await screen.findByText(/runs on a remote target/)).toBeInTheDocument();
+    expect(await screen.findByText(/runs on a remote target/)).toBeTruthy();
   });
 });
