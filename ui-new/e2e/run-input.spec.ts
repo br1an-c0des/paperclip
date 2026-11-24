@@ -52,7 +52,33 @@ test("a run's Input shows its prompt in folded sections", async ({ page, api }) 
   await expect(wakeSection).not.toHaveAttribute("open", "");
   await wakeSection.locator("summary").click();
   await expect(wakeSection.getByText("Comments", { exact: true })).toBeVisible();
-  await expect(wakeSection.getByText("M7 test Brian: please check the hero copy.")).toBeVisible();});
+  await expect(wakeSection.getByText("M7 test Brian: please check the hero copy.")).toBeVisible();
+});
+
+test("a resume that failed and retried fresh shows the fresh attempt", async ({ page, api }) => {
+  const resumed = {
+    ...record,
+    session: "resumed",
+    systemPrompt: [],
+    firstMessage: [{ ...record.firstMessage[0]!, label: "M7 test resumed wake", reason: "the failed resume" }],
+  };
+  api.get("/heartbeat-runs/:runId/events", ({ params, query }) =>
+    Number(query.get("afterSeq") ?? 0) > 0
+      ? []
+      : [
+          event(1, params.runId, "adapter.invoke", { adapterType: "claude_local", command: "claude", commandArgs: ["--resume", "m7-resumed"], prompt: wake }),
+          event(2, params.runId, "adapter.prompt", resumed),
+          event(3, params.runId, "adapter.invoke", { adapterType: "claude_local", command: "claude", commandArgs: ["--print", "m7-fresh"], prompt: `${wake}\n\n${brief}` }),
+          event(4, params.runId, "adapter.prompt", record),
+        ],
+  );
+  const modal = await openInput(page);
+  await expect(modal.locator("details.ps-sec", { hasText: "AGENTS.md" })).toBeVisible();
+  await expect(modal.getByText("Kept from the session's start")).toHaveCount(0);
+  await expect(modal.getByText("the failed resume")).toHaveCount(0);
+  await modal.locator("details.ri-xs", { hasText: "Command" }).locator("summary").click();
+  await expect(modal.getByText(/claude --print m7-fresh/)).toBeVisible();
+});
 
 test("a run recorded before sections shows its prompt as one section", async ({ page, api }) => {
   api.get("/heartbeat-runs/:runId/events", ({ params, query }) =>

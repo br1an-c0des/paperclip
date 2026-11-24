@@ -1,6 +1,6 @@
 import type { RunPromptRecord, RunPromptSection } from "@paperclipai/shared";
 
-/* Prompt records (`adapter.prompt`, step 5) for the Input tab's tests. Nothing emits them yet. */
+/* Prompt records (`adapter.prompt`, step 5) for the Input tab's tests. */
 
 export function promptSection(id: RunPromptSection["id"], text: string, extra: Partial<RunPromptSection> = {}): RunPromptSection {
   return {

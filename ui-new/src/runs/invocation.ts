@@ -38,13 +38,37 @@ const record = (value: unknown): Record<string, unknown> | null =>
 
 const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
 
-export function findInvokeEvent(events: readonly HeartbeatRunEvent[] | undefined) {
-  return events?.find((event) => event.eventType === "adapter.invoke") ?? null;
+/*
+ * Each attempt of a run writes its own `adapter.invoke`, and a claude_local CLI attempt its own
+ * `adapter.prompt` right after it. A resume that fails and retries fresh writes two pairs, and the
+ * last is the attempt that ran (plan Review Focus 1), so Input reads the last of each, in `seq`
+ * order. An event without a `seq` counts by its place in the list.
+ */
+function lastEvent(events: readonly HeartbeatRunEvent[] | undefined, eventType: string) {
+  let found: { event: HeartbeatRunEvent; order: number } | null = null;
+  for (const [index, event] of (events ?? []).entries()) {
+    if (event.eventType !== eventType) continue;
+    const order = typeof event.seq === "number" ? event.seq : index;
+    if (!found || order >= found.order) found = { event, order };
+  }
+  return found;
 }
 
-/** The run's prompt in sections (step 5): an `adapter.prompt` event, appended right after `adapter.invoke`. */
+/** The latest attempt's `adapter.invoke` event. */
+export function findInvokeEvent(events: readonly HeartbeatRunEvent[] | undefined) {
+  return lastEvent(events, "adapter.invoke")?.event ?? null;
+}
+
+/**
+ * The latest attempt's prompt in sections (step 5): the last `adapter.prompt` event, and only when it
+ * came after the latest `adapter.invoke`. Until the latest attempt's record lands, an earlier
+ * attempt's isn't shown beside its invocation.
+ */
 export function findPromptEvent(events: readonly HeartbeatRunEvent[] | undefined) {
-  return events?.find((event) => event.eventType === "adapter.prompt") ?? null;
+  const prompt = lastEvent(events, "adapter.prompt");
+  const invoke = lastEvent(events, "adapter.invoke");
+  if (!prompt || (invoke && prompt.order < invoke.order)) return null;
+  return prompt.event;
 }
 
 /** The prompt record on an `adapter.prompt` event, with home-directory usernames masked when asked. */
