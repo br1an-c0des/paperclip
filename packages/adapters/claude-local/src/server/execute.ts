@@ -66,6 +66,7 @@ import {
   isClaudeModelNotFoundError,
 } from "./parse.js";
 import { composeClaudeCliPrompt, resolveClaudePromptTemplate } from "./legacy-prompt.js";
+import { buildClaudePromptRecord, PROMPT_SECTIONS_MISMATCH_NOTE, readRunPromptPlan } from "./prompt-record.js";
 import {
   materializeRemoteClaudeConfig,
   prepareClaudeConfigSeed,
@@ -452,6 +453,7 @@ async function executeClaudeCli(
     instructionsReadError,
     instructionsPathDirective,
     combinedInstructionsContents,
+    systemPromptSections,
   } = await planClaudeRunSkillsAndInstructions({ config, moduleDir: __moduleDir });
   if (instructionsReadError) {
     await onLog(
@@ -922,6 +924,16 @@ async function executeClaudeCli(
         env,
       });
       const attemptInstructionsFilePath = resumeSessionId ? undefined : effectiveInstructionsFilePath;
+      // What this attempt sent, as the heartbeat's prompt sections when they join to exactly
+      // the prompt above; it records, and never changes, the text.
+      const runPromptPlan = readRunPromptPlan(context);
+      const promptRecord = buildClaudePromptRecord({
+        plan: runPromptPlan,
+        resumed: Boolean(resumeSessionId),
+        prompt,
+        systemPrompt: attemptInstructionsFilePath ? systemPromptSections : [],
+      });
+      if (runPromptPlan && !promptRecord.matchedPlan) await onLog("stderr", PROMPT_SECTIONS_MISMATCH_NOTE);
       const args = buildClaudeArgs(resumeSessionId, attemptInstructionsFilePath);
       const launch = sealed
         ? buildSealedLaunch({ sealedRun: sealed, args, resumeSessionId, attemptInstructionsFilePath, freshReason })
@@ -958,6 +970,7 @@ async function executeClaudeCli(
           env: launch ? buildInvocationEnvForLogs(launch.env, { resolvedCommand }) : loggedEnv,
           prompt,
           promptMetrics,
+          promptRecord,
           context,
           ...(launch ? { runManifest: launch.manifest as unknown as Record<string, unknown> } : {}),
         });
