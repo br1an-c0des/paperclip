@@ -1,6 +1,7 @@
 import type { HeartbeatRunEvent } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
-import { findInvokeEvent, promptSize, readInvocation, readRunManifest } from "./invocation";
+import { freshRecord, resumedRecord } from "./fixtures/prompt-records";
+import { awaitingInvocationEvents, findInvokeEvent, findPromptEvent, promptSize, readInvocation, readPromptRecord, readRunManifest } from "./invocation";
 import { accessText, claudeMdText, credentialText, instructionsText, repoSkillsSkipped, sessionText, skillGroups } from "./run-manifest";
 
 describe("readInvocation", () => {
@@ -63,6 +64,32 @@ describe("helpers", () => {
     ] as HeartbeatRunEvent[];
     expect(findInvokeEvent(events)?.payload).toEqual({ prompt: "p" });
     expect(findInvokeEvent(undefined)).toBeNull();
+  });
+
+  it("finds and reads the adapter.prompt record, masking home-directory usernames when asked", () => {
+    const record = { ...resumedRecord, firstMessage: [{ ...resumedRecord.firstMessage[0]!, text: "Work in /Users/brian/paperclip" }] };
+    const events = [
+      { eventType: "adapter.invoke", payload: { prompt: "p" } },
+      { eventType: "adapter.prompt", payload: record },
+    ] as unknown as HeartbeatRunEvent[];
+    expect(findPromptEvent(events)?.payload).toBe(record);
+    expect(findPromptEvent(undefined)).toBeNull();
+    expect(readPromptRecord(record as unknown as Record<string, unknown>)).toEqual(record);
+    expect(readPromptRecord(record as unknown as Record<string, unknown>, { censorUsername: true })!.firstMessage[0]!.text).not.toContain("brian");
+    expect(readPromptRecord({ version: 2, systemPrompt: [], firstMessage: [] })).toBeNull();
+    expect(readPromptRecord(null)).toBeNull();
+  });
+
+  it("keeps polling a live run's events until adapter.invoke and its adapter.prompt are in, or the grace runs out", () => {
+    const at = new Date("2026-11-23T12:00:00Z");
+    const invoke = { eventType: "adapter.invoke", payload: {}, createdAt: at.toISOString() };
+    const prompt = { eventType: "adapter.prompt", payload: freshRecord };
+    const list = (...events: object[]) => events as unknown as HeartbeatRunEvent[];
+    expect(awaitingInvocationEvents(undefined)).toBe(true);
+    expect(awaitingInvocationEvents(list({ eventType: "lifecycle" }))).toBe(true);
+    expect(awaitingInvocationEvents(list(invoke), at.getTime() + 2_000)).toBe(true);
+    expect(awaitingInvocationEvents(list(invoke, prompt), at.getTime() + 2_000)).toBe(false);
+    expect(awaitingInvocationEvents(list(invoke), at.getTime() + 60_000)).toBe(false);
   });
 
   it("sizes a prompt in characters", () => {

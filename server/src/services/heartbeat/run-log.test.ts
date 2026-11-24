@@ -5,8 +5,11 @@ import {
   boundHeartbeatRunEventPayloadForStorage,
   canonicalNativeRunLogRedactionForms,
   compactRunLogChunk,
+  MAX_RUN_PROMPT_EVENT_STRING_CHARS,
+  prepareHeartbeatRunEventPayloadForStorage,
   redactCanonicalNativeRunLogChunk,
 } from "./run-log.js";
+import type { RunPromptRecord, RunPromptSection } from "@paperclipai/shared";
 
 describe("heartbeat run-log excerpts", () => {
   it("appends chunks while preserving the most recent 32 KiB of output", () => {
@@ -131,6 +134,72 @@ describe("heartbeat run-log payload formatting", () => {
     expect(first.entries).not.toBe(entries);
     expect(nested.text).toHaveLength(20_000);
     expect(entries[0]).toBe(nested);
+  });
+});
+
+describe("heartbeat run-log prompt records (adapter.prompt)", () => {
+  const section = (id: RunPromptSection["id"], text: string, extra: Partial<RunPromptSection> = {}): RunPromptSection => ({
+    id, label: id, placement: "first_message", delivery: "every_run", reason: "fixture", source: "fixture",
+    text, chars: text.length, ...extra,
+  });
+  const record = (firstMessage: RunPromptSection[]): RunPromptRecord => ({
+    version: 1, session: "fresh", systemPrompt: [], firstMessage,
+    firstMessageChars: firstMessage.reduce((n, entry) => n + entry.chars, 0), matchedPlan: true,
+  });
+  const noUser = { enabled: false };
+
+  it("takes a larger string limit without changing the 16 KiB default", () => {
+    const text = "x".repeat(40_000);
+    expect(boundHeartbeatRunEventPayloadForStorage({ text }, { maxStringChars: 50_000 })).toEqual({ text });
+    expect(boundHeartbeatRunEventPayloadForStorage({ text }, { maxStringChars: 10 }))
+      .toEqual({ text: `${"x".repeat(10)}\n[truncated 39990 chars]` });
+    expect(boundHeartbeatRunEventPayloadForStorage({ text })).toEqual({ text: `${"x".repeat(16 * 1024)}\n[truncated ${40_000 - 16 * 1024} chars]` });
+  });
+
+  it("stores a chat turn's 40,000-character sections whole, while adapter.invoke's prompt is still cut at 16,384", () => {
+    const wake = "w".repeat(40_000);
+    const brief = "b".repeat(40_000);
+    const promptRecord = record([
+      section("wake", wake, { parts: [{ id: "wake.comments", label: "Comments", source: "comments", text: wake, chars: wake.length }] }),
+      section("task_brief", brief),
+    ]);
+    const stored = prepareHeartbeatRunEventPayloadForStorage("adapter.prompt", promptRecord as unknown as Record<string, unknown>, noUser);
+    expect(stored).toEqual(promptRecord);
+    const invoke = prepareHeartbeatRunEventPayloadForStorage("adapter.invoke", { prompt: `${wake}\n\n${brief}` }, noUser);
+    expect(invoke.prompt).toBe(`${wake.slice(0, 16_384)}\n[truncated ${80_002 - 16_384} chars]`);
+  });
+
+  it("cuts a section over 256 KiB with the usual note", () => {
+    const text = "s".repeat(300 * 1024);
+    const stored = prepareHeartbeatRunEventPayloadForStorage("adapter.prompt",
+      record([section("task_brief", text)]) as unknown as Record<string, unknown>, noUser) as unknown as RunPromptRecord;
+    expect(MAX_RUN_PROMPT_EVENT_STRING_CHARS).toBe(256 * 1024);
+    expect(stored.firstMessage[0]!.text).toBe(`${"s".repeat(256 * 1024)}\n[truncated ${44 * 1024} chars]`);
+  });
+
+  it("redacts secrets inside the record: secret-named keys and credentials in section text", () => {
+    const text = `${"d".repeat(20_000)}\nAuthorization: Bearer fixture-bearer-canary\n{"api_key": "fixture-api-canary"}`;
+    const withKey = { ...section("task_brief", text), apiKey: "fixture-key-canary" };
+    const stored = prepareHeartbeatRunEventPayloadForStorage("adapter.prompt",
+      record([withKey]) as unknown as Record<string, unknown>, noUser);
+    const json = JSON.stringify(stored);
+    for (const canary of ["fixture-bearer-canary", "fixture-api-canary", "fixture-key-canary"]) expect(json).not.toContain(canary);
+    expect(json).toContain("***REDACTED***");
+    const first = (stored as unknown as RunPromptRecord).firstMessage[0]!;
+    expect(first.text.startsWith("d".repeat(20_000))).toBe(true);
+    expect((first as unknown as Record<string, unknown>).apiKey).toBe("***REDACTED***");
+  });
+
+  it("redacts the current user's name and home directory in a section's text and parts", () => {
+    const text = `${"c".repeat(20_000)} written by fixture-operator in /home/fixture-operator/project`;
+    const stored = prepareHeartbeatRunEventPayloadForStorage("adapter.prompt", record([
+      section("wake", text, { parts: [{ id: "wake.comments", label: "Comments", source: "comments", text, chars: text.length }] }),
+    ]) as unknown as Record<string, unknown>, { enabled: true, userNames: ["fixture-operator"], homeDirs: ["/home/fixture-operator"] });
+    const json = JSON.stringify(stored);
+    expect(json).not.toContain("fixture-operator");
+    const first = (stored as unknown as RunPromptRecord).firstMessage[0]!;
+    expect(first.text.startsWith("c".repeat(20_000))).toBe(true);
+    expect(first.parts![0]!.text).toBe(first.text);
   });
 });
 

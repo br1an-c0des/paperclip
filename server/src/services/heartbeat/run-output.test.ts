@@ -523,6 +523,57 @@ describe("secret-bound environment values in local run output", () => {
   });
 });
 
+describe("a run's prompt record in local run output", () => {
+  async function handlersFor(events: ReturnType<typeof vi.fn>, privateValue?: string) {
+    const row = { ...newRunRow };
+    const output = createHeartbeatRunOutput(createRunRowDb(row), {
+      run: row as Run,
+      runId: row.id!,
+      issueId: null,
+      runLogStore: {
+        begin: async () => ({ store: "local_file", logRef: "company/agent/run.ndjson" }),
+        append: async (_handle, event) => Buffer.byteLength(event.chunk),
+        enqueue: undefined,
+        flush: async () => undefined,
+      },
+      identityRedactor: createAgentIdentityRedactor(privateValue),
+      secretKeys: new Set(),
+      appendRunEvent: events as never,
+      getCurrentUserRedactionOptions: async () => ({ enabled: false }),
+    });
+    return output.begin(row as Run);
+  }
+
+  it("stores the record as its own adapter.prompt event after adapter.invoke, which no longer carries it", async () => {
+    const events = vi.fn(async (_run: unknown, _event: { eventType: string; payload?: Record<string, unknown> }) => undefined);
+    const handlers = await handlersFor(events, "SYNTHETIC_PRIVATE_IDENTITY");
+    const text = `${"w".repeat(40_000)} for SYNTHETIC_PRIVATE_IDENTITY`;
+    const promptRecord = {
+      version: 1, session: "fresh", systemPrompt: [], matchedPlan: true, firstMessageChars: text.length,
+      firstMessage: [{ id: "wake", label: "Wake", placement: "first_message", delivery: "every_run", reason: "woken by a comment",
+        source: "wake payload", text, chars: text.length }],
+    };
+    await handlers.onAdapterMeta({ adapterType: "claude_local", command: "claude", prompt: text, promptRecord } as never);
+    expect(events.mock.calls.map(([, event]) => event.eventType)).toEqual(["adapter.invoke", "adapter.prompt"]);
+    const [[, invoke], [, prompt]] = events.mock.calls;
+    expect(invoke.payload).not.toHaveProperty("promptRecord");
+    expect(invoke.payload).toMatchObject({ adapterType: "claude_local", command: "claude" });
+    expect(prompt).toMatchObject({ stream: "system", level: "info" });
+    const stored = prompt.payload as typeof promptRecord;
+    expect(stored.version).toBe(1);
+    expect(stored.firstMessage[0]!.text.startsWith("w".repeat(40_000))).toBe(true);
+    expect(JSON.stringify(events.mock.calls)).not.toContain("SYNTHETIC_PRIVATE_IDENTITY");
+  });
+
+  it("appends only adapter.invoke when the adapter sends no record", async () => {
+    const events = vi.fn(async (_run: unknown, _event: { eventType: string; payload?: Record<string, unknown> }) => undefined);
+    const handlers = await handlersFor(events);
+    await handlers.onAdapterMeta({ adapterType: "process", command: "synthetic", prompt: "p" } as never);
+    expect(events.mock.calls.map(([, event]) => event.eventType)).toEqual(["adapter.invoke"]);
+    expect(events.mock.calls[0]![1].payload).toEqual({ adapterType: "process", command: "synthetic", prompt: "p" });
+  });
+});
+
 describe("secret-named environment values in local run output", () => {
   it("masks a plain configured value and an inherited value whose key names a credential", async () => {
     const { publishLiveEvent } = await import("../live-events.js");
