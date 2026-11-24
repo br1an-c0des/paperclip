@@ -39,6 +39,16 @@ async function copy(text: string, what: string) {
   }
 }
 
+/** A draft's value the launch fills in: the marker, and why behind an "i" (for `renderPending`). */
+export function PendingMark(props: { why: string }) {
+  return (
+    <span class="rp-pending">
+      filled in at launch
+      <InfoTip label="Why it's filled in at launch">{props.why}</InfoTip>
+    </span>
+  );
+}
+
 export function PromptSections(props: PromptSectionsProps) {
   const id = (name: string) => `${props.idPrefix ?? "ps"}-${name}`;
   const pending = (value: string | null) => (value && props.renderPending ? props.renderPending(value) : null);

@@ -9,9 +9,8 @@ import { useChatListQuery } from "@/chat/chat-index";
 import { useCompany } from "@/lib/company";
 import { useProjectsQuery } from "@/lib/company-data";
 import { AccessRow, AutoMemoryRow, GitHubRow, ManifestList, ManifestRow, McpServersRow, MonoValue, OverriddenRow, SkillsRow } from "@/runs/ManifestRows";
-import { PromptSections } from "@/runs/PromptSections";
+import { PendingMark, PromptSections } from "@/runs/PromptSections";
 import { InfoHeading, TextInput } from "@/ui/Field";
-import { InfoTip } from "@/ui/InfoTip";
 import { Popover } from "@/ui/Popover";
 import { failure } from "../shared";
 import {
@@ -304,16 +303,6 @@ function PromptPart(props: { agent: AgentDetail; noTaskPrompt: RunPromptPreview 
         )}
       </Show>
     </section>
-  );
-}
-
-/** A value the launch fills in: the marker, and why behind an "i". */
-function PendingMark(props: { why: string }) {
-  return (
-    <span class="rp-pending">
-      filled in at launch
-      <InfoTip label="Why it's filled in at launch">{props.why}</InfoTip>
-    </span>
   );
 }
 
