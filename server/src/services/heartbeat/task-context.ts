@@ -230,6 +230,12 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
           projectId: issueRef.projectId,
           executionPolicy: issueContext?.executionPolicy ?? null,
           originKind: issueContext?.originKind ?? null,
+          // The wake names the assignee and routine and shows times in the responsible person's
+          // time zone. The builder reads what's left out (the user assignee) from the task's row;
+          // a draft task in a preview has no row, so its fields come from here.
+          assigneeAgentId: issueContext?.assigneeAgentId,
+          originId: issueContext?.originId,
+          responsibleUserId: issueContext?.responsibleUserId,
         }
       : null,
     exposeLowTrustRaw,
