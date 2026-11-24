@@ -51,7 +51,8 @@ set up for one person running Claude agents.
   (`paperclip-core:<commit>`) and swaps `ui-new` in, so every change on `main` reaches server1 at
   its next deploy. The core image doesn't build `ui-new`; `deploy/Dockerfile` builds it and puts it
   in `ui-new/dist`, where the server serves it from. It deploys only a commit whose CI run passed
-  (`--skip-ci` overrides, `--wait-ci` waits), checks `/api/health` afterwards, and
+  (`--skip-ci` overrides, `--wait-ci` waits); while GitHub Actions is off (below), deploy with
+  `--skip-ci` once the local checks have passed. It checks `/api/health` afterwards, and
   `deploy.sh --rollback` puts the previous image back when no migration ran
   ([deploy/README.md](deploy/README.md#updating)).
 - `pnpm` isn't installed globally on this machine; use `corepack pnpm`.
@@ -68,30 +69,39 @@ The suite runs in tiers through `scripts/test.mjs`. Only the **core** tier gates
   - **Core** (`corepack pnpm test`, ~365 files, about 3½ min locally): every test file that isn't
     opt-in or listed in `scripts/test-extended.txt`.
   - **Extended** (`corepack pnpm test:extended`, ~1,100 files): upstream's slower and flakier
-    integration tests. It runs nightly on `main` (`.github/workflows/extended-nightly.yml`) and
-    gates nothing.
+    integration tests. On demand, locally, while Actions is off (it ran nightly on `main`,
+    `.github/workflows/extended-nightly.yml`); it gates nothing.
   - **Opt-in** (`corepack pnpm test:optin`): dormant halves, the Runner, other adapters, the CLI,
-    plugins, chat channels. On demand only (`.github/workflows/optin.yml`).
+    plugins, chat channels. On demand only.
 - **Before pushing:** `corepack pnpm test:quick` runs the core tests your change touches since its
   merge base with `main` (`--changed <ref>` for another base). The pre-push hook runs it after a
   typecheck of the packages the push changed. `ui-new` has its own `typecheck` and `test` (Common
   commands).
-- **CI** (`.github/workflows/test.yml`) runs on every push to any branch: a typecheck of the whole
-  workspace, `ui-new`, and core in 3 shards, about 7 min.
-- **Before merging into `main`:** the branch's latest push is green in CI. Push the branch, wait for
-  the run, then merge with `--no-ff`. Fix a red run on the branch, not on `main`. For a branch that
-  changes the run lifecycle, heartbeat, workspaces or recovery, also run extended on it once
-  (`gh workflow run extended-nightly.yml -R br1an-c0des/paperclip --ref <branch>`). Read the
-  result; don't chase it.
-- **A red nightly extended run:** about ten minutes.
+- **GitHub Actions is off** (since 2026-11-24: the account's runner minutes ran out). The workflows
+  stay in `.github/workflows/` but nothing runs on push. Until it's back, **the local checks are
+  CI**: the same steps `test.yml` ran on every push, run on the branch before it merges.
+- **The local checks** (`test.yml`'s jobs, in order; about 10 min, under the machine lock for core):
+  1. `corepack pnpm typecheck` (the whole workspace) and `corepack pnpm test:runner` (the CI
+     scripts' own tests);
+  2. `corepack pnpm --filter @paperclipai/ui-new test`, then `build`, then `test:e2e`;
+  3. `flock /tmp/paperclip-test-bench.lock corepack pnpm test` (core, all shards in one run).
+
+  The Docker image build (`test.yml`'s `image` job) is on demand: `deploy.sh` builds the image
+  anyway, so a broken Dockerfile shows at the next deploy.
+- **Before merging into `main`:** the local checks pass on the branch's final commit. Fix a failure
+  on the branch, not on `main`. For a branch that changes the run lifecycle, heartbeat, workspaces
+  or recovery, also run the extended files that cover what it changed (or the whole extended tier
+  under the lock) once. Read the result; don't chase it.
+- **A red extended run:** about ten minutes.
   - **A product bug:** fix it, and delete the file's line from `scripts/test-extended.txt` so core
     runs it.
   - **A test problem** (timing, load, a leak, drift): move the file to opt-in with a one-line reason,
     or delete it. Don't investigate it unless it covers code you're changing.
   - **No bug-list entry** for test-only problems in extended or opt-in.
-  - `deploy.sh` warns when the latest nightly run is red, but deploys anyway.
+  - `deploy.sh` warns when the latest nightly run is red, but deploys anyway (it reads the last
+    nightly run on GitHub, which is old while Actions is off).
 - **Core stays deterministic:** a core flake gets fixed the same day or moves to extended, and a file
-  that flakes twice is out. A core file over 15 s on CI needs a reason.
+  that flakes twice is out. A core file over 15 s needs a reason.
 - **Opt-in tests** get fixed only when that area is being woken up.
 - **New test files land in core.** The extended list only shrinks. A server test file that leaves
   module state behind for the next file in its worker goes in `ISOLATED_BY_NAME` in
@@ -143,7 +153,7 @@ corepack pnpm --filter @paperclipai/ui-new typecheck
 corepack pnpm --filter @paperclipai/ui-new test
 corepack pnpm --filter @paperclipai/ui-new test:e2e   # Playwright smoke suite, mocked API (E2E_LIVE=1: read-only against :3100)
 corepack pnpm --filter @paperclipai/plugin-sdk build # after install, a cherry-pick, or in a fresh worktree; else the server dies with "does not provide an export named …"
-ssh server1 'cd ~/deployments/paperclip/repo && git pull --ff-only && deploy/deploy.sh --wait-ci'   # deploy main to server1 (the real instance), once its CI run passes
+ssh server1 'cd ~/deployments/paperclip/repo && git pull --ff-only && deploy/deploy.sh --skip-ci'   # deploy main to server1 (the real instance), once the local checks pass (Actions is off)
 ```
 
 To review upstream, run `/upstream-watch`: it lists upstream's new commits since the last review,
