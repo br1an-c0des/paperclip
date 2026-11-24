@@ -250,8 +250,8 @@ export function renderClaudeWake(payload: unknown, options: ClaudeWakeRenderOpti
   `cd packages/adapters/claude-local && corepack pnpm exec vitest run src/server/wake/render.test.ts`
 - [ ] **Step 3: Implement** `detectClaudeWakeEvents`, `renderClaudeWakeParts`, `renderClaudeWake`.
   Event detection follows the spec's "When" column. The two recovery rows split on
-  `recovery.originalAssignee.id` versus the woken agent; the payload doesn't say which agent is
-  woken, so pass it in through `ClaudeWakeRenderOptions` as `agentId: string` if it's needed.
+  `recovery.originalAssignee.id` against `options.agentId`; with no original assignee recorded,
+  use `run_stopped` when the task's `assigneeAgentId` is the woken agent.
   Times use decision 3 (`Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone })`).
   The review decision names `paperclip_update_task` with a status and a comment. Read
   `routes/issues.ts`'s execution-stage handling first; if a stage decision needs more than that,
