@@ -1,5 +1,31 @@
-import { describe, expect, it } from "vitest";
-import { buildPaperclipTaskMarkdown } from "./task-markdown.js";
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { joinPaperclipPromptParts } from "@paperclipai/adapter-utils/server-utils";
+import { buildPaperclipTaskMarkdown, buildPaperclipTaskMarkdownParts } from "./task-markdown.js";
+
+// Every brief built below also checks its display parts (step 5, Task 3): they must concatenate
+// to exactly the markdown, or both be null.
+const partsChecks = vi.hoisted(() => ({ count: 0 }));
+vi.mock("./task-markdown.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./task-markdown.js")>();
+  const { joinPaperclipPromptParts: join } = await import("@paperclipai/adapter-utils/server-utils");
+  return {
+    ...actual,
+    buildPaperclipTaskMarkdown: (input: Parameters<typeof actual.buildPaperclipTaskMarkdown>[0]) => {
+      const markdown = actual.buildPaperclipTaskMarkdown(input);
+      const parts = actual.buildPaperclipTaskMarkdownParts(input);
+      if ((parts === null) !== (markdown === null) || (parts && join(parts) !== markdown)) {
+        throw new Error(`task brief parts don't join to the markdown:\n${markdown}`);
+      }
+      const ids = (parts ?? []).map((part) => part.id);
+      if (new Set(ids).size !== ids.length) throw new Error(`duplicate task brief part ids: ${ids.join(", ")}`);
+      partsChecks.count += 1;
+      return markdown;
+    },
+  };
+});
+afterAll(() => {
+  expect(partsChecks.count).toBeGreaterThan(30);
+});
 
 const issue = {
   id: "task-1",
@@ -233,5 +259,64 @@ describe("heartbeat task markdown rendering", () => {
     expect(markdown).toContain("````text\nRevise the scope.");
     expect(markdown).not.toContain("Implement the accepted plan");
     expect(markdown).not.toContain("old-approved-revision");
+  });
+});
+
+describe("heartbeat task markdown parts", () => {
+  const ids = (input: Parameters<typeof buildPaperclipTaskMarkdownParts>[0]) => {
+    const parts = buildPaperclipTaskMarkdownParts(input)!;
+    expect(joinPaperclipPromptParts(parts)).toBe(buildPaperclipTaskMarkdown(input));
+    return parts.map((part) => part.id);
+  };
+
+  it("names a planning brief's parts in order", () => {
+    const input = {
+      issue: { ...issue, workMode: "planning", description: "Plan the launch." },
+      ancestors: [{ id: "parent-1", identifier: "TEST-0", title: "Launch" }],
+      taskPlan: { documentId: "doc-1", revisionId: "rev-1", revisionNumber: 1, body: "1. Draft." },
+      wakeComments: [{ id: "comment-1", body: "Add a rollback step." }],
+      includeWakeComments: false,
+    };
+    expect(ids(input)).toEqual([
+      "task_brief.header",
+      "task_brief.question_guidance",
+      "task_brief.issue",
+      "task_brief.mode_directive",
+      "task_brief.description",
+      "task_brief.plan",
+      "task_brief.ancestors",
+      "task_brief.wake_comments",
+      "task_brief.closing",
+    ]);
+    const parts = buildPaperclipTaskMarkdownParts(input)!;
+    expect(parts.find((part) => part.id === "task_brief.mode_directive")?.text).toContain("Update the plan only.");
+    expect(parts.find((part) => part.id === "task_brief.description")?.text).toContain("Plan the launch.");
+  });
+
+  it("names a chat brief's directive, and leaves the description out", () => {
+    const chat = { ...issue, conversationAgentId: "agent-1", workMode: "standard", description: "Not shown." };
+    for (const includeDescription of [true, false]) {
+      expect(ids({ issue: chat, personTimeZone: "Europe/Paris", includeDescription })).toEqual([
+        "task_brief.header",
+        "task_brief.question_guidance",
+        "task_brief.issue",
+        "task_brief.chat_directive",
+        "task_brief.closing",
+      ]);
+    }
+    const parts = buildPaperclipTaskMarkdownParts({ issue: chat, personTimeZone: "Europe/Paris" })!;
+    const directive = parts.find((part) => part.id === "task_brief.chat_directive")!;
+    expect(directive.text).toContain("Chat mode directive:");
+    expect(directive.text).toContain("The person's time zone is Europe/Paris");
+    expect(directive.label).toBe("Chat mode directive");
+  });
+
+  it("is null exactly when the markdown is", () => {
+    expect(buildPaperclipTaskMarkdownParts({ issue: null })).toBeNull();
+    expect(ids({ issue: null, wakeComments: [{ id: "comment-1", body: "Only a comment." }] })).toEqual([
+      "task_brief.header",
+      "task_brief.wake_comments",
+      "task_brief.closing",
+    ]);
   });
 });

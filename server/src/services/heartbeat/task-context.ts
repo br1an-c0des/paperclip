@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Db, agents, agentTaskSessions, heartbeatRuns } from "@paperclipai/db";
 import { FAST_RESPONSE_AGENT_GUIDANCE, fastResponseHistoryBody, isValidIanaTimeZone } from "@paperclipai/shared";
-import type { PaperclipTurnContext } from "@paperclipai/adapter-utils/server-utils";
+import { joinPaperclipPromptParts, type PaperclipPromptPart, type PaperclipTurnContext } from "@paperclipai/adapter-utils/server-utils";
 import { parseObject } from "../../adapters/utils.js";
 import { isConversation } from "../agent-conversations.js";
 import { chatCompletionInstruction } from "../chat-completion-delivery.js";
@@ -16,9 +16,65 @@ import { caseExecutionMarkdown, getCaseExecutionContext } from "../case-context.
 import type { TrustPresetResolution } from "../trust-preset-resolver.js";
 import { liveVoiceExecutionGuidance } from "../voice/voice-execution-guidance.js";
 import { buildPaperclipWakePayload, ConfigurationIncompleteFailure, readHeartbeatWakeComments, PAPERCLIP_WAKE_PAYLOAD_KEY, type createHeartbeatRunPreparation } from "./run-preparation.js";
-import { buildPaperclipTaskMarkdown } from "./task-markdown.js";
+import { buildPaperclipTaskMarkdown, buildPaperclipTaskMarkdownParts, type PaperclipTaskMarkdownInput } from "./task-markdown.js";
 import { deriveCommentId, extractWakeCommentIds } from "../../modules/run-dispatch/index.js";
 import { workspacePreferenceService } from "../workspace-preferences.js";
+
+/**
+ * Display parts of the two task-brief variants `claude_local` reads (step 5): they concatenate to
+ * `paperclipTaskMarkdownAssignment` and `paperclipTaskMarkdownAssignmentCompact`. In memory only:
+ * they're set as non-enumerable properties, so the run's saved context snapshot (JSON), the
+ * `adapter.invoke` event's context and any `{ ...context }` copy never carry them. Read them with
+ * `readTaskMarkdownParts`, and carry them onto a copied context with `copyTaskMarkdownParts`.
+ */
+export const PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_PARTS_KEY = "paperclipTaskMarkdownAssignmentParts";
+export const PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_COMPACT_PARTS_KEY = "paperclipTaskMarkdownAssignmentCompactParts";
+const TASK_MARKDOWN_PARTS_KEYS = [
+  PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_PARTS_KEY,
+  PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_COMPACT_PARTS_KEY,
+] as const;
+type TaskMarkdownPartsKey = (typeof TASK_MARKDOWN_PARTS_KEYS)[number];
+
+/** Sets a value that a serialized or spread copy of the context leaves out; null deletes it. */
+function setInMemoryContextValue(context: Record<string, unknown>, key: string, value: unknown) {
+  delete context[key];
+  if (value === null || value === undefined) return;
+  Object.defineProperty(context, key, { value, enumerable: false, writable: true, configurable: true });
+}
+
+export function readTaskMarkdownParts(
+  context: Record<string, unknown>,
+  key: TaskMarkdownPartsKey,
+): PaperclipPromptPart[] | null {
+  const value = context[key];
+  return Array.isArray(value) ? value as PaperclipPromptPart[] : null;
+}
+
+export function copyTaskMarkdownParts(from: Record<string, unknown>, to: Record<string, unknown>) {
+  for (const key of TASK_MARKDOWN_PARTS_KEYS) setInMemoryContextValue(to, key, readTaskMarkdownParts(from, key));
+}
+
+/** A variant's parts in the order task-context.ts concatenates its text. */
+function taskBriefVariantParts(input: {
+  liveVoiceTaskPrefix: string;
+  caseMarkdown: string;
+  markdown: PaperclipPromptPart[] | null;
+  chatCompletion: string;
+}): PaperclipPromptPart[] {
+  const part = (id: string, label: string, source: string, text: string): PaperclipPromptPart[] =>
+    text ? [{ id, label, source, text }] : [];
+  return [
+    ...part("task_brief.live_voice", "Live call guidance", "live voice call", input.liveVoiceTaskPrefix),
+    ...part("task_brief.workflow_case", "Workflow case", "case execution context", input.caseMarkdown),
+    // `"" + null` is "null": a run without a task sends that literal string (bug 84).
+    ...(input.markdown ?? part("task_brief.null", "No task brief", "no task: the literal string \"null\" (bug 84)", "null")),
+    ...part("task_brief.chat_completion", "Delegated work completed", "chat completion updates", input.chatCompletion),
+  ];
+}
+
+function partsMatching(parts: PaperclipPromptPart[] | null, text: unknown): PaperclipPromptPart[] | null {
+  return parts && typeof text === "string" && joinPaperclipPromptParts(parts) === text ? parts : null;
+}
 
 type RunPreparation = ReturnType<typeof createHeartbeatRunPreparation>;
 type IssueContext = NonNullable<Awaited<ReturnType<RunPreparation["getIssueExecutionContext"]>>>;
@@ -385,6 +441,19 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
   } else {
     delete context.paperclipTaskMarkdownAssignmentCompact;
   }
+  // The display parts of the two variants claude_local reads (step 5), built from the same inputs.
+  const taskBriefParts = (markdownInput: PaperclipTaskMarkdownInput) => taskBriefVariantParts({
+    liveVoiceTaskPrefix,
+    caseMarkdown: caseExecutionMarkdown(workflowCase),
+    markdown: buildPaperclipTaskMarkdownParts(markdownInput),
+    chatCompletion: chatCompletionInstruction(context),
+  });
+  let taskMarkdownAssignmentParts = typeof context.paperclipTaskMarkdownAssignment === "string"
+    ? taskBriefParts({ ...taskMarkdownInput, taskPlan, includeWakeComments: false })
+    : null;
+  let taskMarkdownAssignmentCompactParts = typeof context.paperclipTaskMarkdownAssignmentCompact === "string"
+    ? taskBriefParts({ ...taskMarkdownInput, taskPlan, includeDescription: false, includeWakeComments: false })
+    : null;
   context.paperclipTaskCommunicationGuidance = [context.paperclipTaskCommunicationGuidance, FAST_RESPONSE_AGENT_GUIDANCE].filter(Boolean).join("\n\n");
   if (issueRef) {
     const redactedWakeContext = await createRunSecretRedactionRegistry(
@@ -398,7 +467,11 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
       paperclipTaskMarkdownCompact: context.paperclipTaskMarkdownCompact,
       paperclipTaskMarkdownAssignment: context.paperclipTaskMarkdownAssignment,
       paperclipTaskMarkdownAssignmentCompact: context.paperclipTaskMarkdownAssignmentCompact,
+      taskMarkdownAssignmentParts,
+      taskMarkdownAssignmentCompactParts,
     });
+    taskMarkdownAssignmentParts = redactedWakeContext.taskMarkdownAssignmentParts;
+    taskMarkdownAssignmentCompactParts = redactedWakeContext.taskMarkdownAssignmentCompactParts;
     context.paperclipIssue = redactedWakeContext.paperclipIssue;
     if (redactedWakeContext.paperclipCase) context.paperclipCase = redactedWakeContext.paperclipCase;
     context.paperclipTaskCommunicationGuidance = redactedWakeContext.paperclipTaskCommunicationGuidance;
@@ -423,6 +496,11 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
         redactedWakeContext.paperclipTaskMarkdownAssignmentCompact;
     }
   }
+  // Kept only while they still join to the (redacted) text they describe.
+  setInMemoryContextValue(context, PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_PARTS_KEY,
+    partsMatching(taskMarkdownAssignmentParts, context.paperclipTaskMarkdownAssignment));
+  setInMemoryContextValue(context, PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_COMPACT_PARTS_KEY,
+    partsMatching(taskMarkdownAssignmentCompactParts, context.paperclipTaskMarkdownAssignmentCompact));
   if (issueRef) {
     const digest = (value: string | null | undefined) =>
       value?.trim()

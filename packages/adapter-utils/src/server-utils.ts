@@ -589,15 +589,15 @@ export function joinPaperclipPromptPartGroups(
   return result;
 }
 
-type PaperclipPromptPartMeta = Pick<PaperclipPromptPart, "label" | "source">;
-type PaperclipPromptLineMark = { id: string; index: number };
+export type PaperclipPromptPartMeta = Pick<PaperclipPromptPart, "label" | "source">;
+export type PaperclipPromptLineMark = { id: string; index: number };
 
 /**
  * Cuts a `lines` array at the marked indices: the lines from one mark up to the next form a
  * part. The parts join to `lines.join("\n")`. Unmarked leading lines, empty stretches and parts
  * that are only whitespace fold into a neighbour, so every part has text of its own.
  */
-function paperclipPromptPartsFromLines(
+export function paperclipPromptPartsFromLines(
   lines: readonly string[],
   marks: readonly PaperclipPromptLineMark[],
   meta: Readonly<Record<string, PaperclipPromptPartMeta>>,
