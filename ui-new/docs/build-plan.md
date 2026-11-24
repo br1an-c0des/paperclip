@@ -123,6 +123,7 @@ it gets built. Numbers like 3.4 and F3 refer to stage 3 further down; "fix 39" i
 | Help people understand what Paperclip is and how to use each feature: a user guide with worked examples, and an interactive guide in the app | Idea, then 1 or 3 | Raised Oct 28, 2026 ([3.15](#315-an-in-app-guide-to-paperclip)). Notes collect in [guides/](guides/README.md). Not designed yet. |
 | Investigate and design upstream's Coordinator workspace (one conversation per agent, task proposals from chat, decision cards, a Needs You queue) against `ui-new`'s Inbox, requests and chat | 1 | Raised Oct 29, 2026, from the upstream sync ([3.16](#316-upstreams-coordinator-workspace)). Not investigated yet. |
 | Permission roles: the company defines its own permission profiles in a permission-role editor and assigns them to agents, replacing the fixed agent Role list | Idea, then 3 or 4 | Raised Nov 16, 2026, when the Role picker was turned off ([decision 55](decisions.md#55-the-agent-role-picker-is-turned-off-permission-roles-later)). A profile could be a named set of the access grants agents already have; the CEO-only checks are hard-coded on the role and would need an upstream change. Not designed yet. |
+| Agent inboxes: a feed of recent changes across the company that an agent reads to catch up before it starts, maybe tied into the memory service | Idea, low priority | Raised Nov 23, 2026, while designing hard-fork step 5 ([3.21](#321-agent-inboxes-a-recent-changes-feed-for-agents)). Not designed yet; to investigate or try out. |
 
 ## Stage 1: the new UI
 
@@ -974,6 +975,7 @@ alone; anything else is deferred or waits on upstream.
 | [3.17](#317-smaller-feature-ideas) Smaller feature ideas (F1 to F12) | No: each changes upstream's server or an adapter | All of it: offered upstream where it would help any user, otherwise stage 4 or the hard fork |
 | [3.16](#316-upstreams-coordinator-workspace) Coordinator workspace | Decided; the two Inbox ideas are stage 1 work (U36) | — |
 | [3.20](#320-a-dedicated-workspaces-page) Workspaces page | Yes, in core | — |
+| [3.21](#321-agent-inboxes-a-recent-changes-feed-for-agents) Agent inboxes | Yes, in core; an idea to try out first | — |
 
 ### 3.1 Custom statuses and status rules
 
@@ -1401,6 +1403,34 @@ Raised Nov 21, 2026, while designing hard-fork step 4b part 3 (worktrees by defa
 - **Questions:** whether it stays an organization tab or becomes its own page in the nav; how it
   relates to a project's Workspaces settings; whether bulk clean-up uses the sweep's rules or
   Close's.
+
+### 3.21 Agent inboxes: a recent-changes feed for agents
+
+Raised Nov 23, 2026, while designing hard-fork step 5 (the prompt builder); low priority, an idea to
+investigate or experiment with. Not designed or scheduled.
+
+- **The idea:** each agent gets an inbox of its own: database records that show or summarize what
+  has happened recently (updates and changes across the company and its projects), so an agent can
+  catch up on the broader state of things before it starts work, the way you would read your own
+  Inbox.
+- **Why:** a run knows its own task well (the wake, `paperclip_task_context`), but little about
+  what else is going on. Step 5's discussion settled on agents pulling context through their MCP
+  tools rather than the prompt pushing it in; an inbox would be one more thing to pull, with the
+  prompt telling the agent to read it first.
+- **Have today, partly:**
+  - the heartbeat already queues wakes for an agent with what woke it (comments, mentions,
+    approvals);
+  - activity logs and the Summarizer's summary slots (project and workspace summaries) record
+    changes;
+  - the user's Inbox shows what needs a person, not an agent.
+- **Ties to memory:** it could work with the memory service
+  ([3.5](#35-memory-service), [proposal](proposals/memory-service-hindsight.md)). For example,
+  inbox items could be recalled or retained as memories, or the memory service could write the
+  digest an agent reads.
+- **Questions:** what counts as a change worth an item, and for which agents (all company changes,
+  or only those near the agent's projects and tasks); whether items are raw events or summaries,
+  and who writes the summaries (a built-in agent like the Summarizer, or the server); read state,
+  and how long items last; and how it differs from memory recall.
 
 ## Stage 4: source-change features (merged into stage 3)
 

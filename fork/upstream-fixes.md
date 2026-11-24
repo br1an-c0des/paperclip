@@ -128,6 +128,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 87 | [Store a run's whole prompt, not the first 16,384 characters](#87-store-a-runs-whole-prompt-not-the-first-16384-characters) | candidate | | | 2026-11-23 | | |
 | 88 | [Give `claude_local` runs the instruction working-copy guidance](#88-give-claude_local-runs-the-instruction-working-copy-guidance) | candidate | | | 2026-11-23 | | |
 | 89 | [Stop prompt texts naming Runner tools and curl recipes runs don't use](#89-stop-prompt-texts-naming-runner-tools-and-curl-recipes-runs-dont-use) | candidate | | | 2026-11-23 | | |
+| 90 | [Keep the agent's instructions after Claude compacts a session](#90-keep-the-agents-instructions-after-claude-compacts-a-session) | candidate | | | 2026-11-23 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1585,3 +1586,24 @@ Found 2026-11-23 by the step 5 research.
   - the execution-stage reviewer text names "the Paperclip Runner" (`server-utils.ts:3056`).
 - **Likely fix:** point each at the `paperclip_*` tool that does the same thing. Mostly step 5's
   template work; the handoff text could be fixed on its own.
+
+### 90. Keep the agent's instructions after Claude compacts a session
+
+Found 2026-11-23 while designing step 5, by testing Claude Code 2.1.325 by hand (`claude --print`,
+Haiku, the sealed run's `--strict-mcp-config --setting-sources user`, a throwaway folder).
+
+- **Problem:** Claude saves a session's system prompt when the session starts and restores that
+  copy on every `--resume`; a different `--append-system-prompt-file` passed on resume is ignored.
+  After a compaction the saved copy is rebuilt on the next call from that call's own flags. A
+  sealed CLI run passes `--append-system-prompt-file` only on fresh sessions
+  (`packages/adapters/claude-local/src/server/execute.ts:843-847`), so once a session is compacted
+  (by Claude's auto-compact during a resumed run, or `/compact`), every later run in it goes without
+  the agent's `AGENTS.md` and the company skill-library list. Checked: fresh with the file, then
+  `/compact` (with or without the file), then resume without it → the instructions are gone;
+  resume with the file on the first call after the compaction → they're back. Auto-compact itself
+  wasn't triggered in the test, only `/compact`. Paperclip's own session rotation is off for
+  `claude_local`, so long sessions (chat especially) rely on Claude's compaction.
+- **Likely fix:** pass `--append-system-prompt-file` on resumed runs too. Before a compaction it's
+  ignored, after one it restores the instructions. The run manifest's "instructions sent" row and
+  the session's bundle-key check would need to agree with that. Step 5's builder may take it.
+
