@@ -130,6 +130,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 89 | [Stop prompt texts naming Runner tools and curl recipes runs don't use](#89-stop-prompt-texts-naming-runner-tools-and-curl-recipes-runs-dont-use) | candidate | | | 2026-11-23 | | |
 | 90 | [Keep the agent's instructions after Claude compacts a session](#90-keep-the-agents-instructions-after-claude-compacts-a-session) | candidate | | | 2026-11-23 | | |
 | 91 | [Show a run's whole prompt size in the Transcript tab's prompt card](#91-show-a-runs-whole-prompt-size-in-the-transcript-tabs-prompt-card) | candidate | | | 2026-11-24 | | |
+| 92 | [List the whole company skill library in a run's system prompt, as intended](#92-list-the-whole-company-skill-library-in-a-runs-system-prompt-as-intended) | candidate | | | 2026-11-24 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1619,4 +1620,26 @@ Found 2026-11-24 by step 5's record agent (Task 6, `step5/record`).
 - **Likely fix:** have the card read `firstMessageChars` from the `adapter.prompt` record when
   there is one (`ui-new/src/runs/invocation.ts` `readPromptRecord`), falling back to today's
   length for older runs.
+
+### 92. List the whole company skill library in a run's system prompt, as intended
+
+Found 2026-11-24 by step 5's real-run check (run `7eb33da7` on TES-43, desktop dev instance) and
+traced by the preview agent.
+
+- **Problem:** a `claude_local` run's system prompt ends with a "Company skill library" list, built
+  by `buildSkillLibraryManifestMarkdown` in `planClaudeRunSkillsAndInstructions`
+  (`packages/adapters/claude-local/src/server/run-plan.ts`). Its comment says it exists to "tell
+  the model what the company library actually holds", so an installed skill the agent doesn't have
+  isn't mistaken for a missing one; it writes "installed, not enabled for you" lines for those.
+  But the heartbeat hands the adapter only the agent's own skills (`prepareSkills` in
+  `server/src/services/heartbeat/execution-configuration.ts` selects with
+  `resolveLegacyPaperclipDesiredSkillNames`), so every line reads "enabled" and the
+  "not enabled" case never appears. The research baseline (step-5-research.md 3.2) described the
+  intended behaviour, not this one.
+- **Cost of fixing:** the list is in the system prompt, inside the prompt bundle's key, so a fix
+  changes every agent's bundle and starts each one's sessions fresh once. Step 5 kept the run as it
+  is and made the run preview match it.
+- **Likely fix:** pass the whole library's entries to the manifest separately from the mounted
+  skills (the mount stays the agent's own), then check the preview still matches. Decide together
+  with any other system-prompt change, so sessions reset once.
 
