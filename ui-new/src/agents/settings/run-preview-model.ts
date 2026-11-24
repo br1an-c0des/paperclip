@@ -5,7 +5,10 @@ import type {
   ClaudeRunPreviewManifest,
   ClaudeRunPreviewProject,
   ClaudeRunPreviewUnsupportedReason,
+  RunPromptPreview,
+  RunPromptPreviewKind,
 } from "@paperclipai/shared";
+import { promptViewFromRecord, type PromptView } from "@/runs/prompt-sections";
 import { credentialText } from "@/runs/run-manifest";
 
 /*
@@ -180,4 +183,95 @@ export function storeProject(agentId: string, projectId: string | null, store: K
   } catch {
     // Private windows and blocked storage: nothing to remember it in.
   }
+}
+
+/*
+ * The Prompt part (step 5, fork/step-5-prompt-builder.md "In ui-new"): a draft of the next run's
+ * prompt for a picked task and kind of wake, in the run view's sections (runs/PromptSections.tsx).
+ */
+
+/** The task the draft is for: one of the agent's tasks, or one of its chats. */
+export type PromptTask = { id: string; identifier: string | null; title: string; chat: boolean };
+
+type TaskRow = { id: string; identifier: string | null; title: string };
+
+export const PROMPT_KIND_LABEL: Record<RunPromptPreviewKind, string> = {
+  assignment: "Fresh assignment",
+  comment: "Comment",
+  chat_turn: "Chat turn",
+  no_task: "No task",
+};
+
+/** The kinds of wake a pick can have: none without a task, a chat's turn, or a task's assignment or comment. */
+export function promptKinds(task: PromptTask | null): RunPromptPreviewKind[] {
+  if (!task) return ["no_task"];
+  return task.chat ? ["chat_turn"] : ["assignment", "comment"];
+}
+
+/** The kind the draft asks for: the one picked while the task can have it, else the task's first. */
+export function effectivePromptKind(task: PromptTask | null, picked: RunPromptPreviewKind | null): RunPromptPreviewKind {
+  const kinds = promptKinds(task);
+  return picked && kinds.includes(picked) ? picked : kinds[0]!;
+}
+
+/** The short note a 422 answer shows beside the picker; null for any other failure. */
+export function promptNote(error: unknown, task: PromptTask | null): string | null {
+  const status = (error as { status?: unknown } | null)?.status;
+  const code = ((error as { body?: unknown } | null)?.body as { code?: unknown } | null | undefined)?.code;
+  if (status !== 422) return null;
+  if (code === "not_a_chat") return "Not one of this agent's chats, so there's no chat turn to draft.";
+  if (code === "no_comment") {
+    return task?.chat ? "No messages in this chat yet, so nothing to wake on." : "No comments on this task yet, so nothing to wake on.";
+  }
+  return null;
+}
+
+/** A draft in the shape of a run's record, for the section view. */
+export function promptPreviewView(prompt: RunPromptPreview): PromptView {
+  return promptViewFromRecord({
+    version: 1,
+    session: "fresh",
+    systemPrompt: prompt.systemPrompt,
+    firstMessage: prompt.firstMessage,
+    firstMessageChars: prompt.firstMessageChars,
+    matchedPlan: true,
+  });
+}
+
+/** The picked task's name: its identifier and title, or "No task". */
+export function promptTaskName(task: PromptTask | null): string {
+  if (!task) return "No task";
+  return task.identifier ? `${task.identifier} ${task.title}` : task.title;
+}
+
+/**
+ * The picker's lists: the agent's open tasks first, then its chats, then other tasks the search
+ * found; the first two filtered by the search text, and none listed twice.
+ */
+export function promptTaskGroups(input: {
+  query: string;
+  assigned: readonly TaskRow[];
+  chats: readonly TaskRow[];
+  found: readonly TaskRow[];
+}): { label: string; tasks: PromptTask[] }[] {
+  const term = input.query.trim().toLowerCase();
+  const matches = (task: TaskRow) =>
+    !term || task.title.toLowerCase().includes(term) || !!task.identifier?.toLowerCase().includes(term);
+  const seen = new Set<string>();
+  const pick = (tasks: readonly TaskRow[], chat: boolean, filter: boolean): PromptTask[] => {
+    const picked: PromptTask[] = [];
+    for (const task of tasks) {
+      if ((filter && !matches(task)) || seen.has(task.id)) continue;
+      seen.add(task.id);
+      picked.push({ id: task.id, identifier: task.identifier ?? null, title: task.title, chat });
+    }
+    return picked;
+  };
+  const groups = [
+    { label: "Assigned to this agent", tasks: pick(input.assigned, false, true) },
+    { label: "Chats with this agent", tasks: pick(input.chats, true, true) },
+    // The search matched these already; listed only while searching.
+    { label: "Other tasks", tasks: term ? pick(input.found, false, false) : [] },
+  ];
+  return groups.filter((group) => group.tasks.length > 0);
 }

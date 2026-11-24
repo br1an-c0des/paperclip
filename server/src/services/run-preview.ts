@@ -15,6 +15,7 @@ import {
   type ClaudeRunPreviewBlocker,
   type ClaudeRunPreviewCheckout,
   type ClaudeRunPreviewManifest,
+  type RunPromptPreviewKind,
 } from "@paperclipai/shared";
 import type { AdapterRuntimeMcpServer } from "@paperclipai/adapter-utils";
 import { readPaperclipSkillSyncPreference, type PaperclipSkillEntry } from "@paperclipai/adapter-utils/server-utils";
@@ -23,6 +24,7 @@ import { findActiveServerAdapter } from "../adapters/index.js";
 import { localAgentJwtAvailable } from "../agent-auth-jwt.js";
 import { notFound } from "../errors.js";
 import { resolveDefaultAgentWorkspaceDir } from "../home-paths.js";
+import { agentInstructionsBundleMode } from "./agent-instructions.js";
 import { assertManagedAiProjectAuth, describeManagedAiRuntime, stripAiAuthBindings } from "./ai-connection-runtime.js";
 import { companySkillService, RUNTIME_SKILL_PENDING_MATERIALIZATION_DETAIL } from "./company-skills.js";
 import { applyConnectorSkills, resolveConnectorAssignments } from "./connector-runtime.js";
@@ -43,18 +45,24 @@ import {
 } from "./heartbeat/run-preparation.js";
 import { resolveRunGitHub } from "./heartbeat/sealed-run-github.js";
 import { previewProjectCheckout, stripWorkspaceRuntimeFromExecutionRunConfig } from "./heartbeat/workspaces.js";
+import { buildRunPreviewPrompt, resolvePreviewPromptTarget } from "./run-preview-prompt.js";
 import { previewTaskWorktree, type PreviewedTaskWorktree } from "./run-preview-worktree.js";
 
 /**
  * What an agent's runs get, before any run (fork/step-4b-parts-2-3.md, part 2): the next sealed
- * `claude_local` CLI launch's manifest, for a fresh run on a task in a chosen project or in none.
+ * `claude_local` CLI launch's manifest, for a fresh run on a task in a chosen project or in none,
+ * and a draft of that run's prompt for a chosen task and kind of wake (step 5 Task 8,
+ * run-preview-prompt.ts).
  *
  * It resolves what `executeRun` resolves for a run, through the same functions where they're
  * read-only and through read-only paths of the ones that aren't, then hands the result to the
  * adapter's `previewRun`, which plans the launch with the same code as a real one and stops
  * before acting. Nothing is started, written or minted: no files under the instance folder, no
- * run token, MCP bearer or gateway, no database writes, and no secret or credential decrypted
- * (their values are placeholders; only the names of variables reach the manifest).
+ * run token, MCP bearer or gateway, no checkout, no run row and no database writes. No secret or
+ * credential the run would use is decrypted: their values are placeholders, and only the names
+ * of variables reach the manifest. The one decryption is the task's: the prompt draft redacts
+ * the secrets registered on the task's earlier runs out of its text, as a run does, on the server
+ * only.
  */
 
 type AgentRow = Pick<
@@ -226,7 +234,10 @@ export function runPreviewService(db: Db) {
       versionSelections: skillVersionSelectionMap(preference.desiredSkillEntries, { versionPinsEnabled: betaSkills }),
     }));
     const assignments = await resolveConnectorAssignments(db, { companyId: agent.companyId, agentId: agent.id });
-    return applyConnectorSkills({ ...config, paperclipRuntimeSkills: entries }, entries, assignments, { materialize: false });
+    return {
+      config: await applyConnectorSkills({ ...config, paperclipRuntimeSkills: entries }, entries, assignments, { materialize: false }),
+      hasConnectors: assignments.length > 0,
+    };
   }
 
   async function previewAgentRun(
@@ -235,6 +246,10 @@ export function runPreviewService(db: Db) {
       projectId: string | null;
       /** Whose task the run would be for: the user asking (a run's responsible user). */
       responsibleUserId: string | null;
+      /** The task the prompt draft is for; its project is the one used. None: a run without a task. */
+      issueId?: string | null;
+      /** The kind of wake the draft is for; the default follows `issueId` (run-preview-prompt.ts). */
+      kind?: RunPromptPreviewKind | null;
     },
   ): Promise<ClaudeRunPreview> {
     if (agent.adapterType === "paperclip_runner") return { supported: false, reason: "runner" };
@@ -248,16 +263,19 @@ export function runPreviewService(db: Db) {
 
     const blockers: ClaudeRunPreviewBlocker[] = [];
     const { responsibleUserId } = input;
+    // The wake the prompt draft is for (422 when the task can't have it), and its task's project.
+    const promptTarget = await resolvePreviewPromptTarget(db, agent, { issueId: input.issueId ?? null, kind: input.kind ?? null });
+    const projectId = promptTarget.issue ? promptTarget.issue.projectId : input.projectId;
 
     // The project, and where a run on its task would read the repo from.
-    const project = input.projectId
+    const project = projectId
       ? await db
         .select({ id: projects.id, name: projects.name, env: projects.env, executionWorkspacePolicy: projects.executionWorkspacePolicy })
         .from(projects)
-        .where(and(eq(projects.id, input.projectId), eq(projects.companyId, agent.companyId)))
+        .where(and(eq(projects.id, projectId), eq(projects.companyId, agent.companyId)))
         .then((rows) => rows[0] ?? null)
       : null;
-    if (input.projectId && !project) throw notFound("Project not found");
+    if (projectId && !project) throw notFound("Project not found");
     const checkout = project ? await previewProjectCheckout(db, { companyId: agent.companyId, projectId: project.id }) : null;
     // A git checkout gives each task its own worktree unless the project chose the shared
     // checkout (step 4b part 3); the run makes it, the preview only works out where and from what.
@@ -289,6 +307,7 @@ export function runPreviewService(db: Db) {
       companyId: agent.companyId,
       agent: { companyId: agent.companyId, permissions: agent.permissions },
       project: project ? { companyId: agent.companyId, executionWorkspacePolicy: project.executionWorkspacePolicy } : null,
+      issue: promptTarget.issue ? { companyId: agent.companyId, executionPolicy: promptTarget.issue.executionPolicy } : null,
       run: { companyId: agent.companyId, executionPolicy: undefined },
     });
     if (trustPreset.kind === "denied") blockers.push({ code: "trust_preset_denied", message: trustPreset.detail });
@@ -370,7 +389,8 @@ export function runPreviewService(db: Db) {
       connectionName = pool?.name ?? null;
     }
 
-    let runtimeConfig: Record<string, unknown> = await previewSkillConfig(agent, resolvedConfig, betaSkills);
+    const skillConfig = await previewSkillConfig(agent, resolvedConfig, betaSkills);
+    let runtimeConfig: Record<string, unknown> = skillConfig.config;
     if (Object.keys(github.githubRunEnv).length > 0) {
       runtimeConfig = {
         ...runtimeConfig,
@@ -422,6 +442,19 @@ export function runPreviewService(db: Db) {
     });
     if (!preview.supported) return preview;
 
+    const prompt = await buildRunPreviewPrompt(db, {
+      agent: { id: agent.id, companyId: agent.companyId, name: agent.name, adapterType: agent.adapterType, adapterConfig: agent.adapterConfig },
+      target: promptTarget,
+      config: runtimeConfig,
+      context,
+      systemPrompt: preview.systemPrompt,
+      runTokenAvailable,
+      trustPreset,
+      plannedBranchName: taskWorktree?.branchName ?? null,
+      instructionsWorkingCopy: Boolean(preview.instructionsPathDirective) && agentInstructionsBundleMode(agent) === "managed",
+      hasConnections: skillConfig.hasConnectors || servers.some((server) => server.name === ASSIGNED_MCP_SERVER_NAME),
+    });
+
     // A repo that isn't cloned yet, or a worktree base that isn't fetched yet: the run gets it
     // first and reads the repo then; the preview doesn't, so it says so (a switch that's off
     // still reads off).
@@ -441,7 +474,7 @@ export function runPreviewService(db: Db) {
       project: project && previewCheckout ? { id: project.id, name: project.name, checkout: previewCheckout } : null,
       manifest,
       blockers: [...blockers, ...preview.blockers],
-      prompt: null, // step 5 Task 8 fills this
+      prompt,
     };
   }
 

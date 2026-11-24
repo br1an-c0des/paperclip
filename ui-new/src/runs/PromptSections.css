@@ -19,7 +19,7 @@
   flex-wrap: wrap;
 }
 
-.ps-grouph h3 {
+.ps-grouph .ps-grouptitle {
   color: var(--text);
   font-size: 13px;
   font-weight: 800;

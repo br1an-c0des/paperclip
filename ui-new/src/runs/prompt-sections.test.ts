@@ -38,6 +38,19 @@ describe("promptViewFromRecord", () => {
     expect(wake.parts.every((part) => part.pending === null)).toBe(true);
   });
 
+  it("shows a part without the blank line that separates it from the one before", () => {
+    const wake = freshRecord.firstMessage[1]!;
+    const record = {
+      ...freshRecord,
+      firstMessage: [{ ...wake, parts: [
+        { id: "wake.header", label: "Header", source: "wake", text: "## Wake", chars: 7 },
+        { id: "wake.comments", label: "Comments", source: "task comments", text: "\n\n- a comment", chars: 13, pending: "read at launch" },
+      ] }],
+    };
+    const [, first] = promptViewFromRecord(record).groups;
+    expect(first!.sections[0]!.parts.map((part) => [part.text, part.pending])).toEqual([["## Wake", null], ["- a comment", "read at launch"]]);
+  });
+
   it("gives the whole first message as sent, for Copy", () => {
     const view = promptViewFromRecord(freshRecord);
     expect(view.firstMessageText).toBe(

@@ -4129,6 +4129,35 @@ const claudeRunPreviewRepoLoad = z.union([
   z.object({ enabled: z.literal(true) }).passthrough(),
   z.object({ enabled: z.literal(false), reason: z.string() }),
 ]);
+// `RunPromptPreview` (@paperclipai/shared, step 5): a draft of the next run's prompt in sections.
+// `pending` marks a value only the launch fills in, with why.
+const runPromptPartSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  source: z.string(),
+  text: z.string(),
+  chars: z.number(),
+  pending: z.string().optional(),
+});
+const runPromptSectionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  placement: z.enum(["system", "first_message"]),
+  delivery: z.enum(["every_run", "fresh_only", "resumed_only"]),
+  reason: z.string(),
+  source: z.string(),
+  text: z.string(),
+  chars: z.number(),
+  parts: z.array(runPromptPartSchema).optional(),
+  pending: z.string().optional(),
+});
+const runPromptPreviewSchema = z.object({
+  kind: z.enum(["assignment", "comment", "chat_turn", "no_task"]),
+  issueId: z.string().nullable(),
+  systemPrompt: z.array(runPromptSectionSchema),
+  firstMessage: z.array(runPromptSectionSchema),
+  firstMessageChars: z.number(),
+}).nullable();
 const claudeRunPreviewSchema = z.union([
   z.object({
     supported: z.literal(true),
@@ -4173,6 +4202,7 @@ const claudeRunPreviewSchema = z.union([
       github: z.object({ mode: z.enum(["connection", "server_login", "none"]) }).passthrough().optional(),
     }).passthrough(),
     blockers: z.array(z.object({ code: z.string(), message: z.string() })),
+    prompt: runPromptPreviewSchema,
   }),
   z.object({
     supported: z.literal(false),
@@ -4187,9 +4217,25 @@ registry.registerPath({
   summary: "Preview what the agent's next run gets",
   description:
     "Board only. The manifest of the agent's next sealed claude_local CLI run, for a task in `projectId` or in no project, " +
-    "worked out read-only: nothing is started, written or minted. `supported: false` for other adapters, the ACP engine, the Runner and remote targets.",
-  request: { params: z.object({ id: z.string() }), query: z.object({ projectId: z.string().optional() }) },
-  responses: { 200: r.ok(claudeRunPreviewSchema), 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
+    "and `prompt`, a draft of that run's prompt (a fresh session's system prompt and first message, in sections) for the task " +
+    "`issueId` and the wake `kind`, from the same builder a run uses. With `issueId`, the task's own project is used. " +
+    "`kind` defaults to `assignment` with an `issueId` and to `no_task` without one; `comment` wakes on the task's latest comment, " +
+    "`chat_turn` on the latest message of one of the agent's chats. Worked out read-only: nothing is started, written or minted, " +
+    "and the task's registered secrets are decrypted on the server only, to redact its text. " +
+    "`supported: false` for other adapters, the ACP engine, the Runner and remote targets. " +
+    "422 with `code` `not_a_chat` (a `chat_turn` on a task that isn't one of the agent's chats) or `no_comment` (nothing to wake on).",
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      projectId: z.string().optional(),
+      issueId: z.string().optional(),
+      kind: z.enum(["assignment", "comment", "chat_turn", "no_task"]).optional(),
+    }),
+  },
+  responses: {
+    200: r.ok(claudeRunPreviewSchema), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound,
+    422: r.unprocessable,
+  },
 });
 
 registry.registerPath({
