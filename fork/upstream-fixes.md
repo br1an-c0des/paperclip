@@ -129,6 +129,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 88 | [Give `claude_local` runs the instruction working-copy guidance](#88-give-claude_local-runs-the-instruction-working-copy-guidance) | candidate | | | 2026-11-23 | | |
 | 89 | [Stop prompt texts naming Runner tools and curl recipes runs don't use](#89-stop-prompt-texts-naming-runner-tools-and-curl-recipes-runs-dont-use) | candidate | | | 2026-11-23 | | |
 | 90 | [Keep the agent's instructions after Claude compacts a session](#90-keep-the-agents-instructions-after-claude-compacts-a-session) | candidate | | | 2026-11-23 | | |
+| 91 | [Show a run's whole prompt size in the Transcript tab's prompt card](#91-show-a-runs-whole-prompt-size-in-the-transcript-tabs-prompt-card) | candidate | | | 2026-11-24 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1606,4 +1607,16 @@ Haiku, the sealed run's `--strict-mcp-config --setting-sources user`, a throwawa
 - **Likely fix:** pass `--append-system-prompt-file` on resumed runs too. Before a compaction it's
   ignored, after one it restores the instructions. The run manifest's "instructions sent" row and
   the session's bundle-key check would need to agree with that. Step 5's builder may take it.
+
+### 91. Show a run's whole prompt size in the Transcript tab's prompt card
+
+Found 2026-11-24 by step 5's record agent (Task 6, `step5/record`).
+
+- **Problem:** the run modal's Transcript tab has a "Prompt from Paperclip" card that reports the
+  prompt's length from the `adapter.invoke` event's `prompt`, which run event storage cuts at
+  16,384 characters. For a longer prompt (every hidden-task chat turn) it shows the cut length.
+  Since step 5 the Input tab reads the whole prompt from the `adapter.prompt` record.
+- **Likely fix:** have the card read `firstMessageChars` from the `adapter.prompt` record when
+  there is one (`ui-new/src/runs/invocation.ts` `readPromptRecord`), falling back to today's
+  length for older runs.
 
