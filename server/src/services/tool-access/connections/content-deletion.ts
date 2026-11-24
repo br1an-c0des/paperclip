@@ -20,6 +20,7 @@ import type {
 import { isRunLogStoreType, type RunLogHandle, type RunLogStore } from "../../run-log-store.js";
 import { DELIVERY_QUEUES, notifyDeliveryWork } from "../../delivery-work-notifications.js";
 import { logActivity } from "../../activity-log.js";
+import { RUN_PROMPT_EVENT_TYPE } from "../../heartbeat/run-log.js";
 
 const BATCH_SIZE = 200;
 const EVENT_BATCH_SIZE = 1000;
@@ -35,6 +36,8 @@ const STRUCTURAL_EVENT_TYPES = [
   "run.terminal",
   "run.presentation.resolved",
   "adapter.invoke",
+  // The run's prompt record is what Paperclip sent, like adapter.invoke's prompt, so it's kept too.
+  RUN_PROMPT_EVENT_TYPE,
   "usage.reported",
   "context.compacted",
   "session.started",

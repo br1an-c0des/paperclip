@@ -262,6 +262,34 @@ describeEmbeddedPostgres("deleting content stored from a connection's tool calls
     expect((await service.storedContent(seed.connection)).stored).toEqual({ toolCalls: 0, approvals: 0, appViews: 0, runs: 0, runsInProgress: 0 });
   });
 
+  it("keeps a run's adapter.invoke and adapter.prompt payloads, which hold what Paperclip sent", async () => {
+    const runLogs = memoryRunLogs();
+    const service = createConnectionContentDeletion(db, { runLogStore: () => runLogs.store });
+    const seed = await seedCompany(runLogs);
+    const prompt = "## Wake\n\nPlease look at the failing test.";
+    const invokePayload = { adapterType: "claude_local", command: "claude", prompt };
+    const promptRecord = {
+      version: 1, session: "fresh", systemPrompt: [], matchedPlan: true, firstMessageChars: prompt.length,
+      firstMessage: [{ id: "wake", label: "Wake", placement: "first_message", delivery: "every_run", reason: "woken by a comment",
+        source: "wake payload", text: prompt, chars: prompt.length,
+        parts: [{ id: "wake.comments", label: "Comments", source: "task comments", text: prompt, chars: prompt.length }] }],
+    };
+    await db.insert(heartbeatRunEvents).values([
+      { companyId: seed.company.id, runId: seed.settledRun.id, agentId: seed.agent.id, seq: 3, eventType: "adapter.invoke", message: "adapter invocation", payload: invokePayload },
+      { companyId: seed.company.id, runId: seed.settledRun.id, agentId: seed.agent.id, seq: 4, eventType: "adapter.prompt", message: "prompt sections", payload: promptRecord },
+    ]);
+
+    await service.request(seed.connection, { actorType: "user", actorId: "board-user" });
+    await drain(service);
+
+    const events = await db.select().from(heartbeatRunEvents).where(eq(heartbeatRunEvents.runId, seed.settledRun.id));
+    expect(events.find((event) => event.eventType === "adapter.invoke")!.payload).toEqual(invokePayload);
+    expect(events.find((event) => event.eventType === "adapter.prompt")!.payload).toEqual(promptRecord);
+    expect(events.find((event) => event.eventType === "adapter.prompt")!.message).toBe("prompt sections");
+    // The connection's own content in the same run is still removed.
+    expect(JSON.stringify(events)).not.toContain(SECRET);
+  });
+
   it("resumes an interrupted deletion to completion on the next pass", async () => {
     const runLogs = memoryRunLogs();
     const service = createConnectionContentDeletion(db, { runLogStore: () => runLogs.store });
