@@ -1,6 +1,6 @@
 # Step 5, phase 2: the wake
 
-**Draft for approval, 2026-11-24.** The first section reworked in phase 2 of step 5
+**Approved by the user, 2026-11-24.** The first section reworked in phase 2 of step 5
 ([step-5-prompt-builder.md](step-5-prompt-builder.md), "Later: changing the prompt"). The user
 chose direction B (below) on 2026-11-24, after reviewing the
 [Run Prompt Map](https://claude.ai/artifact/9hd4emcjFNG1uksCskvMsr) and the
