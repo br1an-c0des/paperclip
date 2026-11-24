@@ -1,4 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Every render below also checks the wake's display parts against the rendered text.
+vi.mock("./server-utils.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./server-utils.js")>();
+  const { checkedWakePromptRenderer } = await import("./test-fixtures/wake-prompt-parts.js");
+  return { ...actual, renderPaperclipWakePrompt: checkedWakePromptRenderer(actual) };
+});
 import { paperclipChatFilePreparationDelivery } from "./chat-file-delivery.js";
 import { renderPaperclipWakePrompt } from "./server-utils.js";
 
