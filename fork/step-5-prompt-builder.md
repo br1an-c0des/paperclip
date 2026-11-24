@@ -283,7 +283,17 @@ here as the options discussed, so the decision starts from them.
   - the prompt bugs 84, 85, 88 and 89;
   - `promptTemplate` and `bootstrapPromptTemplate` no longer applying to `claude_local` CLI runs,
     with any non-default value moved into the agent's `AGENTS.md`;
-  - `promptMetrics` fixed or retired in favour of the sections' own sizes.
+  - `promptMetrics` fixed or retired in favour of the sections' own sizes;
+  - **the core `paperclip` skill re-evaluated and perhaps reorganized** (the user, 2026-11-24).
+    It's listed in every run but never injected: Claude Code shows only its name and description,
+    and the body (the "Every run" steps, `in_review` vs `done`, how to block, delegating, asking
+    the user, governance) loads only if the agent calls its Skill tool. Nothing in Paperclip's
+    prompt tells it to; the nearest is the MCP note ("Start with `paperclip_task_context`; end the
+    run with…"). In both real-run-check runs (`7eb33da7`, `65fe29b9`, a trivial task) the agent
+    didn't open the skill, and didn't call `paperclip_task_context` either. Options: leave it to
+    the agent; one line telling it to read the skill first; or move the short "Every run" core into
+    the system prompt and keep the detail in the skill. A read-only look at server1's run logs
+    would show how often real agents open it on harder tasks.
 - **Already decided, if it goes ahead:**
   - **Long-lived orientation goes in the system prompt,** so it survives a compaction (with bug
     90 fixed). The deploy that does this starts every ongoing chat session fresh once, and any
