@@ -18,9 +18,9 @@ import {
 
 /**
  * The run preview of a `claude_local` agent (fork/step-4b-parts-2-3.md, part 2): the manifest of
- * its next sealed CLI launch, from the planning half of the launch only (`run-plan.ts`). It
- * starts nothing and writes nothing: no config folder, prompt bundle, plugin folder, MCP config
- * or temporary `HOME`.
+ * its next sealed CLI launch, and its system prompt's sections (step 5), from the planning half of
+ * the launch only (`run-plan.ts`). It starts nothing and writes nothing: no config folder, prompt
+ * bundle, plugin folder, MCP config or temporary `HOME`.
  */
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -75,5 +75,12 @@ export async function previewClaudeRun(ctx: AdapterRunPreviewContext): Promise<A
   });
   const { session: _session, setAside: _setAside, ...rest } = manifest;
   const previewManifest: ClaudeRunPreviewManifest = { ...rest, credential };
-  return { supported: true, manifest: previewManifest, blockers };
+  return {
+    supported: true,
+    manifest: previewManifest,
+    blockers,
+    // A fresh session's system prompt, and the directive its first message starts with.
+    systemPrompt: skills.systemPromptSections,
+    instructionsPathDirective: skills.instructionsPathDirective,
+  };
 }

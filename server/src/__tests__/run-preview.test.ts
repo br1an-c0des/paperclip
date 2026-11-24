@@ -6,14 +6,20 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { sql } from "drizzle-orm";
-import { agents, authUsers, companies, companyMemberships, createDb, issues, projectWorkspaces, projects } from "@paperclipai/db";
+import { agents, authUsers, companies, companyMemberships, createDb, issueComments, issues, projectWorkspaces, projects } from "@paperclipai/db";
 import type { AdapterExecutionContext, ServerAdapterModule } from "@paperclipai/adapter-utils";
 import {
   execute as claudeExecute,
   previewClaudeRun,
   sessionCodec as claudeSessionCodec,
 } from "@paperclipai/adapter-claude-local/server";
-import { CLAUDE_RUN_PREVIEW_TASK_BRANCH, type ClaudeRunManifest, type ClaudeRunPreview } from "@paperclipai/shared";
+import {
+  CLAUDE_RUN_PREVIEW_TASK_BRANCH,
+  joinRunPromptSections,
+  type ClaudeRunManifest,
+  type ClaudeRunPreview,
+  type RunPromptPreviewKind,
+} from "@paperclipai/shared";
 import { heartbeatService } from "../services/heartbeat.js";
 import { runPreviewService } from "../services/run-preview.js";
 import { companySkillService } from "../services/company-skills.js";
@@ -25,8 +31,13 @@ import { drainHeartbeatRunsToQuiescence } from "./helpers/drain-heartbeat-runs.j
 // claude_local adapter, with a fake `claude`), and reading it starts, writes and mints nothing.
 // Step 4b part 3 made a task worktree the default for a project whose checkout is a git
 // repository; the preview reads that worktree's CLAUDE.md and skills from its base commit.
+// Step 5 Task 8 added the prompt draft: for a task and kind of wake, the first message a run sends.
 
-const captured = vi.hoisted(() => ({ manifest: null as Record<string, unknown> | null }));
+const captured = vi.hoisted(() => ({
+  manifest: null as Record<string, unknown> | null,
+  prompt: null as string | null,
+  systemPrompt: null as unknown[] | null,
+}));
 const minted = vi.hoisted(() => ({ runTokens: 0, runtimeToolTokens: 0 }));
 
 vi.mock("../agent-auth-jwt.js", async (importOriginal) => {
@@ -67,6 +78,8 @@ const claudeAdapter: Partial<ServerAdapterModule> = {
     ...ctx,
     onMeta: async (meta) => {
       if (meta.runManifest) captured.manifest = meta.runManifest;
+      if (typeof meta.prompt === "string") captured.prompt = meta.prompt;
+      if (meta.promptRecord) captured.systemPrompt = meta.promptRecord.systemPrompt;
       await ctx.onMeta?.(meta);
     },
   }),
@@ -167,6 +180,8 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
   afterEach(async () => {
     await drainHeartbeatRunsToQuiescence(db, heartbeat);
     captured.manifest = null;
+    captured.prompt = null;
+    captured.systemPrompt = null;
   });
 
   afterAll(async () => {
@@ -268,10 +283,32 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     return captured.manifest as unknown as ClaudeRunManifest;
   }
 
-  async function preview(seeded: Awaited<ReturnType<typeof seed>>): Promise<ClaudeRunPreview> {
+  async function preview(
+    seeded: Awaited<ReturnType<typeof seed>>,
+    prompt: { issueId?: string; kind?: RunPromptPreviewKind } = {},
+  ): Promise<ClaudeRunPreview> {
     return runPreviewService(db).previewAgentRun(await readAgent(seeded.agentId), {
-      projectId: seeded.projectId, responsibleUserId: seeded.userId,
+      projectId: seeded.projectId, responsibleUserId: seeded.userId, issueId: prompt.issueId ?? null, kind: prompt.kind ?? null,
     });
+  }
+
+  /** A task of the agent's in the seeded project, with a comment, and one of the agent's chats with a message. */
+  async function promptTargets(seeded: Awaited<ReturnType<typeof seed>>) {
+    const taskId = randomUUID(), chatId = randomUUID();
+    await db.insert(issues).values({
+      id: taskId, companyId: seeded.companyId, projectId: seeded.projectId, projectWorkspaceId: seeded.projectWorkspaceId,
+      title: "M7 test commented task", description: "Count the ledger.", status: "todo", assigneeAgentId: seeded.agentId,
+      responsibleUserId: seeded.userId,
+    });
+    await db.insert(issues).values({
+      id: chatId, companyId: seeded.companyId, title: "M7 test chat", status: "in_progress", assigneeAgentId: seeded.agentId,
+      conversationAgentId: seeded.agentId, conversationUserId: seeded.userId, conversationState: "active",
+    });
+    await db.insert(issueComments).values([
+      { companyId: seeded.companyId, issueId: taskId, body: "M7 test: add March", authorUserId: seeded.userId },
+      { companyId: seeded.companyId, issueId: chatId, body: "M7 test: what's left?", authorUserId: seeded.userId },
+    ]);
+    return { taskId, chatId };
   }
 
   /**
@@ -375,17 +412,26 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     // The repo too, `.git` included: no worktree, no `.paperclip` folder, no exclude line.
     const repoBefore = await listTree(seeded.repo!);
     const excludeBefore = await readFile(path.join(seeded.repo!, ".git", "info", "exclude"), "utf8").catch(() => null);
+    // A prompt draft for every kind of wake: a task with a comment, and a chat with a message.
+    const { taskId, chatId } = await promptTargets(seeded);
     const tokensBefore = { ...minted };
     const [{ xmax: xmaxBefore }] = (await db.execute(sql`select pg_snapshot_xmax(pg_current_snapshot())::text as xmax`)) as unknown as Array<{ xmax: string }>;
 
     // Nothing in the temp folder either: no temporary HOME, no credential home.
-    const { result: previewed, left: tempLeft } = await inPrivateTmpdir(root, () => preview(seeded));
+    const { result: previews, left: tempLeft } = await inPrivateTmpdir(root, () => Promise.all([
+      preview(seeded),
+      preview(seeded, { issueId: taskId, kind: "assignment" }),
+      preview(seeded, { issueId: taskId, kind: "comment" }),
+      preview(seeded, { issueId: chatId, kind: "chat_turn" }),
+    ]));
+    const [previewed] = previews;
     expect(previewed.supported).toBe(true);
     if (previewed.supported) {
       expect(previewed.project?.checkout).toMatchObject({ kind: "local", worktree: { baseRef: "main" } });
       expect(previewed.manifest.claudeMd.enabled).toBe(true);
       expect(previewed.manifest.skills.length).toBeGreaterThan(1);
     }
+    expect(previews.map((each) => each.supported && each.prompt?.kind)).toEqual(["no_task", "assignment", "comment", "chat_turn"]);
 
     const [{ xmax: xmaxAfter }] = (await db.execute(sql`select pg_snapshot_xmax(pg_current_snapshot())::text as xmax`)) as unknown as Array<{ xmax: string }>;
     // No transaction id was handed out: nothing was inserted, updated or deleted.
@@ -402,6 +448,48 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview: what an agent'
     const [{ xmax: xmaxWritten }] = (await db.execute(sql`select pg_snapshot_xmax(pg_current_snapshot())::text as xmax`)) as unknown as Array<{ xmax: string }>;
     expect(xmaxWritten).not.toBe(xmaxAfter);
   }, 60_000);
+
+  it("drafts a fresh assignment as the prompt a real run on it sends: system prompt and first message", async () => {
+    const seeded = await seed();
+    // The company's library, brought up to date as the Skills page would: it holds skills this
+    // agent doesn't have, which a run's skill list leaves out.
+    const library = await companySkillService(db).listRuntimeSkillEntries(seeded.companyId);
+    const issueId = randomUUID();
+    await db.insert(issues).values({
+      id: issueId, companyId: seeded.companyId, title: "M7 test drafted task", description: "Total the March ledger.",
+      status: "todo", assigneeAgentId: seeded.agentId, responsibleUserId: seeded.userId,
+    });
+    // The draft first: the run changes the task (its status, its history).
+    const previewed = await preview(seeded, { issueId });
+    expect(previewed.supported).toBe(true);
+    if (!previewed.supported) return;
+    expect(previewed.prompt).toMatchObject({ kind: "assignment", issueId });
+
+    // Assigning the task wakes the agent this way (issue-assignment-wakeup.ts).
+    const run = await heartbeat.wakeup(seeded.agentId, {
+      source: "assignment", triggerDetail: "system", reason: "issue_assigned",
+      payload: { issueId, mutation: "update" }, contextSnapshot: { issueId, source: "issue.update" },
+    });
+    expect(run).not.toBeNull();
+    await vi.waitFor(async () => {
+      expect((await heartbeat.getRun(run!.id))?.status).toMatch(/^(succeeded|failed|cancelled|timed_out)$/);
+    }, { timeout: 30_000 });
+    expect((await heartbeat.getRun(run!.id))?.status).toBe("succeeded");
+    expect(captured.prompt).not.toBeNull();
+    expect(joinRunPromptSections(previewed.prompt!.firstMessage)).toBe(captured.prompt);
+
+    // The system prompt too: the skill list names what the run's skills are, not the whole library.
+    expect(captured.systemPrompt).not.toBeNull();
+    expect(previewed.prompt!.systemPrompt).toEqual(captured.systemPrompt);
+    const listed = previewed.prompt!.systemPrompt.find((section) => section.id === "skill_library");
+    expect(listed).toBeDefined();
+    const notTheAgents = library.filter((entry) => !previewed.manifest.skills.some((skill) => skill.key === entry.key));
+    expect(notTheAgents.length).toBeGreaterThan(0);
+    for (const entry of notTheAgents) expect(listed!.text).not.toContain(`- ${entry.key} —`);
+    // The manifest's skills agree with the run's.
+    const ran = captured.manifest as unknown as ClaudeRunManifest;
+    expect(previewed.manifest.skills).toEqual(ran.skills);
+  }, 90_000);
 
   it("says so for another adapter, the ACP engine and the Runner", async () => {
     const other = await seed({ adapterType: "codex_local" });

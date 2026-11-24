@@ -28,6 +28,7 @@ import {
   revokeHeartbeatRunGatewayTokens,
 } from "./run-preparation.js";
 import { orderRunMcpServers, paperclipRunMcpServers } from "./paperclip-run-mcp.js";
+import { attachClaudeRunPromptPlan } from "../run-prompt/attach-claude-run-prompt.js";
 import {
   WorkspaceValidationFailure,
   isWorkspaceValidationFailure,
@@ -880,6 +881,22 @@ export async function executeHeartbeatRuntime(db: Db, input: HeartbeatRuntimeExe
       if (managedMcpConfig) {
         adapterContext.paperclipManagedMcp = managedMcpConfig;
       }
+      // claude_local CLI runs on a local target record their prompt as labelled sections (step 5).
+      await attachClaudeRunPromptPlan({
+        agent,
+        runId: run.id,
+        config: runtimeConfig,
+        context,
+        adapterContext,
+        executionTarget,
+        legacyRemoteExecution: remoteExecution,
+        authToken,
+        getFreshSessionHandoff,
+        onWarning: async (message) => {
+          logger.warn({ companyId: agent.companyId, agentId: agent.id, runId: run.id }, `run prompt sections: ${message}`);
+          await onLog("stderr", `[paperclip] Warning: ${message}.\n`);
+        },
+      });
       const guardedDispatch =
         await dispatchWithTiming(
           (markDispatchStarted) => {

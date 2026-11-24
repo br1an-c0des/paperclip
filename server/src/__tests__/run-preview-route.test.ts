@@ -5,14 +5,15 @@ import path from "node:path";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { agentApiKeys, agents, authUsers, companies, companyMemberships, createDb, projects } from "@paperclipai/db";
+import { agentApiKeys, agents, authUsers, companies, companyMemberships, createDb, issues, projects } from "@paperclipai/db";
 import { actorMiddleware } from "../middleware/auth.js";
 import { errorHandler } from "../middleware/error-handler.js";
 import { agentRoutes } from "../routes/agents.js";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 
 // Step 4b part 2: GET /api/agents/:id/run-preview is for the board, behind the agent read's
-// company check, and the project must be the agent's company's.
+// company check, and the project must be the agent's company's. Step 5 Task 8: so must the task
+// the prompt draft is for, and a kind of wake the task can't have answers 422.
 
 const support = await getEmbeddedPostgresTestSupport();
 
@@ -41,6 +42,11 @@ const support = await getEmbeddedPostgresTestSupport();
         { id: callerId, companyId, name: "M7 test caller" },
       ]);
       await db.insert(projects).values({ id: otherProjectId, companyId: otherCompanyId, name: "Elsewhere", status: "in_progress" });
+      const taskId = randomUUID(), otherTaskId = randomUUID();
+      await db.insert(issues).values([
+        { id: taskId, companyId, title: "M7 test route task", status: "todo", assigneeAgentId: agentId },
+        { id: otherTaskId, companyId: otherCompanyId, title: "M7 test elsewhere", status: "todo" },
+      ]);
       await db.insert(agentApiKeys).values({ companyId, agentId: callerId, name: "Caller", responsibleUserId: userId,
         keyHash: createHash("sha256").update(token).digest("hex") });
 
@@ -54,6 +60,20 @@ const support = await getEmbeddedPostgresTestSupport();
       expect(read.status).toBe(200);
       expect(read.body).toMatchObject({ supported: true, project: null });
       expect(read.body.blockers.map((blocker: { code: string }) => blocker.code)).toContain("claude_credential_missing");
+      expect(read.body.prompt).toMatchObject({ kind: "no_task", issueId: null });
+
+      const previewUrl = (query: string) => `/api/agents/${agentId}/run-preview?${query}`;
+      const drafted = await request(board).get(previewUrl(`issueId=${taskId}`));
+      expect(drafted.status).toBe(200);
+      expect(drafted.body.prompt).toMatchObject({ kind: "assignment", issueId: taskId });
+      const noComment = await request(board).get(previewUrl(new URLSearchParams({ issueId: taskId, kind: "comment" }).toString()));
+      expect({ status: noComment.status, code: noComment.body.code }).toEqual({ status: 422, code: "no_comment" });
+      const notAChat = await request(board).get(previewUrl(new URLSearchParams({ issueId: taskId, kind: "chat_turn" }).toString()));
+      expect({ status: notAChat.status, code: notAChat.body.code }).toEqual({ status: 422, code: "not_a_chat" });
+      expect((await request(board).get(previewUrl(`issueId=${otherTaskId}`))).status).toBe(404);
+      expect((await request(board).get(previewUrl("issueId=not-a-task"))).status).toBe(404);
+      expect((await request(board).get(previewUrl("kind=sometime"))).status).toBe(400);
+      expect((await request(board).get(previewUrl("kind=comment"))).status).toBe(400);
 
       expect((await request(board).get(`/api/agents/${agentId}/run-preview?projectId=${otherProjectId}`)).status).toBe(404);
       expect((await request(board).get(`/api/agents/${randomUUID()}/run-preview`)).status).toBe(404);

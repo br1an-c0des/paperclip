@@ -12,6 +12,8 @@ import type {
   ClaudeRunPreviewUnsupportedReason,
   ExecutionContinuationEnvelope,
   NativeFinalizationResult,
+  RunPromptRecord,
+  RunPromptSection,
 } from "@paperclipai/shared";
 
 export interface AdapterAgent {
@@ -198,6 +200,8 @@ export interface AdapterInvocationMeta {
   context?: Record<string, unknown>;
   /** A sealed `claude_local` CLI run's manifest (`ClaudeRunManifest` in `@paperclipai/shared`). */
   runManifest?: Record<string, unknown>;
+  /** A `claude_local` CLI run's prompt as sent, in sections; stored as an `adapter.prompt` run event. */
+  promptRecord?: RunPromptRecord;
 }
 
 export interface AdapterRuntimeMcpServer {
@@ -546,7 +550,15 @@ export interface AdapterRunPreviewRepoView {
 
 /** What the adapter's next run would get, planned without starting, writing or minting anything. */
 export type AdapterRunPreview =
-  | { supported: true; manifest: ClaudeRunPreviewManifest; blockers: ClaudeRunPreviewBlocker[] }
+  | {
+      supported: true;
+      manifest: ClaudeRunPreviewManifest;
+      blockers: ClaudeRunPreviewBlocker[];
+      /** The system prompt's parts as the run would send them. */
+      systemPrompt: RunPromptSection[];
+      /** The instructions-path directive the first message would carry ("" when none). */
+      instructionsPathDirective: string;
+    }
   | { supported: false; reason: ClaudeRunPreviewUnsupportedReason };
 
 export interface ServerAdapterModule {

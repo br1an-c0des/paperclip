@@ -2,6 +2,11 @@ import type { ClaudeRunPreviewProject } from "@paperclipai/shared";
 import { describe, expect, it } from "vitest";
 import {
   blockerLines,
+  effectivePromptKind,
+  promptKinds,
+  promptNote,
+  promptTaskGroups,
+  promptTaskName,
   checkoutValue,
   chosenProject,
   claudeMdValue,
@@ -172,5 +177,45 @@ describe("the project choice", () => {
     expect(readStoredProject("a1", broken)).toBeNull();
     expect(() => storeProject("a1", "p1", broken)).not.toThrow();
     expect(readStoredProject("a1", null)).toBeNull();
+  });
+});
+
+describe("the prompt draft's pickers", () => {
+  const task = { id: "t1", identifier: "TES-1", title: "Ledger", chat: false };
+  const chat = { id: "c1", identifier: "TES-6", title: "Chat with Ada", chat: true };
+
+  it("offers the kinds a pick can have, keeping a picked kind only while it fits", () => {
+    expect(promptKinds(null)).toEqual(["no_task"]);
+    expect(promptKinds(task)).toEqual(["assignment", "comment"]);
+    expect(promptKinds(chat)).toEqual(["chat_turn"]);
+    expect(effectivePromptKind(task, "comment")).toBe("comment");
+    expect(effectivePromptKind(chat, "comment")).toBe("chat_turn");
+    expect(effectivePromptKind(null, "comment")).toBe("no_task");
+    expect(promptTaskName(task)).toBe("TES-1 Ledger");
+    expect(promptTaskName(null)).toBe("No task");
+  });
+
+  it("turns a 422 into a note, and nothing else", () => {
+    const answer = (status: number, code: string) => ({ status, body: { error: "x", code } });
+    expect(promptNote(answer(422, "not_a_chat"), chat)).toMatch(/chats/);
+    expect(promptNote(answer(422, "no_comment"), task)).toBe("No comments on this task yet, so nothing to wake on.");
+    expect(promptNote(answer(422, "no_comment"), chat)).toBe("No messages in this chat yet, so nothing to wake on.");
+    expect(promptNote(answer(500, "no_comment"), task)).toBeNull();
+    expect(promptNote(new Error("offline"), task)).toBeNull();
+  });
+
+  it("lists the agent's tasks, then its chats, then other tasks found, each once", () => {
+    const rows = (...ids: string[]) => ids.map((id) => ({ id, identifier: id.toUpperCase(), title: `Task ${id}` }));
+    const groups = promptTaskGroups({ query: "", assigned: rows("a", "b"), chats: rows("c"), found: rows("a", "z") });
+    expect(groups.map((group) => [group.label, group.tasks.map((entry) => entry.id)])).toEqual([
+      ["Assigned to this agent", ["a", "b"]],
+      ["Chats with this agent", ["c"]],
+    ]);
+    expect(groups[1]!.tasks[0]!.chat).toBe(true);
+    const searching = promptTaskGroups({ query: "task a", assigned: rows("a", "b"), chats: rows("c"), found: rows("a", "z") });
+    expect(searching.map((group) => [group.label, group.tasks.map((entry) => entry.id)])).toEqual([
+      ["Assigned to this agent", ["a"]],
+      ["Other tasks", ["z"]],
+    ]);
   });
 });

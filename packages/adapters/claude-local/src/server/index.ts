@@ -1,5 +1,9 @@
 export { claudeSessionCwdMatchesExecutionTarget, execute, runClaudeLogin } from "./execute.js";
 export { previewClaudeRun, CLAUDE_RUN_PREVIEW_RUN_ID } from "./preview.js";
+export { composeClaudeCliPrompt, resolveClaudePromptTemplate } from "./legacy-prompt.js";
+export type { ClaudeCliPromptInput, ClaudeCliPromptSectionTexts } from "./legacy-prompt.js";
+export { planClaudeInstructionsDirective, planClaudeRunSkillsAndInstructions } from "./run-plan.js";
+export { buildClaudePromptRecord, PAPERCLIP_RUN_PROMPT_PLAN_KEY, readRunPromptPlan } from "./prompt-record.js";
 export * from "./acp.js";
 export { getConfigSchema } from "./config-schema.js";
 export { listClaudeSkills, syncClaudeSkills } from "./skills.js";

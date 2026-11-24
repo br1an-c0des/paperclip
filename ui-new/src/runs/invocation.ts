@@ -1,4 +1,5 @@
-import type { ClaudeRunManifest, HeartbeatRunEvent } from "@paperclipai/shared";
+import type { ClaudeRunManifest, HeartbeatRunEvent, RunPromptRecord } from "@paperclipai/shared";
+import { isRunPromptRecord } from "@paperclipai/shared/run-prompt";
 import { redactCommandText } from "@paperclipai/adapter-utils/command-redaction";
 import { redactHomePathUserSegments, redactHomePathUserSegmentsInValue } from "@paperclipai/adapter-utils/log-redaction";
 
@@ -37,8 +38,59 @@ const record = (value: unknown): Record<string, unknown> | null =>
 
 const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
 
+/*
+ * Each attempt of a run writes its own `adapter.invoke`, and a claude_local CLI attempt its own
+ * `adapter.prompt` right after it. A resume that fails and retries fresh writes two pairs, and the
+ * last is the attempt that ran (plan Review Focus 1), so Input reads the last of each, in `seq`
+ * order. An event without a `seq` counts by its place in the list.
+ */
+function lastEvent(events: readonly HeartbeatRunEvent[] | undefined, eventType: string) {
+  let found: { event: HeartbeatRunEvent; order: number } | null = null;
+  for (const [index, event] of (events ?? []).entries()) {
+    if (event.eventType !== eventType) continue;
+    const order = typeof event.seq === "number" ? event.seq : index;
+    if (!found || order >= found.order) found = { event, order };
+  }
+  return found;
+}
+
+/** The latest attempt's `adapter.invoke` event. */
 export function findInvokeEvent(events: readonly HeartbeatRunEvent[] | undefined) {
-  return events?.find((event) => event.eventType === "adapter.invoke") ?? null;
+  return lastEvent(events, "adapter.invoke")?.event ?? null;
+}
+
+/**
+ * The latest attempt's prompt in sections (step 5): the last `adapter.prompt` event, and only when it
+ * came after the latest `adapter.invoke`. Until the latest attempt's record lands, an earlier
+ * attempt's isn't shown beside its invocation.
+ */
+export function findPromptEvent(events: readonly HeartbeatRunEvent[] | undefined) {
+  const prompt = lastEvent(events, "adapter.prompt");
+  const invoke = lastEvent(events, "adapter.invoke");
+  if (!prompt || (invoke && prompt.order < invoke.order)) return null;
+  return prompt.event;
+}
+
+/** The prompt record on an `adapter.prompt` event, with home-directory usernames masked when asked. */
+export function readPromptRecord(payload: Record<string, unknown> | null | undefined, options: { censorUsername?: boolean } = {}): RunPromptRecord | null {
+  if (!isRunPromptRecord(payload)) return null;
+  return redactHomePathUserSegmentsInValue(payload, { enabled: options.censorUsername ?? false }) as RunPromptRecord;
+}
+
+/* `adapter.prompt` lands just after `adapter.invoke`; a read between the two misses it. */
+const PROMPT_EVENT_GRACE_MS = 15_000;
+
+/**
+ * Whether a live run's events may still gain what Input shows: no `adapter.invoke` yet, or one so
+ * recent that its `adapter.prompt` may not have landed. Runs that record no sections stop after the grace.
+ */
+export function awaitingInvocationEvents(events: readonly HeartbeatRunEvent[] | undefined, now = Date.now()) {
+  const invoke = findInvokeEvent(events);
+  if (!invoke) return true;
+  if (findPromptEvent(events)) return false;
+  // JSON gives an ISO string where the type says Date; `new Date` takes either.
+  const at = new Date(invoke.createdAt).getTime();
+  return Number.isFinite(at) && now - at < PROMPT_EVENT_GRACE_MS;
 }
 
 function envLine(key: string, value: unknown, censor: boolean): EnvLine {
@@ -103,6 +155,10 @@ export function readInvocation(payload: Record<string, unknown> | null | undefin
 /** "4.2k characters": the prompt's size, without pretending to count tokens. */
 export function promptSize(prompt: string | null) {
   if (!prompt) return null;
-  const n = prompt.length;
+  return charsSize(prompt.length);
+}
+
+/** "4.2k characters" for a count of characters, as `promptSize` gives for a text. */
+export function charsSize(n: number) {
   return n >= 1000 ? `${Number((n / 1000).toFixed(1))}k characters` : `${n} characters`;
 }

@@ -1,4 +1,5 @@
 import type { AgentAccessLevel, AgentAccessOverrides } from "./agent-access.js";
+import type { RunPromptPreview } from "./run-prompt.js";
 
 /**
  * The run manifest: what a sealed `claude_local` CLI run got from Paperclip (credential, config
@@ -191,5 +192,7 @@ export type ClaudeRunPreview =
       manifest: ClaudeRunPreviewManifest;
       /** Empty when the run would start. */
       blockers: ClaudeRunPreviewBlocker[];
+      /** A draft of the next run's prompt, or null when none could be drafted. */
+      prompt: RunPromptPreview | null;
     }
   | { supported: false; reason: ClaudeRunPreviewUnsupportedReason };

@@ -16,6 +16,9 @@ import { previewClaudeRun } from "./preview.js";
 const FAKE_CLAUDE = `#!/usr/bin/env node
 if (process.argv.includes("--version")) { console.log("2.1.325 (Claude Code)"); process.exit(0); }
 require("node:fs").readFileSync(0, "utf8");
+// The system prompt the launch appends, kept beside this script for the test to read.
+const appendAt = process.argv.indexOf("--append-system-prompt-file");
+if (appendAt > 0) require("node:fs").writeFileSync(__dirname + "/system-prompt.txt", require("node:fs").readFileSync(process.argv[appendAt + 1], "utf8"));
 const sessionId = "11111111-1111-4111-8111-111111111111";
 console.log(JSON.stringify({ type: "system", subtype: "init", session_id: sessionId, model: "claude-sonnet" }));
 console.log(JSON.stringify({ type: "result", subtype: "success", session_id: sessionId, result: "done", usage: { input_tokens: 1, cache_read_input_tokens: 0, output_tokens: 1 } }));
@@ -180,6 +183,18 @@ describe("previewClaudeRun", () => {
     expect(withFile.supported && withFile.manifest.claudeMd).toEqual({ enabled: true, path: path.join(worktree, "CLAUDE.md") });
     expect(withFile.supported && withFile.manifest.repoSkills).toEqual({ enabled: false, reason: "no_skills" });
     expect(await fs.readdir(repo)).toEqual(expect.not.arrayContaining([".paperclip"]));
+  });
+
+  it("gives the system prompt a fresh launch appends, in sections, and the instructions directive", async () => {
+    const input = inputs({ context: workspace(null) });
+    const preview = await previewClaudeRun(previewContext(input));
+    await runManifest(input);
+    expect(preview.supported).toBe(true);
+    if (!preview.supported) return;
+    expect(preview.systemPrompt.map((section) => section.id)).toEqual(["agent_instructions", "skill_library"]);
+    expect(preview.systemPrompt.map((section) => section.text).join("\n\n"))
+      .toBe(await fs.readFile(path.join(path.dirname(commandPath), "system-prompt.txt"), "utf8"));
+    expect(preview.instructionsPathDirective).toContain(instructionsPath);
   });
 
   it("makes no config folder, plugin folder, MCP config, prompt bundle or temporary HOME", async () => {

@@ -77,9 +77,168 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rp-body {
+  .rp-body,
+  .rp-prompt-body {
     transition: none;
   }
+}
+
+/* The Prompt part: task and kind pickers, then the draft in the run view's sections. */
+.rp-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.rp-prompt-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.rp-prompt-head > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rp-prompt-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.rp-prompt-pick {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-width: 0;
+}
+
+.rp-prompt-note {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.rp-task {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-align: left;
+}
+
+.rp-task-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-task > svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.rp-prompt-body {
+  transition: opacity 120ms ease;
+}
+
+.rp-prompt-body.rp-body--stale {
+  opacity: 0.6;
+}
+
+/* A value the launch fills in, in a section's or a part's header. */
+.rp-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The task picker's popover: search, then the lists. */
+.rp-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(460px, 65vh);
+  min-height: 0;
+  padding: 6px;
+}
+
+.rp-picker .input {
+  margin-bottom: 4px;
+  background: var(--well);
+}
+
+.rp-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.rp-picker-group {
+  margin: 8px 10px 2px;
+  color: var(--muted);
+}
+
+.rp-picker-empty {
+  margin: 0;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rp-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.rp-option:hover {
+  background: var(--hover);
+}
+
+.rp-option[aria-selected="true"] {
+  background: var(--sel);
+  box-shadow: var(--sel-shadow);
+}
+
+.rp-option-id {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rp-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* In a narrow card (phones), labels move above their values and the project picker takes the row */
@@ -97,8 +256,19 @@
     margin: 12px 16px 0;
   }
 
-  .rp-body {
+  .rp-body,
+  .rp-prompt {
     padding: 12px 16px 16px;
+  }
+
+  .rp-prompt-pick,
+  .rp-prompt-pick > .rp-for {
+    flex: 1 1 100%;
+  }
+
+  .rp-prompt-pick .rp-select {
+    flex: 1 1 auto;
+    max-width: none;
   }
 
   .rp .ri-kvl > li {
