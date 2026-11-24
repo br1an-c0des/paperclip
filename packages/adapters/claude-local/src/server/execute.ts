@@ -36,20 +36,11 @@ import {
   asBoolean,
   parseObject,
   parseJson,
-  joinPromptSections,
   buildInvocationEnvForLogs,
   ensureAbsoluteDirectory,
   ensurePathInEnv,
   refreshPaperclipWorkspaceEnvForExecution,
-  renderTemplate,
   hydrateFreshSessionHandoff,
-  isPaperclipExternalChatTurn,
-  renderPaperclipMcpNote,
-  selectInitialCommunicationGuidance,
-  selectPaperclipPromptSections,
-  isPaperclipRecoveryWakePayload,
-  DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
-  DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE,
 } from "@paperclipai/adapter-utils/server-utils";
 import {
   parseLocalProcessFilesystemScope,
@@ -74,6 +65,7 @@ import {
   isClaudeImageProcessingError,
   isClaudeModelNotFoundError,
 } from "./parse.js";
+import { composeClaudeCliPrompt, resolveClaudePromptTemplate } from "./legacy-prompt.js";
 import {
   materializeRemoteClaudeConfig,
   prepareClaudeConfigSeed,
@@ -360,12 +352,7 @@ async function executeClaudeCli(
   const executionTargetIsRemote = adapterExecutionTargetIsRemote(executionTarget);
   const executionTargetIsSandbox = executionTarget?.kind === "remote" && executionTarget.transport === "sandbox";
 
-  const promptTemplate = asString(
-    config.promptTemplate,
-    context.conversationMode === true
-      ? DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE
-      : DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
-  );
+  const promptTemplate = resolveClaudePromptTemplate(config, context);
   const effort = asString(config.effort, "");
   const chrome = asBoolean(config.chrome, false);
   const maxTurns = asNumber(config.maxTurnsPerRun, 0);
@@ -924,42 +911,16 @@ async function executeClaudeCli(
 
     const runAttempt = async (resumeSessionId: string | null, freshReason: ClaudeFreshSessionReason) => {
       await hydrateFreshSessionHandoff(ctx, { resumedSession: Boolean(resumeSessionId) });
-      const renderedBootstrapPrompt =
-        !resumeSessionId && bootstrapPromptTemplate.trim().length > 0
-          ? renderTemplate(bootstrapPromptTemplate, templateData).trim()
-          : "";
-      const { taskContextNote, wakePrompt } = selectPaperclipPromptSections(context, {
-        resumedSession: Boolean(resumeSessionId),
-        includeCommunicationGuidance: false,
-      });
-      const shouldUseResumeDeltaPrompt = Boolean(resumeSessionId) && wakePrompt.length > 0;
-      const renderedPrompt = shouldUseResumeDeltaPrompt || isPaperclipRecoveryWakePayload(context.paperclipWake)
-        ? ""
-        : renderTemplate(promptTemplate, templateData);
-      const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
-      // Fresh sealed sessions are pointed at the `paperclip_*` tools, as ACP's are; resumed
-      // sessions and external chat turns aren't.
-      const paperclipMcpNote = sealed && !resumeSessionId && !isPaperclipExternalChatTurn(context.paperclipWake)
-        ? renderPaperclipMcpNote(env, true)
-        : "";
-      const prompt = joinPromptSections([
+      const { prompt, promptMetrics } = composeClaudeCliPrompt({
+        context,
+        resumed: Boolean(resumeSessionId),
         instructionsPathDirective,
-        renderedBootstrapPrompt,
-        selectInitialCommunicationGuidance(context, { resumedSession: Boolean(resumeSessionId) }),
-        wakePrompt,
-        sessionHandoffNote,
-        taskContextNote,
-        paperclipMcpNote,
-        renderedPrompt,
-      ]);
-      const promptMetrics = {
-        promptChars: prompt.length,
-        bootstrapPromptChars: renderedBootstrapPrompt.length,
-        wakePromptChars: wakePrompt.length,
-        sessionHandoffChars: sessionHandoffNote.length,
-        taskContextChars: taskContextNote.length,
-        heartbeatPromptChars: renderedPrompt.length,
-      };
+        bootstrapPromptTemplate,
+        promptTemplate,
+        templateData,
+        sealed: Boolean(sealed),
+        env,
+      });
       const attemptInstructionsFilePath = resumeSessionId ? undefined : effectiveInstructionsFilePath;
       const args = buildClaudeArgs(resumeSessionId, attemptInstructionsFilePath);
       const launch = sealed

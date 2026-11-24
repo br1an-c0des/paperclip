@@ -5,7 +5,18 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { wakePromptPartsChecks } from "./test-fixtures/wake-prompt-parts.js";
+
+// Every render below also checks the wake's display parts against the rendered text.
+vi.mock("./server-utils.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./server-utils.js")>();
+  const { checkedWakePromptRenderer } = await import("./test-fixtures/wake-prompt-parts.js");
+  return { ...actual, renderPaperclipWakePrompt: checkedWakePromptRenderer(actual) };
+});
+afterAll(() => {
+  expect(wakePromptPartsChecks.count).toBeGreaterThan(50);
+});
 import { CONNECTION_INTENT_AGENT_GUIDANCE } from "@paperclipai/shared";
 import {
   readPaperclipRuntimeSkillEntries,

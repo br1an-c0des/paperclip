@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { AdapterExecutionContext, AdapterRunPreviewRepoView, AdapterRuntimeMcpServer } from "@paperclipai/adapter-utils";
-import type { ClaudeMdLoad, ClaudeRepoSkillsLoad, ClaudeRunCredential, ClaudeRunPreviewBlocker } from "@paperclipai/shared";
+import type { ClaudeMdLoad, ClaudeRepoSkillsLoad, ClaudeRunCredential, ClaudeRunPreviewBlocker, RunPromptSection } from "@paperclipai/shared";
 import {
   adapterExecutionTargetIsRemote,
   adapterExecutionTargetRemoteCwd,
@@ -502,6 +502,50 @@ export interface ClaudeRunSkillsAndInstructions {
   instructionsPathDirective: string;
   /** The bundle's instructions file contents: the agent's instructions and the skill library list. */
   combinedInstructionsContents: string | null;
+  /**
+   * `combinedInstructionsContents` as labelled system-prompt sections (step 5): the agent's
+   * instructions, then the skill library list. Their texts joined with a blank line are exactly
+   * `combinedInstructionsContents`; empty when that is null.
+   */
+  systemPromptSections: RunPromptSection[];
+}
+
+const INSTRUCTIONS_LOCATION_NOTE =
+  "\nUse the agent instruction file location supplied in the current run prompt to resolve relative file references.";
+
+/** Reads the agent's instructions file: its contents and the run prompt's location directive. */
+async function readClaudeInstructionsFile(config: Record<string, unknown>): Promise<{
+  instructionsFilePath: string;
+  content: string | null;
+  directive: string;
+  readError: string | null;
+}> {
+  const instructionsFilePath = asString(config.instructionsFilePath, "").trim();
+  const instructionsFileDir = instructionsFilePath ? `${path.dirname(instructionsFilePath)}/` : "";
+  if (!instructionsFilePath) return { instructionsFilePath, content: null, directive: "", readError: null };
+  try {
+    const content = await fs.readFile(instructionsFilePath, "utf-8");
+    const directive =
+      `Agent instructions for this run were loaded from ${instructionsFilePath}. ` +
+      `Resolve any relative file references from ${instructionsFileDir}. ` +
+      `This base directory is authoritative for sibling instruction files such as ` +
+      `./HEARTBEAT.md, ./SOUL.md, and ./TOOLS.md; do not resolve those from the parent agent directory. ` +
+      `This location replaces any instruction file location from earlier turns.`;
+    return { instructionsFilePath, content, directive, readError: null };
+  } catch (err) {
+    return { instructionsFilePath, content: null, directive: "", readError: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * The first message's instructions-path directive, as the run computes it: set only when the
+ * agent's instructions file was read. Reads the file; writes nothing.
+ */
+export async function planClaudeInstructionsDirective(
+  config: Record<string, unknown>,
+): Promise<{ directive: string; readError: string | null }> {
+  const { directive, readError } = await readClaudeInstructionsFile(config);
+  return { directive, readError };
 }
 
 /** Reads the run's skills and the agent's instructions file; writes nothing. */
@@ -510,29 +554,29 @@ export async function planClaudeRunSkillsAndInstructions(input: {
   moduleDir: string;
 }): Promise<ClaudeRunSkillsAndInstructions> {
   const { config } = input;
-  const instructionsFilePath = asString(config.instructionsFilePath, "").trim();
-  const instructionsFileDir = instructionsFilePath ? `${path.dirname(instructionsFilePath)}/` : "";
   const claudeSkillEntries = await readPaperclipRuntimeSkillEntries(config, input.moduleDir);
   const desiredSkillNames = new Set(resolveClaudeDesiredSkillNames(config, claudeSkillEntries));
   // Keep per-run working-copy paths out of the content-addressed system prompt.
   // Resumed sessions retain that prompt, so refresh the location on every turn.
-  let combinedInstructionsContents: string | null = null;
-  let instructionsPathDirective = "";
-  let instructionsReadError: string | null = null;
-  if (instructionsFilePath) {
-    try {
-      const instructionsContent = await fs.readFile(instructionsFilePath, "utf-8");
-      instructionsPathDirective =
-        `Agent instructions for this run were loaded from ${instructionsFilePath}. ` +
-        `Resolve any relative file references from ${instructionsFileDir}. ` +
-        `This base directory is authoritative for sibling instruction files such as ` +
-        `./HEARTBEAT.md, ./SOUL.md, and ./TOOLS.md; do not resolve those from the parent agent directory. ` +
-        `This location replaces any instruction file location from earlier turns.`;
-      combinedInstructionsContents = instructionsContent +
-        "\nUse the agent instruction file location supplied in the current run prompt to resolve relative file references.";
-    } catch (err) {
-      instructionsReadError = err instanceof Error ? err.message : String(err);
-    }
+  const instructions = await readClaudeInstructionsFile(config);
+  const { instructionsFilePath } = instructions;
+  const instructionsPathDirective = instructions.directive;
+  const instructionsReadError = instructions.readError;
+  let combinedInstructionsContents: string | null = instructions.content === null
+    ? null
+    : instructions.content + INSTRUCTIONS_LOCATION_NOTE;
+  const systemPromptSections: RunPromptSection[] = [];
+  if (instructions.content !== null) {
+    systemPromptSections.push(systemPromptSection({
+      id: "agent_instructions",
+      label: "Agent instructions",
+      reason: "the agent's instructions file was read",
+      source: `instructions file: ${instructionsFilePath}`,
+      parts: [
+        { id: "agent_instructions.file", label: "Instructions file", source: instructionsFilePath, text: instructions.content },
+        { id: "agent_instructions.location_note", label: "Location note", source: "claude_local run plan", text: INSTRUCTIONS_LOCATION_NOTE },
+      ],
+    }));
   }
   // Tell the model what the company library actually holds. Without this, an
   // installed-but-not-enabled skill is indistinguishable from a nonexistent
@@ -548,6 +592,13 @@ export async function planClaudeRunSkillsAndInstructions(input: {
     combinedInstructionsContents = combinedInstructionsContents
       ? `${combinedInstructionsContents}\n\n${skillLibraryManifest}`
       : skillLibraryManifest;
+    systemPromptSections.push(systemPromptSection({
+      id: "skill_library",
+      label: "Company skill library",
+      reason: "the company has library skills",
+      source: "skill library manifest",
+      parts: [{ id: "skill_library.list", label: "Skill list", source: "company skill library", text: skillLibraryManifest }],
+    }));
   }
   // Missing-source entries must never reach the bundle: their path does not
   // exist, so the bundle hasher would throw and fail the whole run over one
@@ -564,6 +615,30 @@ export async function planClaudeRunSkillsAndInstructions(input: {
     instructionsReadError,
     instructionsPathDirective,
     combinedInstructionsContents,
+    systemPromptSections,
+  };
+}
+
+/** A system-prompt section from its parts; its text is the parts' concatenation. */
+function systemPromptSection(input: {
+  id: RunPromptSection["id"];
+  label: string;
+  reason: string;
+  source: string;
+  parts: Array<{ id: string; label: string; source: string; text: string }>;
+}): RunPromptSection {
+  const text = input.parts.map((part) => part.text).join("");
+  return {
+    id: input.id,
+    label: input.label,
+    placement: "system",
+    // Sent with --append-system-prompt-file on fresh sessions; a resumed session keeps its own.
+    delivery: "fresh_only",
+    reason: input.reason,
+    source: input.source,
+    text,
+    chars: text.length,
+    parts: input.parts.map((part) => ({ ...part, chars: part.text.length })),
   };
 }
 
