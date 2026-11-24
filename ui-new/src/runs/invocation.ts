@@ -1,4 +1,5 @@
-import type { ClaudeRunManifest, HeartbeatRunEvent } from "@paperclipai/shared";
+import type { ClaudeRunManifest, HeartbeatRunEvent, RunPromptRecord } from "@paperclipai/shared";
+import { isRunPromptRecord } from "@paperclipai/shared/run-prompt";
 import { redactCommandText } from "@paperclipai/adapter-utils/command-redaction";
 import { redactHomePathUserSegments, redactHomePathUserSegmentsInValue } from "@paperclipai/adapter-utils/log-redaction";
 
@@ -39,6 +40,33 @@ const text = (value: unknown) => (typeof value === "string" && value.trim() ? va
 
 export function findInvokeEvent(events: readonly HeartbeatRunEvent[] | undefined) {
   return events?.find((event) => event.eventType === "adapter.invoke") ?? null;
+}
+
+/** The run's prompt in sections (step 5): an `adapter.prompt` event, appended right after `adapter.invoke`. */
+export function findPromptEvent(events: readonly HeartbeatRunEvent[] | undefined) {
+  return events?.find((event) => event.eventType === "adapter.prompt") ?? null;
+}
+
+/** The prompt record on an `adapter.prompt` event, with home-directory usernames masked when asked. */
+export function readPromptRecord(payload: Record<string, unknown> | null | undefined, options: { censorUsername?: boolean } = {}): RunPromptRecord | null {
+  if (!isRunPromptRecord(payload)) return null;
+  return redactHomePathUserSegmentsInValue(payload, { enabled: options.censorUsername ?? false }) as RunPromptRecord;
+}
+
+/* `adapter.prompt` lands just after `adapter.invoke`; a read between the two misses it. */
+const PROMPT_EVENT_GRACE_MS = 15_000;
+
+/**
+ * Whether a live run's events may still gain what Input shows: no `adapter.invoke` yet, or one so
+ * recent that its `adapter.prompt` may not have landed. Runs that record no sections stop after the grace.
+ */
+export function awaitingInvocationEvents(events: readonly HeartbeatRunEvent[] | undefined, now = Date.now()) {
+  const invoke = findInvokeEvent(events);
+  if (!invoke) return true;
+  if (findPromptEvent(events)) return false;
+  // JSON gives an ISO string where the type says Date; `new Date` takes either.
+  const at = new Date(invoke.createdAt).getTime();
+  return Number.isFinite(at) && now - at < PROMPT_EVENT_GRACE_MS;
 }
 
 function envLine(key: string, value: unknown, censor: boolean): EnvLine {
@@ -103,6 +131,10 @@ export function readInvocation(payload: Record<string, unknown> | null | undefin
 /** "4.2k characters": the prompt's size, without pretending to count tokens. */
 export function promptSize(prompt: string | null) {
   if (!prompt) return null;
-  const n = prompt.length;
+  return charsSize(prompt.length);
+}
+
+/** "4.2k characters" for a count of characters, as `promptSize` gives for a text. */
+export function charsSize(n: number) {
   return n >= 1000 ? `${Number((n / 1000).toFixed(1))}k characters` : `${n} characters`;
 }

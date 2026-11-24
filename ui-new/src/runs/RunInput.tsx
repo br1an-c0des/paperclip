@@ -1,9 +1,10 @@
-import { ChevronRight, Copy } from "lucide-solid";
+import { ChevronRight } from "lucide-solid";
 import { For, Show } from "solid-js";
 import type { RunDetail } from "@/api/runs";
 import { InfoTip } from "@/ui/InfoTip";
-import { pushToast } from "@/ui/Toast";
 import type { RunInvocation } from "./invocation";
+import type { PromptView } from "./prompt-sections";
+import { PromptSections } from "./PromptSections";
 import { capitalize, isActiveRun, shortId } from "./run-model";
 import { RunManifest } from "./RunManifest";
 import "./RunInput.css";
@@ -12,21 +13,16 @@ import "./RunInput.css";
  * "What the agent was sent" (board 17). Paperclip keeps the prompt it rendered, the wake context,
  * the command and the environment; the harness adds its own system prompt, tool definitions and
  * session history before calling the model. Following decision 4, the view shows what exists and
- * says plainly what it doesn't: the exact model input is only in a provider trace.
+ * says plainly what it doesn't: the exact model input is only in a provider trace. Since step 5 a
+ * claude_local CLI run's prompt is shown in labelled sections (PromptSections); a run recorded
+ * before them shows its one prompt text as a single section.
  */
-
-async function copy(text: string, what: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    pushToast({ tone: "success", title: `Copied the ${what}` });
-  } catch {
-    pushToast({ tone: "error", title: `Couldn't copy the ${what}` });
-  }
-}
 
 export function RunInput(props: {
   run: RunDetail;
   invocation: RunInvocation | null;
+  /** The prompt in sections, from the run's `adapter.prompt` record or, before step 5, `adapter.invoke`'s prompt. */
+  prompt: PromptView | null;
   loading: boolean;
   harness: string;
   isAdmin: boolean;
@@ -68,25 +64,21 @@ export function RunInput(props: {
       >
         {(invocation) => (
           <>
-            <section class="ri-sec" aria-labelledby="ri-prompt">
-              <div class="ri-sech">
-                <h3 class="disp" id="ri-prompt">
-                  Prompt
-                </h3>
-                <span class="cap">
-                  {invocation().prompt ? `${invocation().prompt!.length.toLocaleString()} characters · rendered from the agent's prompt template` : "No prompt recorded"}
-                </span>
-                <Show when={invocation().prompt}>
-                  {(prompt) => (
-                    <button type="button" class="rm-b" onClick={() => void copy(prompt(), "prompt")}>
-                      <Copy size={13} aria-hidden="true" />
-                      Copy
-                    </button>
-                  )}
-                </Show>
-              </div>
-              <Show when={invocation().prompt}>{(prompt) => <pre class="rm-pre">{prompt()}</pre>}</Show>
-            </section>
+            <Show
+              when={props.prompt}
+              fallback={
+                <section class="ri-sec" aria-labelledby="ri-prompt">
+                  <div class="ri-sech">
+                    <h3 class="disp" id="ri-prompt">
+                      Prompt
+                    </h3>
+                    <span class="cap">No prompt recorded</span>
+                  </div>
+                </section>
+              }
+            >
+              {(view) => <PromptSections view={view()} idPrefix="ri-prompt" />}
+            </Show>
 
             <section class="ri-sec" aria-labelledby="ri-loaded">
               <div class="ri-sech">

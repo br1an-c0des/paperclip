@@ -31,7 +31,8 @@ import { Dialog } from "@/ui/Dialog";
 import { InfoTip } from "@/ui/InfoTip";
 import { Capsule } from "@/ui/Status";
 import { pushToast } from "@/ui/Toast";
-import { findInvokeEvent, promptSize, readInvocation } from "./invocation";
+import { awaitingInvocationEvents, charsSize, findInvokeEvent, findPromptEvent, readInvocation, readPromptRecord } from "./invocation";
+import { promptViewFromLegacyPrompt, promptViewFromRecord } from "./prompt-sections";
 import { runProviderFailure } from "@/ui/provider-failure";
 import { ProviderFailureNotice } from "@/ui/ProviderFailureNotice";
 import { buildTranscript, showsPlainLines } from "./parsers";
@@ -160,8 +161,8 @@ function RunView(props: { runId: string }) {
   const events = createQuery(() => ({
     queryKey: queryKeys.runs.events(props.runId),
     queryFn: () => runsApi.events(props.runId, 0, 200),
-    // Until the harness starts, there's nothing about what it was sent.
-    refetchInterval: (query) => (active() && !findInvokeEvent(query.state.data) ? 3_000 : false),
+    // Until the harness starts, there's nothing about what it was sent; its prompt record lands just after.
+    refetchInterval: (query) => (active() && awaitingInvocationEvents(query.state.data) ? 3_000 : false),
   }));
   const settings = createQuery(() => ({
     queryKey: queryKeys.instance.generalSettings,
@@ -186,6 +187,13 @@ function RunView(props: { runId: string }) {
 
   const censorUsername = () => settings.data?.censorUsernameInLogs === true;
   const invocation = createMemo(() => readInvocation(findInvokeEvent(events.data)?.payload, { censorUsername: censorUsername() }));
+  // The prompt in sections (step 5); a run recorded before them shows adapter.invoke's prompt as one.
+  const promptView = createMemo(() => {
+    const record = readPromptRecord(findPromptEvent(events.data)?.payload, { censorUsername: censorUsername() });
+    if (record) return promptViewFromRecord(record);
+    const prompt = invocation()?.prompt;
+    return prompt ? promptViewFromLegacyPrompt(prompt) : null;
+  });
   const adapterType = () => invocation()?.adapterType ?? agent()?.adapterType ?? null;
   const harness = () => harnessName(adapterType());
 
@@ -480,7 +488,7 @@ function RunView(props: { runId: string }) {
     ];
     if (isCompact()) return list;
     list.push(
-      { value: "input", label: "Input", note: promptSize(invocation()?.prompt ?? null)?.replace(" characters", " chars") ?? "" },
+      { value: "input", label: "Input", note: promptView() ? charsSize(promptView()!.firstMessageChars).replace(" characters", " chars") : "" },
       { value: "raw", label: "Raw output", note: run.data?.logBytes ? formatBytes(run.data.logBytes) : `${log.chunks().length} lines` },
     );
     if (isAdmin()) {
@@ -779,6 +787,7 @@ function RunView(props: { runId: string }) {
                     <RunInput
                       run={current()}
                       invocation={invocation()}
+                      prompt={promptView()}
                       loading={events.isPending}
                       harness={harness()}
                       isAdmin={isAdmin()}
