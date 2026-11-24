@@ -1,0 +1,170 @@
+/* A prompt in labelled sections (step 5): the run modal's Input tab and the agent's run preview.
+   Self-contained, so it looks the same outside the run modal; follows RunInput.css's disclosures. */
+.ps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ps-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ps-grouph {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ps-grouph h3 {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ps-b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0 11px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-pill);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ps-b:hover {
+  background: var(--well);
+  color: var(--text);
+}
+
+.ps-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ps-note--warn {
+  border-color: color-mix(in srgb, var(--amber-fg) 45%, transparent);
+  background: var(--amber-bg);
+  color: var(--amber-fg);
+}
+
+.ps-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ps-sec > summary {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--card);
+  list-style: none;
+  cursor: pointer;
+}
+
+.ps-sec > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ps-sec[open] > summary {
+  border-radius: var(--r-inner) var(--r-inner) 0 0;
+}
+
+.ps-chev {
+  flex-shrink: 0;
+  color: var(--dashed);
+  transition: transform 0.12s;
+}
+
+.ps-sec[open] > summary .ps-chev {
+  transform: rotate(90deg);
+}
+
+.ps-label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ps-reason {
+  color: var(--body);
+  font-size: 12px;
+}
+
+.ps-meta {
+  margin-left: auto;
+  overflow-wrap: anywhere;
+}
+
+.ps-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 var(--r-inner) var(--r-inner);
+  background: var(--code);
+}
+
+.ps-part {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ps-part + .ps-part {
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.ps-parth {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+}
+
+.ps-part-label {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ps-pre {
+  margin: 0;
+  max-height: 480px;
+  overflow: auto;
+  color: var(--body);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

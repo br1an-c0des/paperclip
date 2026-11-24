@@ -36,7 +36,7 @@ import {
 } from "./run-state.js";
 import { CONFIGURATION_INCOMPLETE_FAILURE_CODE } from "./run-preparation.js";
 import { WORKSPACE_VALIDATION_FAILURE_CODE } from "./workspaces.js";
-import { boundHeartbeatRunEventPayloadForStorage } from "./run-log.js";
+import { prepareHeartbeatRunEventPayloadForStorage, RUN_PROMPT_EVENT_TYPE } from "./run-log.js";
 import { preserveWorkspaceRestoreRecoveryMetadata } from "../workspace-restore-recovery-state.js";
 import { pendingNativeWorkspaceFinalizationCondition } from "../native-runtime/native-workspace-finalization-state.js";
 import { activeIssueInteractionCondition } from "../issue-question-context.js";
@@ -182,11 +182,9 @@ import { resolveRequiredSuccessfulRunHandoffOnValidPath } from "../successful-ru
 import { escalateExhaustedIssueReviewPathRecovery } from "../recovery/review-path-recovery-escalation.js";
 import {
   redactCurrentUserText,
-  redactCurrentUserValue,
   type CurrentUserRedactionOptions,
 } from "../../log-redaction.js";
 import {
-  redactEventPayload,
   redactSensitiveText,
 } from "../../redaction.js";
 import {
@@ -266,6 +264,7 @@ const LIVENESS_BOOKKEEPING_ACTIVITY_ACTIONS = [
 const LIVENESS_BOOKKEEPING_EVENT_TYPES = [
   "lifecycle",
   "adapter.invoke",
+  RUN_PROMPT_EVENT_TYPE,
   "error",
   "legacy.case_handoff_cleanup_intent",
   "legacy.case_handoff_cleanup_verified",
@@ -555,7 +554,8 @@ function buildRunEventRuntimeProgress(input: {
   const normalizedEventType = input.eventType.toLowerCase();
   if (
     normalizedEventType === "lifecycle" ||
-    normalizedEventType === "adapter.invoke"
+    normalizedEventType === "adapter.invoke" ||
+    normalizedEventType === RUN_PROMPT_EVENT_TYPE
   ) {
     return null;
   }
@@ -2262,18 +2262,13 @@ export function createHeartbeatLifecycle(db: Db, dependencies: HeartbeatLifecycl
           redactCurrentUserText(event.message, currentUserRedactionOptions),
         )
       : event.message;
-    const boundedPayload = event.payload
-      ? boundHeartbeatRunEventPayloadForStorage(event.payload)
-      : event.payload;
-    const secretSanitizedPayload = boundedPayload
-      ? redactEventPayload(boundedPayload)
-      : boundedPayload;
-    const sanitizedPayload = secretSanitizedPayload
-      ? redactCurrentUserValue(
-          secretSanitizedPayload,
+    const sanitizedPayload = event.payload
+      ? prepareHeartbeatRunEventPayloadForStorage(
+          event.eventType,
+          event.payload,
           currentUserRedactionOptions,
         )
-      : secretSanitizedPayload;
+      : event.payload;
     const issueId = readRuntimeStatusIssueIdCandidate(run) ?? null;
     const progress = buildRunEventRuntimeProgress({
       eventType: event.eventType,
