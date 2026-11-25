@@ -267,12 +267,13 @@ export const fixtures = {
     checkedOutByHarness: true,
     executionContinuation: continuation({ trigger: { reason: "issue_assigned", interactionId: null, sourceRunId: null }, interruptedRunId: "run-old" }),
   },
+  /** A person's Retry of a failed run, in a fresh workspace. */
   retry_workspace: {
     ...base,
-    reason: "issue_assigned",
+    reason: "task_retry",
     issue,
     executionContinuation: continuation({
-      trigger: { reason: "issue_assigned", interactionId: null, sourceRunId: null, retriedReason: "issue_commented" },
+      trigger: { reason: "task_retry", interactionId: null, sourceRunId: null, retriedReason: "issue_commented" },
       priorWorkspace: {
         sourceRunId: "run-old", path: "/work/old/tes-45", branchName: "pc/tes-45", changedFilesKnown: true, changedFileCount: 2,
         changedFiles: ["src/theme.ts", "src/settings.tsx"],
@@ -311,6 +312,25 @@ export const fixtures = {
     reason: "run_liveness_continuation",
     issue,
     livenessContinuation: { attempt: 1, maxAttempts: 2, state: "plan_only", instruction: "Take the first concrete action now." },
+  },
+  /**
+   * Run 2bfa012a: a disposition repair whose recovery action is the repair itself, and whose
+   * record carries the original assignment as retriedReason (it has a retryOfRunId).
+   */
+  disposition_repair_with_recovery: {
+    ...base,
+    reason: "issue_disposition_repair",
+    issue,
+    checkedOutByHarness: true,
+    recovery: {
+      cause: "deliberate_wait_without_target", failureSummary: null,
+      originalAssignee: { id: SELF, name: "Ada" }, attemptCount: 1, maxAttempts: 2, nextAction: null,
+    },
+    dispositionRepair: { attempt: 1, maxAttempts: 2, sourceRunId: "run-old", instruction: "Finish, block or report progress." },
+    executionContinuation: continuation({
+      trigger: { reason: "issue_disposition_repair", interactionId: null, sourceRunId: null, retriedReason: "issue_assigned" },
+    }),
+    continuationSummary: { body: "# Continuation Summary\n\nToggle added; persistence not started." },
   },
   run_unfinished: {
     ...base,

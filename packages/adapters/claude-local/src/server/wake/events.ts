@@ -149,6 +149,17 @@ const REASON_EVENTS: Record<string, ClaudeWakeEventKind> = {
  */
 const CONTINUE_REASONS = new Set(["issue_continuation_needed", "issue_recovery_action_restored"]);
 
+/**
+ * Wake reasons that re-run a failed run: a person's Retry (`task_retry`, `retry_failed_run`) or a
+ * bounded transient retry (`transient_failure_retry`, heartbeat/retries.ts). `trigger.retriedReason`
+ * alone doesn't make a retry: execution-continuation.ts sets it on any run with a `retryOfRunId`,
+ * which disposition repairs and liveness continuations have too.
+ */
+export const RETRY_REASONS: ReadonlySet<string> = new Set(["task_retry", "retry_failed_run", "transient_failure_retry"]);
+
+/** Events that already say why the agent runs again; "retry" adds nothing to them. */
+const REPAIR_EVENTS: readonly ClaudeWakeEventKind[] = ["run_stopped", "continue", "recovery", "run_only_planned", "run_unfinished"];
+
 export function isMonitorReason(reason: string | null): boolean {
   return Boolean(reason?.startsWith("issue_monitor_"));
 }
@@ -224,10 +235,12 @@ export function detectClaudeWakeEvents(
   if (comments.edited.length > 0) found.add("comment_edited");
   if (continuation?.interruptedRunId) found.add("interrupted");
   if (continuation?.priorWorkspace || (continuation?.recoveredFiles?.length ?? 0) > 0) found.add("retry_workspace");
-  if (continuation?.trigger?.retriedReason) found.add("retry");
-  if (payload.recovery || reason === "source_scoped_recovery_action") {
+  // A liveness or disposition repair is the more specific event: its recovery action (when the
+  // payload carries one) is that repair, so no run_stopped, recovery or continue beside it.
+  const repair = Boolean(payload.livenessContinuation || payload.dispositionRepair);
+  if (!repair && (payload.recovery || reason === "source_scoped_recovery_action")) {
     found.add(payload.recovery && isOwnRecovery(payload, agentId) ? "run_stopped" : "recovery");
-  } else if (reason && CONTINUE_REASONS.has(reason) && !payload.livenessContinuation && !payload.dispositionRepair) {
+  } else if (!repair && reason && CONTINUE_REASONS.has(reason)) {
     found.add("continue");
   }
   if (payload.livenessContinuation) found.add("run_only_planned");
@@ -237,6 +250,7 @@ export function detectClaudeWakeEvents(
   if (primary === "monitor_due") found.add("monitor_due");
   if (payload.taskWatchdog || primary === "watchdog") found.add("watchdog");
   if (payload.treeHoldInteraction || payload.dependencyBlockedInteraction) found.add("held");
+  if (reason && RETRY_REASONS.has(reason) && !REPAIR_EVENTS.some((kind) => found.has(kind))) found.add("retry");
 
   const ordered = CLAUDE_WAKE_EVENT_ORDER.filter((kind) => found.has(kind));
   if (primary && found.has(primary)) {

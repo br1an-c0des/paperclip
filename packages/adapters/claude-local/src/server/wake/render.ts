@@ -106,7 +106,7 @@ const EVENT_SOURCES: Record<ClaudeWakeEventKind, string> = {
   comment_edited: "wake payload: executionContinuation.resumeDelta",
   interrupted: "wake payload: executionContinuation.interruptedRunId",
   retry_workspace: "wake payload: executionContinuation.priorWorkspace, recoveredFiles",
-  retry: "wake payload: executionContinuation.trigger.retriedReason",
+  retry: "wake payload: reason (a retry), executionContinuation.trigger.retriedReason",
   run_stopped: "wake payload: recovery, reason",
   continue: "wake payload: reason (a continuation with no recovery)",
   recovery: "wake payload: recovery, executionContinuation.recoveryOutcomes",
@@ -484,8 +484,8 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       };
     }
     case "retry": {
-      const retried = wakeContinuation(wake)?.trigger?.retriedReason ?? "";
-      return { text: t(EVENTS.retry.text, { reason: reasonWords(retried) }) };
+      const retried = wakeContinuation(wake)?.trigger?.retriedReason;
+      return { text: retried ? t(EVENTS.retry.text, { reason: reasonWords(retried) }) : EVENTS.retry.plain };
     }
     case "run_stopped": {
       const cause = causeText(wake.recovery);
@@ -729,16 +729,15 @@ function renderHistory(ctx: Ctx, history: ClaudeWakeComment[]): string | null {
   return lines(...blocks);
 }
 
-function renderWhereThingsStand(ctx: Ctx, events: ClaudeWakeEventKind[]): string | null {
-  const { wake, options } = ctx;
-  const recoveryWake = events.includes("run_stopped") || events.includes("recovery");
-  const summary = wake.continuationSummary;
-  const showSummary = Boolean(summary) && (!options.resumedSession || recoveryWake);
-  const history = options.resumedSession ? null : renderHistory(ctx, ctx.comments.history);
-  if (!showSummary && !history) return null;
+/** Fresh sessions only: a resumed session already holds the history, recovery wakes included. */
+function renderWhereThingsStand(ctx: Ctx): string | null {
+  if (ctx.options.resumedSession) return null;
+  const summary = ctx.wake.continuationSummary;
+  const history = renderHistory(ctx, ctx.comments.history);
+  if (!summary && !history) return null;
   return lines(
     HEADINGS.whereThingsStand,
-    showSummary && summary && lines(WHERE_THINGS_STAND.summary, quoteClaudeWakeText(summary.body), summary.bodyTruncated && WHERE_THINGS_STAND.summaryCut),
+    summary && lines(WHERE_THINGS_STAND.summary, quoteClaudeWakeText(summary.body), summary.bodyTruncated && WHERE_THINGS_STAND.summaryCut),
     history,
   );
 }
@@ -798,7 +797,7 @@ export function renderClaudeWakeParts(payload: unknown, options: ClaudeWakeRende
     ? SESSION_NOTES.resumed
     : options.handoffPresent ? SESSION_NOTES.freshWithHandoff : null;
   if (sessionNote) blocks.push({ id: "wake.session_note", text: sessionNote });
-  const where = renderWhereThingsStand(ctx, events);
+  const where = renderWhereThingsStand(ctx);
   if (where) blocks.push({ id: "wake.where_things_stand", text: where });
   const task = renderTaskLine(ctx);
   if (task) blocks.push({ id: "wake.task", text: task });
