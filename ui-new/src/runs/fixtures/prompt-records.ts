@@ -64,6 +64,23 @@ export const freshRecord: RunPromptRecord = {
 };
 freshRecord.firstMessageChars = freshRecord.firstMessage.map((section) => section.text.trim()).filter(Boolean).join("\n\n").length;
 
+/** A sealed run's resumed attempt: the system prompt file goes with every run (step 5 phase 2, bug 90). */
+export const sealedResumedRecord: RunPromptRecord = {
+  version: 1,
+  session: "resumed",
+  systemPrompt: [
+    promptSection("identity", "You are Ada, Release manager.", { label: "Who you are", placement: "system" }),
+    promptSection("working_in_paperclip", "## Working in Paperclip\n\nPaperclip wakes you in runs.", { label: "Working in Paperclip", placement: "system" }),
+    promptSection("skill_library", "## Skills\n\nThe company's skill library may hold others.", { label: "Skills", placement: "system" }),
+  ],
+  firstMessage: [
+    promptSection("what_happened", "## What happened\n\nA new comment.", { label: "What happened", reason: "woken by a comment" }),
+  ],
+  firstMessageChars: "## What happened\n\nA new comment.".length,
+  matchedPlan: true,
+};
+
+/** An older (or unsealed) resumed run: no system prompt recorded, since the session kept its own. */
 export const resumedRecord: RunPromptRecord = {
   version: 1,
   session: "resumed",

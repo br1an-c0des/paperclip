@@ -207,6 +207,13 @@ describe("the run manifest", () => {
     expect(accessText(read.access)).toBe("Worker · Hire agents: on");
     expect(accessText(null)).toBe("Not recorded");
     expect(instructionsText(read.instructions)).toBe("AGENTS.md, sent");
+    expect(instructionsText(read.instructions, read.session)).toBe("AGENTS.md, sent");
+    // A sealed resume sends the file too (step 5 phase 2); an older record of a resume didn't.
+    const resumed = { mode: "resumed", sessionId: "s-1" } as const;
+    expect(instructionsText({ entryFile: "AGENTS.md", sent: true }, resumed))
+      .toBe("AGENTS.md, system prompt file sent; a resumed session uses it only after a compaction");
+    expect(instructionsText({ entryFile: null, sent: true }, resumed)).toBe("Sent; a resumed session uses it only after a compaction");
+    expect(instructionsText({ entryFile: "AGENTS.md", sent: false }, resumed)).toBe("AGENTS.md, not sent: the resumed session already has it");
     expect(sessionText(read.session, (id) => id)).toBe("A new session: the agent's skills or instructions changed");
     expect(sessionText({ mode: "resumed", sessionId: "s-1" }, (id) => id)).toBe("Resumed s-1");
   });

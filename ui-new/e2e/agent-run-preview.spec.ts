@@ -38,18 +38,32 @@ const section = (id: RunPromptSection["id"], label: string, text: string, extra:
   text, chars: text.length, ...extra,
 });
 
+/**
+ * A sealed run's system prompt (step 5 phase 2, the system prompt): who the agent is, Working in
+ * Paperclip, the agent's instructions and its skills, sent with every run.
+ */
+const systemPrompt: RunPromptSection[] = [
+  section("identity", "Who you are", "You are M7 test Builder, Builder.", { placement: "system" }),
+  section("working_in_paperclip", "Working in Paperclip", "## Working in Paperclip\n\nM7 test rules.", { placement: "system" }),
+  section("agent_instructions", "Agent instructions", "M7 test: you are the Builder.", { placement: "system" }),
+  section("skill_library", "Skills", "## Skills\n\nM7 test skills.", { placement: "system" }),
+];
+
 /** A draft: the system prompt, then the first message's sections. */
 function draft(kind: RunPromptPreview["kind"], issueId: string | null, firstMessage: RunPromptSection[]): RunPromptPreview {
   return {
     kind,
     issueId,
-    systemPrompt: [section("agent_instructions", "Agent instructions", "M7 test: you are the Builder.", { placement: "system", delivery: "fresh_only" })],
+    systemPrompt,
     firstMessage,
     firstMessageChars: firstMessage.map((entry) => entry.text).join("\n\n").length,
   };
 }
 
-const noTaskDraft = draft("no_task", null, [section("heartbeat_template", "Who you are", "You are M7 test Builder, Builder."), section("task_brief", "Task brief", "null")]);
+const noTaskDraft = draft("no_task", null, [
+  section("instructions_directive", "Instructions file location", "Your instructions file is /m7-test/AGENTS.md; relative paths in it resolve from /m7-test/."),
+  section("task_brief", "Task brief", "null"),
+]);
 
 /** The Runtime section's other reads, which no other spec visits yet: empty answers. */
 function runtimeReads(api: MockApi) {
@@ -178,8 +192,10 @@ test("the Prompt part drafts the next run for a picked task and kind, marking wh
   await page.goto("/MSE/agents/m7-test-builder/runtime");
   const prompt = page.locator("section.rp-prompt");
   await expect(prompt.getByRole("heading", { name: "Prompt", exact: true })).toBeVisible();
-  // Without a task: the draft of a run without one.
+  // Without a task: the draft of a run without one. Who the agent is is in the system prompt.
   await expect(prompt.locator(".ps-label", { hasText: "Who you are" })).toBeVisible();
+  await expect(prompt.locator(".ps-label", { hasText: "Working in Paperclip" })).toBeVisible();
+  await expect(prompt.locator(".ps-label", { hasText: "Instructions file location" })).toBeVisible();
   await expect(prompt.getByLabel("Kind")).toBeDisabled();
 
   // The agent's own task, then a comment on it.

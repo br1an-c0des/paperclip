@@ -17,11 +17,16 @@ export type {
 } from "./wake/render.js";
 export type { ClaudeCliPromptInput, ClaudeCliPromptSectionTexts } from "./legacy-prompt.js";
 export {
+  CLAUDE_INSTRUCTIONS_RELATIVE_NOTE,
   claudeIdentityLine,
   claudeInstructionsLocation,
-  claudeToolsNote,
-  claudeToolsNoteEndsRun,
+  claudeSkillsSection,
+  PAPERCLIP_INSTRUCTION_COPY_KEY,
+  readClaudeInstructionCopy,
+  WORKING_IN_PAPERCLIP,
+  WORKING_IN_PAPERCLIP_ENDING,
 } from "./standing-texts.js";
+export type { ClaudeInstructionCopy } from "./standing-texts.js";
 export { planClaudeInstructionsDirective, planClaudeRunSkillsAndInstructions } from "./run-plan.js";
 export { buildClaudePromptRecord, PAPERCLIP_RUN_PROMPT_PLAN_KEY, readRunPromptPlan } from "./prompt-record.js";
 export * from "./acp.js";

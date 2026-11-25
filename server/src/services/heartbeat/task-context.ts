@@ -100,7 +100,11 @@ export interface HeartbeatTaskContextInput {
   policy: {
     recovering?: boolean;
     trustPreset: Pick<TrustPresetResolution, "kind">;
-    experimentalInstanceSettings: { enableSimplifiedEnglishInteractions?: boolean; enableCases?: boolean; enableConferenceRoomChat?: boolean; enableStatusCards?: boolean };
+    experimentalInstanceSettings: {
+      enableSimplifiedEnglishInteractions?: boolean; enableCases?: boolean; enableConferenceRoomChat?: boolean; enableStatusCards?: boolean;
+      /** The fast-response note goes in the communication guidance only when this is on. */
+      enableFastResponses?: boolean;
+    };
   };
   services: {
     issuesSvc: Pick<ReturnType<typeof issueService>, "getAncestors">;
@@ -484,7 +488,13 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
   } else {
     delete context.paperclipRunTask;
   }
-  context.paperclipTaskCommunicationGuidance = [context.paperclipTaskCommunicationGuidance, FAST_RESPONSE_AGENT_GUIDANCE].filter(Boolean).join("\n\n");
+  // The fast-response note only when the instance's experimental flag is on (step 5 phase 2, the
+  // system prompt), for every adapter. It stays in the first message, so turning the flag on or
+  // off doesn't reset sessions. The heartbeat and the run preview pass the instance's experimental
+  // settings in.
+  if (experimentalInstanceSettings.enableFastResponses === true) {
+    context.paperclipTaskCommunicationGuidance = [context.paperclipTaskCommunicationGuidance, FAST_RESPONSE_AGENT_GUIDANCE].filter(Boolean).join("\n\n");
+  }
   if (issueRef) {
     const redactedWakeContext = await createRunSecretRedactionRegistry(
       db,

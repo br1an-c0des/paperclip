@@ -39,7 +39,7 @@ export function RunManifest(props: { manifest: ClaudeRunManifest }) {
             <MonoValue>{claudeMd().text}</MonoValue>
           </Show>
         </ManifestRow>
-        <ManifestRow label="Instructions">{instructionsText(props.manifest.instructions)}</ManifestRow>
+        <ManifestRow label="Instructions">{instructionsText(props.manifest.instructions, props.manifest.session)}</ManifestRow>
         <ManifestRow label="Session">{sessionText(props.manifest.session, shortId)}</ManifestRow>
         <AutoMemoryRow />
         <Show when={setAside()}>
