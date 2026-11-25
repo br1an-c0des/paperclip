@@ -1659,3 +1659,17 @@ Found 2026-11-24 while mapping the prompt for step 5 phase 2 (desktop dev instan
 - **Likely fix:** in `buildRunPreviewPrompt` (`server/src/services/run-preview-prompt.ts`), turn the
   error into a 422 with a code (`task_not_runnable`, say) and a plain message ("This task is done,
   so assigning it wouldn't start a run"), and show it in the preview like `no_comment`.
+
+### 94. An "Other" answer shows its option id in the answer summary
+
+Found 2026-11-24 in the wake's real-run check (run `da19589b`, TES-45, desktop dev instance).
+Candidate.
+
+- **Problem:** when the user answers an agent's question with "Other" and types text, the answer
+  summary the agent receives reads `…: paperclip_custom_answer, Both, the header dropdown…`.
+  `questionAnswerLines` (`server/src/services/question-response-delivery.ts`) maps each selected
+  option id to its label, falling back to the id. The free-text option `paperclip_custom_answer`
+  isn't in the map it builds, so the raw id is printed before the typed text.
+- **Likely fix:** skip the custom-answer option id when the answer has custom text (or map it to
+  nothing), so the line reads `…: Both, the header dropdown…`. A test in
+  `question-response-delivery.test.ts`.
