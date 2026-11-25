@@ -440,3 +440,102 @@ export const fixtures = {
 } satisfies Record<string, Record<string, unknown>>;
 
 export type WakeFixtureName = keyof typeof fixtures;
+
+// --- The task's history (step 5 phase 2, the handoff) ----------------------------------------
+
+/**
+ * Run e365cdbd on TES-45: a fresh session on a task with history, from its recorded first
+ * message (the wake's comments, the handoff's run summary and answered question), with plain
+ * made-up ids. The user is "Brian" (the design's sketch), the woken agent `SELF`. The request
+ * texts and the documents follow the design's sketch; the times are the run's (America/Denver).
+ */
+const tes45 = { ...issue, id: "issue-tes-45", title: "M7 test wake: dark mode notes", description: "This is a test of how you're woken. Keep each run short.\n\nWrite three one-line ideas for a dark mode toggle in a comment on this task. Then end the run with paperclip_report_progress (without continue), leaving the task open: I'll reply with feedback." };
+const tes45Message = (id: string, body: string, author: { type: string; id: string }, createdAt: string) =>
+  message(id, body, author, createdAt);
+const tes45Messages = [
+  tes45Message("c-ideas", "Three dark mode toggle ideas:\n1. A sun/moon icon button in the header that flips theme instantly and remembers the choice in localStorage.\n2. A three-way switch (Light / Dark / System) in settings that follows the OS `prefers-color-scheme` by default.\n3. A keyboard shortcut (e.g. Ctrl+Shift+D) with a brief toast confirming the active theme.", ada, "2026-11-25T00:37:10.000Z"),
+  tes45Message("c-posted", "Posted three dark mode toggle ideas in a comment. Leaving the task open for your feedback.", ada, "2026-11-25T00:37:15.000Z"),
+  tes45Message("c-already", "Ideas already posted above; waiting on your feedback.", ada, "2026-11-25T00:37:30.000Z"),
+  tes45Message("c-still", "Still waiting on board feedback; nothing new to do.", ada, "2026-11-25T00:37:39.608Z"),
+  tes45Message("c-no-feedback", "There's still no feedback on TES-45. The three ideas are posted and the task is open. The earlier recovery flag is cleared, so I'm not posting another comment. I'm waiting for your reply.", ada, "2026-11-25T00:37:47.574Z"),
+  tes45Message("c-waiting", "Waiting on feedback.", ada, "2026-11-25T00:37:50.828Z"),
+  tes45Message("c-three", "Three ideas posted; waiting on board feedback.", ada, "2026-11-25T00:37:58.298Z"),
+  tes45Message("c-idea-2", "Thanks. Go with idea 2, the three-way switch. Before you write anything else, ask me one question about it with paperclip_ask_board (give me two or three choices), and wait for my answer.", brian, "2026-11-25T00:39:16.899Z"),
+  tes45Message("c-asked", "I asked you one question on TES-45 and I'm waiting for your answer. I haven't written anything else yet.\n\nThe question: where should the Light / Dark / System switch live in the UI? The choices are:\n- Settings page only\n- Header dropdown, always visible\n- Both: header dropdown and settings page", ada, "2026-11-25T00:39:23.519Z"),
+  tes45Message("c-approval", "I've requested your approval on TES-45 to build the switch, and I'm waiting for your decision before building anything.\n\nThe request covers a Light / Dark / System switch in both the header dropdown and the settings page, as you answered. System follows the OS `prefers-color-scheme` by default, and the choice is saved in localStorage. I listed one risk: the two entry points must stay in sync with the same stored preference.", ada, "2026-11-25T00:40:06.197Z"),
+  tes45Message("c-plan", "Plan for the Light / Dark / System switch:\n1. Store one `theme` preference (`light` | `dark` | `system`) in localStorage, defaulting to `system`.\n2. On load, resolve the theme (using `prefers-color-scheme` for `system`) and set a `data-theme` attribute on the root element; listen for OS changes while on `system`.\n3. Build one shared three-option switch component and render it in both the header dropdown and the settings page, both reading and writing the same stored preference.\n4. Quick manual check: each option applies, the choice survives reload, and the two switches stay in sync.", ada, "2026-11-25T00:40:40.200Z"),
+  tes45Message("c-short-plan", "Posted a short plan for the Light/Dark/System switch (header dropdown and settings page, shared stored preference), as approved. No code written.", ada, "2026-11-25T00:40:41.740Z"),
+  tes45Message("c-reopen", "Reopening this for one last step: in a single comment, sum up what we agreed (where the switch lives and what you planned), then finish the task.", brian, "2026-11-25T00:41:02.372Z"),
+];
+const tes45RunSummary = "I posted a four-step plan for the Light / Dark / System switch as a comment on TES-45, and the task is now marked done. I wrote no code, as you asked.\n\nThe plan:\n1. **Storage:** keep one `theme` preference in localStorage, defaulting to `system`.\n2. **Applying it:** on load, resolve the theme and set a `data-theme` attribute on the root element. While on `system`, it follows OS changes.\n3. **UI:** one shared three-option switch component, shown in both the header dropdown and the settings page. Both read and write the same stored preference.\n4. **Check:** each option applies, the choice survives a reload, and the two switches stay in sync.";
+/** Today's generated continuation summary: the history leaves it out. */
+const tes45ContinuationSummary = `# Continuation Summary\n\n- Issue: TES-45 — M7 test wake: dark mode notes\n- Status: done\n\n## Objective\n\n${tes45.description}\n\n## Recent Concrete Actions\n\n- ${tes45RunSummary}\n\n## Files / Routes Touched\n\n- No file or route paths were detected in the captured run summary.`;
+
+export const brianRef = { type: "user" as const, id: BRIAN };
+export const adaRef = { type: "agent" as const, id: SELF };
+
+/** An answered question: "Where should the switch go? → Both places". */
+export const answeredQuestion = {
+  id: "interaction-where",
+  kind: "ask_user_questions",
+  status: "answered",
+  title: null,
+  aboutPlan: false,
+  questions: [{
+    id: "q-where",
+    prompt: "Where should the switch go?",
+    options: [
+      { id: "settings", label: "Settings page only" },
+      { id: "header", label: "Header dropdown" },
+      { id: "both", label: "Both places" },
+      { id: "paperclip_custom_answer", label: "Other" },
+    ],
+  }],
+  answers: [{ questionId: "q-where", optionIds: ["both"], otherText: null }],
+  askedBy: adaRef,
+  decidedBy: brianRef,
+  askedAt: "2026-11-25T00:39:20.000Z",
+  decidedAt: "2026-11-25T00:39:50.000Z",
+};
+
+/** An approval linked to the task, approved with a note. */
+export const approvedRequest = {
+  id: "approval-build",
+  kind: "approval",
+  status: "approved",
+  title: "Build the switch",
+  aboutPlan: false,
+  outcome: "approved",
+  note: "Fine, but plan only.",
+  askedBy: adaRef,
+  decidedBy: brianRef,
+  askedAt: "2026-11-25T00:40:05.000Z",
+  decidedAt: "2026-11-25T00:40:25.000Z",
+};
+
+export const tes45History = {
+  lastRun: {
+    runId: "run-ecd990d4", agentId: SELF, ownRun: true, status: "succeeded",
+    finishedAt: "2026-11-25T00:40:44.154Z", body: tes45RunSummary, bodyTruncated: false,
+  },
+  answered: [approvedRequest, answeredQuestion],
+  answeredOmitted: 0,
+  open: [] as Array<Record<string, unknown>>,
+  documents: [{ key: "plan", title: "Plan", inBrief: true }, { key: "notes", title: "Notes", inBrief: false }],
+};
+
+export const historyFixtures = {
+  /** Run e365cdbd: assigned again on a fresh session, with the task's history. */
+  tes45: {
+    ...base,
+    timeZone: "America/Denver",
+    reason: "issue_assigned",
+    actor: brianRef,
+    issue: tes45,
+    comments: [],
+    checkedOutByHarness: true,
+    executionContinuation: continuation({ issueId: tes45.id, objective: tes45.description, messages: tes45Messages }),
+    continuationSummary: { body: tes45ContinuationSummary },
+    history: tes45History,
+  },
+} satisfies Record<string, Record<string, unknown>>;
