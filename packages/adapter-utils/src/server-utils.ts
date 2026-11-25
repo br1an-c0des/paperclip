@@ -637,6 +637,25 @@ type PaperclipWakeIssue = {
   status: string | null;
   workMode: string | null;
   priority: string | null;
+  /** Step 5 phase 2: the task's assignee, for the claude_local wake. Present only when set. */
+  assigneeAgentId?: string | null;
+  assigneeUserId?: string | null;
+  /** The routine that made the task. Present only when set. */
+  routineName?: string | null;
+};
+
+/** Who caused the wake: the wakeup request's requester. */
+export type PaperclipWakeActorRef = { type: "user" | "agent" | "system"; id: string | null };
+
+/** The approval an approval wake is about. */
+export type PaperclipWakeApproval = {
+  id: string;
+  type: string;
+  /** One line: the payload's title, summary or name. */
+  summary: string | null;
+  status: string;
+  decisionNote: string | null;
+  decidedByUserId: string | null;
 };
 
 type PaperclipWakeExecutionPrincipal = {
@@ -904,8 +923,19 @@ type PaperclipWakeRecovery = {
 export type PaperclipExternalChatProvider =
   "slack" | "github" | "discord" | "microsoft-teams" | "telegram" | "imessage-photon" | "speko";
 
-type PaperclipWakePayload = {
+export type PaperclipWakePayload = {
   githubReviewConfigurations: Array<{ key: string; instructions: string }>;
+  /**
+   * Step 5 phase 2 (fork/step-5-wake-plan.md, "The contract"), read by the claude_local wake.
+   * Each is present only when the payload carries it, so the normalized shape of older payloads
+   * doesn't change.
+   */
+  approval?: PaperclipWakeApproval | null;
+  actor?: PaperclipWakeActorRef | null;
+  /** "user:<id>" | "agent:<id>" -> display name. */
+  names?: Record<string, string>;
+  /** An IANA zone for the wake's times. */
+  timeZone?: string | null;
   executionContinuation: ExecutionContinuationEnvelope | null;
   reason: string | null;
   recovery: PaperclipWakeRecovery | null;
@@ -1028,6 +1058,9 @@ function normalizePaperclipWakeIssue(
   const workMode = asString(issue.workMode, "").trim() || null;
   const priority = asString(issue.priority, "").trim() || null;
   if (!id && !identifier && !title) return null;
+  const assigneeAgentId = asString(issue.assigneeAgentId, "").trim() || null;
+  const assigneeUserId = asString(issue.assigneeUserId, "").trim() || null;
+  const routineName = asString(issue.routineName, "").trim() || null;
   return {
     id,
     identifier,
@@ -1037,7 +1070,42 @@ function normalizePaperclipWakeIssue(
     status,
     workMode,
     priority,
+    ...(assigneeAgentId ? { assigneeAgentId } : {}),
+    ...(assigneeUserId ? { assigneeUserId } : {}),
+    ...(routineName ? { routineName } : {}),
   };
+}
+
+function normalizePaperclipWakeApproval(value: unknown): PaperclipWakeApproval | null {
+  const approval = parseObject(value);
+  const id = asString(approval.id, "").trim();
+  const type = asString(approval.type, "").trim();
+  const status = asString(approval.status, "").trim();
+  if (!id || !type || !status) return null;
+  return {
+    id,
+    type,
+    summary: asString(approval.summary, "").trim() || null,
+    status,
+    decisionNote: asString(approval.decisionNote, "").trim() || null,
+    decidedByUserId: asString(approval.decidedByUserId, "").trim() || null,
+  };
+}
+
+function normalizePaperclipWakeActor(value: unknown): PaperclipWakeActorRef | null {
+  const actor = parseObject(value);
+  const type = actor.type;
+  if (type !== "user" && type !== "agent" && type !== "system") return null;
+  return { type, id: asString(actor.id, "").trim() || null };
+}
+
+function normalizePaperclipWakeNames(value: unknown): Record<string, string> | null {
+  const names: Record<string, string> = {};
+  for (const [key, name] of Object.entries(parseObject(value))) {
+    if (!/^(user|agent):.+$/.test(key) || typeof name !== "string" || !name.trim()) continue;
+    names[key] = name.trim();
+  }
+  return Object.keys(names).length > 0 ? names : null;
 }
 
 function normalizePaperclipWakeComment(
@@ -1959,6 +2027,10 @@ export function normalizePaperclipWakePayload(
   );
   const agentMessage = normalizePaperclipWakeAgentMessage(payload.agentMessage);
   const issue = normalizePaperclipWakeIssue(payload.issue);
+  const approval = normalizePaperclipWakeApproval(payload.approval);
+  const actor = normalizePaperclipWakeActor(payload.actor);
+  const names = normalizePaperclipWakeNames(payload.names);
+  const timeZone = asString(payload.timeZone, "").trim() || null;
   const skillTest =
     issue?.workMode === "skill_test" ||
     payload.skillTest === true ||
@@ -1984,12 +2056,18 @@ export function normalizePaperclipWakePayload(
     !executionWorkspace &&
     !agentMessage &&
     !recovery &&
-    !issue
+    !issue &&
+    // An approval with no linked task still wakes with a payload (step 5 phase 2).
+    !approval
   ) {
     return null;
   }
 
   return {
+    ...(approval ? { approval } : {}),
+    ...(actor ? { actor } : {}),
+    ...(names ? { names } : {}),
+    ...(timeZone ? { timeZone } : {}),
     reason: asString(payload.reason, "").trim() || null,
     // Server-owned delivery snapshots also restore instructions for board wakes.
     // This field does not authenticate an external-chat turn or grant tools.
