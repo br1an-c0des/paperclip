@@ -1691,3 +1691,18 @@ dev instance). Candidate.
 - **Likely fix:** keep only the current wake's own origin comments in the delta unconditionally;
   include inherited origins only when the base run didn't deliver them. A test in
   `execution-continuation.test.ts`.
+
+### 96. Paperclip doesn't record when Claude compacts a CLI session
+
+Found 2026-11-24 by step 5's task-brief work (the Data agent, `step5-brief/data`). Candidate.
+
+- **Problem:** the run transcript's compaction divider and `issue-context-usage.ts` read
+  `context.compacted` run events, which only the Paperclip Runner writes. The `claude_local`
+  adapter's parsers (`parse.ts`, `execute.ts`, `acp.ts`, `ui/parse-stdout.ts`) don't handle
+  Claude's `compact_boundary` stream event, so a CLI run that auto-compacts leaves no record.
+- **Effect:** the run message can't tell that a session was compacted, so it doesn't resend the
+  description and plan afterwards (`compactedSinceLastRun` is always false), and the transcript
+  shows no divider for CLI runs. Related to bug 90 (the system prompt lost after a compaction).
+- **Likely fix:** have the `claude_local` parser record a `context.compacted` run event when the
+  stream carries `compact_boundary`, then set `compactedSinceLastRun` from it
+  (`server/src/services/heartbeat/run-task-facts.ts`).
