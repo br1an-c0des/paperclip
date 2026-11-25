@@ -38,6 +38,8 @@ export const COMMENTS = {
   seen: "(you've seen this)",
   cutShort: "(This comment was cut short; `paperclip_read_task` has all of it.)",
   others: "Other new comments on {{taskRef}}:",
+  /** A resumed session's comments that an earlier run already received; no rule goes with them. */
+  earlier: "Earlier comments on {{taskRef}}:",
   omitted: "{{count}} more comments on {{taskRef}} aren't shown here; `paperclip_read_task` reads up to 100.",
   omittedOne: "1 more comment on {{taskRef}} isn't shown here; `paperclip_read_task` reads up to 100.",
 } as const;
@@ -168,6 +170,7 @@ export const EVENTS = {
   },
   retry: {
     text: "This is a retry: the last run didn't finish handling {{reason}}.",
+    plain: "This is a retry of a run that didn't finish.",
   },
   run_stopped: {
     withCause: "Your last run on {{taskRef}} stopped before finishing: {{cause}}.",
@@ -176,7 +179,10 @@ export const EVENTS = {
   },
   continue: {
     text: "Paperclip woke you to continue {{taskRef}} from where your last run left off.",
-    rules: ["Pick up where you left off; don't redo finished steps."],
+    rules: [
+      "Pick up where you left off; don't redo finished steps.",
+      "End the run with `paperclip_finish`, `paperclip_block` (if you're waiting on someone) or `paperclip_report_progress` with `continue: true`.",
+    ],
   },
   recovery: {
     text: "{{task}} ({{assignee}}'s task) is stuck: {{cause}}.",

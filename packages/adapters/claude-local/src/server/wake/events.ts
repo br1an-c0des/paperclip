@@ -50,6 +50,12 @@ export interface ClaudeWakeComments {
   edited: ClaudeWakeComment[];
   /** A fresh session's earlier messages (the continuation record's), oldest first, news left out. */
   history: ClaudeWakeComment[];
+  /**
+   * A resumed session's comments that an earlier run already received: never news. The batch's
+   * comments marked `readByEarlierTurn`, and the record's origin comments that came in with the
+   * resume delta though they aren't in this wake's batch (see `selectClaudeWakeComments`).
+   */
+  earlier: ClaudeWakeComment[];
 }
 
 type Continuation = NonNullable<PaperclipWakePayload["executionContinuation"]>;
@@ -68,8 +74,15 @@ function byCreatedAt(left: ClaudeWakeComment, right: ClaudeWakeComment): number 
 }
 
 /**
- * Splits the wake's comments: what's new (the news), what was edited, and the history a fresh
- * session needs. The woken agent's own comments are never news.
+ * Splits the wake's comments: what's new (the news), what was edited, the history a fresh session
+ * needs, and, on a resumed session, what an earlier run already received. The woken agent's own
+ * comments are never news.
+ *
+ * Why "earlier" (run da19589b): the record's resume delta keeps every origin comment even when
+ * the base run delivered it (execution-continuation.ts, `originCommentIds.includes(message.id) ||
+ * !delivered`), and the origins include the source run's and the interaction's. So an answered
+ * question brings back the comment that woke the run which asked it. An origin in the delta that
+ * isn't in this wake's batch is that case; it's shown as seen, not as news.
  */
 export function selectClaudeWakeComments(
   payload: PaperclipWakePayload,
@@ -77,7 +90,7 @@ export function selectClaudeWakeComments(
 ): ClaudeWakeComments {
   const own = (comment: { authorType: string | null; authorId: string | null }) =>
     comment.authorType === "agent" && comment.authorId === options.agentId;
-  const news: ClaudeWakeComment[] = payload.comments
+  const batch: ClaudeWakeComment[] = payload.comments
     .filter((comment) => !own(comment))
     .map((comment) => ({
       id: comment.id,
@@ -88,6 +101,9 @@ export function selectClaudeWakeComments(
       authorId: comment.authorId,
       seen: comment.readByEarlierTurn,
     }));
+  // On a resumed session, a comment an earlier run read is history the session holds.
+  const news = options.resumedSession ? batch.filter((comment) => !comment.seen) : batch;
+  const earlier = options.resumedSession ? batch.filter((comment) => comment.seen) : [];
   const batchIds = new Set(payload.comments.map((comment) => comment.id).filter(Boolean));
   const continuation = wakeContinuation(payload);
   const edited: ClaudeWakeComment[] = [];
@@ -105,7 +121,8 @@ export function selectClaudeWakeComments(
     // Every new or edited message since the last run, not only this wake's batch.
     for (const message of continuation?.resumeDelta?.messages ?? []) {
       if (message.deleted || batchIds.has(message.id) || own({ authorType: message.authorType, authorId: message.authorId })) continue;
-      if (message.updatedAt && message.createdAt && message.updatedAt !== message.createdAt) edited.push(fromMessage(message));
+      if (continuation?.originCommentIds.includes(message.id)) earlier.push({ ...fromMessage(message), seen: true });
+      else if (message.updatedAt && message.createdAt && message.updatedAt !== message.createdAt) edited.push(fromMessage(message));
       else news.push(fromMessage(message));
     }
   } else {
@@ -114,7 +131,7 @@ export function selectClaudeWakeComments(
       history.push(fromMessage(message));
     }
   }
-  return { news: news.sort(byCreatedAt), edited, history: history.sort(byCreatedAt) };
+  return { news: news.sort(byCreatedAt), edited, history: history.sort(byCreatedAt), earlier: earlier.sort(byCreatedAt) };
 }
 
 /** Events that quote the latest comment themselves; any other new comments follow them. */
@@ -148,6 +165,17 @@ const REASON_EVENTS: Record<string, ClaudeWakeEventKind> = {
  * "continue", not "run_stopped": with no `recovery` object nothing failed that the wake can name.
  */
 const CONTINUE_REASONS = new Set(["issue_continuation_needed", "issue_recovery_action_restored"]);
+
+/**
+ * Wake reasons that re-run a failed run: a person's Retry (`task_retry`, `retry_failed_run`) or a
+ * bounded transient retry (`transient_failure_retry`, heartbeat/retries.ts). `trigger.retriedReason`
+ * alone doesn't make a retry: execution-continuation.ts sets it on any run with a `retryOfRunId`,
+ * which disposition repairs and liveness continuations have too.
+ */
+export const RETRY_REASONS: ReadonlySet<string> = new Set(["task_retry", "retry_failed_run", "transient_failure_retry"]);
+
+/** Events that already say why the agent runs again; "retry" adds nothing to them. */
+const REPAIR_EVENTS: readonly ClaudeWakeEventKind[] = ["run_stopped", "continue", "recovery", "run_only_planned", "run_unfinished"];
 
 export function isMonitorReason(reason: string | null): boolean {
   return Boolean(reason?.startsWith("issue_monitor_"));
@@ -224,10 +252,12 @@ export function detectClaudeWakeEvents(
   if (comments.edited.length > 0) found.add("comment_edited");
   if (continuation?.interruptedRunId) found.add("interrupted");
   if (continuation?.priorWorkspace || (continuation?.recoveredFiles?.length ?? 0) > 0) found.add("retry_workspace");
-  if (continuation?.trigger?.retriedReason) found.add("retry");
-  if (payload.recovery || reason === "source_scoped_recovery_action") {
+  // A liveness or disposition repair is the more specific event: its recovery action (when the
+  // payload carries one) is that repair, so no run_stopped, recovery or continue beside it.
+  const repair = Boolean(payload.livenessContinuation || payload.dispositionRepair);
+  if (!repair && (payload.recovery || reason === "source_scoped_recovery_action")) {
     found.add(payload.recovery && isOwnRecovery(payload, agentId) ? "run_stopped" : "recovery");
-  } else if (reason && CONTINUE_REASONS.has(reason) && !payload.livenessContinuation && !payload.dispositionRepair) {
+  } else if (!repair && reason && CONTINUE_REASONS.has(reason)) {
     found.add("continue");
   }
   if (payload.livenessContinuation) found.add("run_only_planned");
@@ -237,6 +267,7 @@ export function detectClaudeWakeEvents(
   if (primary === "monitor_due") found.add("monitor_due");
   if (payload.taskWatchdog || primary === "watchdog") found.add("watchdog");
   if (payload.treeHoldInteraction || payload.dependencyBlockedInteraction) found.add("held");
+  if (reason && RETRY_REASONS.has(reason) && !REPAIR_EVENTS.some((kind) => found.has(kind))) found.add("retry");
 
   const ordered = CLAUDE_WAKE_EVENT_ORDER.filter((kind) => found.has(kind));
   if (primary && found.has(primary)) {

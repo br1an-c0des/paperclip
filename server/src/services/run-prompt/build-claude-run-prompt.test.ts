@@ -233,7 +233,8 @@ const kinds: RunKind[] = [
   },
   {
     name: "recovery",
-    shows: ["Your last run on PAP-1 stopped before finishing: its process was lost (the process exited).", "Your last run on PAP-1 ended without concrete progress (attempt 1 of 2)."],
+    // The liveness continuation is the specific event; the recovery object doesn't add run_stopped.
+    shows: ["Your last run on PAP-1 ended without concrete progress (attempt 1 of 2)."],
     input: () => runInput(withBrief({
       paperclipTaskCommunicationGuidance: guidance,
       paperclipWake: {

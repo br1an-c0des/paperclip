@@ -106,7 +106,7 @@ const EVENT_SOURCES: Record<ClaudeWakeEventKind, string> = {
   comment_edited: "wake payload: executionContinuation.resumeDelta",
   interrupted: "wake payload: executionContinuation.interruptedRunId",
   retry_workspace: "wake payload: executionContinuation.priorWorkspace, recoveredFiles",
-  retry: "wake payload: executionContinuation.trigger.retriedReason",
+  retry: "wake payload: reason (a retry), executionContinuation.trigger.retriedReason",
   run_stopped: "wake payload: recovery, reason",
   continue: "wake payload: reason (a continuation with no recovery)",
   recovery: "wake payload: recovery, executionContinuation.recoveryOutcomes",
@@ -124,6 +124,7 @@ const EVENT_SOURCES: Record<ClaudeWakeEventKind, string> = {
 const PART_META: Readonly<Record<string, PaperclipPromptPartMeta>> = {
   "wake.what_happened": { label: "What happened", source: "claude_local wake: heading" },
   "wake.comments": { label: "Other new comments", source: "wake payload: comments" },
+  "wake.earlier_comments": { label: "Earlier comments", source: "wake payload: comments read by an earlier run, record origin comments" },
   "wake.omitted_comments": { label: "Omitted comments", source: "wake payload: comment window" },
   "wake.session_note": { label: "Session note", source: "claude_local wake: resumed or fresh session" },
   "wake.where_things_stand": { label: "Where things stand", source: "wake payload: continuationSummary, executionContinuation.messages" },
@@ -334,7 +335,7 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       return {
         text: lines(
           t(wake.issue ? EVENTS.questions_answered.onTask : EVENTS.questions_answered.plain, { ...data, who }),
-          quoteClaudeWakeText(response.summaryMarkdown),
+          quoteClaudeWakeText(answersText(response.summaryMarkdown)),
           response.truncated && EVENTS.questions_answered.cutShort,
         ),
         rules: EVENTS.questions_answered.rules,
@@ -484,8 +485,8 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       };
     }
     case "retry": {
-      const retried = wakeContinuation(wake)?.trigger?.retriedReason ?? "";
-      return { text: t(EVENTS.retry.text, { reason: reasonWords(retried) }) };
+      const retried = wakeContinuation(wake)?.trigger?.retriedReason;
+      return { text: retried ? t(EVENTS.retry.text, { reason: reasonWords(retried) }) : EVENTS.retry.plain };
     }
     case "run_stopped": {
       const cause = causeText(wake.recovery);
@@ -568,6 +569,16 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       return { text };
     }
   }
+}
+
+/**
+ * The server's answer summary without its own heading ("Resolved questions and answers:",
+ * question-response-delivery.ts), which the wake's sentence already says.
+ */
+function answersText(summary: string): string {
+  const [first, ...rest] = summary.replace(/\r\n?/g, "\n").split("\n");
+  const remainder = rest.join("\n").trim();
+  return /^\s*resolved questions and answers[:.]?\s*$/i.test(first ?? "") && remainder ? remainder : summary;
 }
 
 function causeText(recovery: PaperclipWakePayload["recovery"]): string | null {
@@ -729,16 +740,15 @@ function renderHistory(ctx: Ctx, history: ClaudeWakeComment[]): string | null {
   return lines(...blocks);
 }
 
-function renderWhereThingsStand(ctx: Ctx, events: ClaudeWakeEventKind[]): string | null {
-  const { wake, options } = ctx;
-  const recoveryWake = events.includes("run_stopped") || events.includes("recovery");
-  const summary = wake.continuationSummary;
-  const showSummary = Boolean(summary) && (!options.resumedSession || recoveryWake);
-  const history = options.resumedSession ? null : renderHistory(ctx, ctx.comments.history);
-  if (!showSummary && !history) return null;
+/** Fresh sessions only: a resumed session already holds the history, recovery wakes included. */
+function renderWhereThingsStand(ctx: Ctx): string | null {
+  if (ctx.options.resumedSession) return null;
+  const summary = ctx.wake.continuationSummary;
+  const history = renderHistory(ctx, ctx.comments.history);
+  if (!summary && !history) return null;
   return lines(
     HEADINGS.whereThingsStand,
-    showSummary && summary && lines(WHERE_THINGS_STAND.summary, quoteClaudeWakeText(summary.body), summary.bodyTruncated && WHERE_THINGS_STAND.summaryCut),
+    summary && lines(WHERE_THINGS_STAND.summary, quoteClaudeWakeText(summary.body), summary.bodyTruncated && WHERE_THINGS_STAND.summaryCut),
     history,
   );
 }
@@ -788,6 +798,10 @@ export function renderClaudeWakeParts(payload: unknown, options: ClaudeWakeRende
     const rule = others.length === 1 ? EVENTS.comment.rulesOne[0] : EVENTS.comment.rulesMany[0];
     if (!rules.includes(rule)) rules.push(rule);
   }
+  if (ctx.comments.earlier.length > 0) {
+    blocks.push({ id: "wake.earlier_comments", text: lines(t(COMMENTS.earlier, { taskRef: ctx.taskRef }),
+      ...ctx.comments.earlier.map((comment) => commentItem(ctx, comment))) });
+  }
   const omitted = Math.max(wake.missingCount, wake.cutCount);
   if (omitted > 0) {
     blocks.push({ id: "wake.omitted_comments", text: omitted === 1
@@ -798,7 +812,7 @@ export function renderClaudeWakeParts(payload: unknown, options: ClaudeWakeRende
     ? SESSION_NOTES.resumed
     : options.handoffPresent ? SESSION_NOTES.freshWithHandoff : null;
   if (sessionNote) blocks.push({ id: "wake.session_note", text: sessionNote });
-  const where = renderWhereThingsStand(ctx, events);
+  const where = renderWhereThingsStand(ctx);
   if (where) blocks.push({ id: "wake.where_things_stand", text: where });
   const task = renderTaskLine(ctx);
   if (task) blocks.push({ id: "wake.task", text: task });
