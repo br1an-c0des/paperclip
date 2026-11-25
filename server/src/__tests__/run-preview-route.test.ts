@@ -150,9 +150,16 @@ const support = await getEmbeddedPostgresTestSupport();
       expect(drafted.status).toBe(200);
       expect(drafted.body).toMatchObject({ supported: true, project: { id: projectId } });
       expect(drafted.body.prompt).toMatchObject({ kind: "assignment", issueId: null });
-      const brief = drafted.body.prompt.firstMessage.find((section: { id: string }) => section.id === "task_brief");
-      expect(brief.text).toContain('- Issue: "PDA-1"');
-      expect(brief.text).toContain("Ask mode directive:");
+      // A non-chat task's run message (step 5 phase 2, the task brief): the task under "The task",
+      // its mode's rule under "What to do now", and no separate brief.
+      const sections = drafted.body.prompt.firstMessage as Array<{ id: string; text: string }>;
+      const section = (id: string) => sections.find((entry) => entry.id === id);
+      expect(sections.map((entry) => entry.id)).toEqual(expect.arrayContaining(["what_happened", "the_task", "to_do"]));
+      expect(section("task_brief")).toBeUndefined();
+      expect(section("the_task")!.text).toContain('PDA-1 "M7 test draft"');
+      expect(section("the_task")!.text).toContain("work mode: ask");
+      expect(section("the_task")!.text).toContain("> Count the ledger.");
+      expect(section("to_do")!.text).toContain("This task is in ask mode: answer the question in a comment on the task.");
       // Nothing was made.
       expect((await db.select({ id: issues.id }).from(issues)).length).toBe(2);
 
