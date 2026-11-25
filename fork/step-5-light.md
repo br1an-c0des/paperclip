@@ -1,6 +1,6 @@
 # Step 5, phase 2: the light sections
 
-**Draft, 2026-11-25; not yet approved.** The fourth piece of phase 2 of step 5, after the wake
+**Approved by the user, 2026-11-25.** The fourth piece of phase 2 of step 5, after the wake
 ([step-5-wake.md](step-5-wake.md)), the handoff ([step-5-handoff.md](step-5-handoff.md)) and the
 task brief ([step-5-brief.md](step-5-brief.md)). The user chose "trim in place" (below) on
 2026-11-25 and agreed to cut the heartbeat template down to the identity line.
@@ -215,6 +215,9 @@ WHERE a.adapter_config ? 'promptTemplate'
 ORDER BY a.adapter_type, a.name;
 ROLLBACK;
 ```
+
+**Ran 2026-11-25: no rows.** server1's five agents are all `claude_local`, none sets a template, an
+engine or a rotation override, so the design stands as written.
 
 - **No rows, or only `engine` set to `cli`/`auto`:** the design stands as written.
 - **A template:** shown to the user, who decides per agent (move into `AGENTS.md`, or keep the
