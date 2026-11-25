@@ -49,7 +49,7 @@ function draft(kind: RunPromptPreview["kind"], issueId: string | null, firstMess
   };
 }
 
-const noTaskDraft = draft("no_task", null, [section("task_brief", "Task brief", "null"), section("heartbeat_template", "Heartbeat template", "M7 test: do the work.")]);
+const noTaskDraft = draft("no_task", null, [section("heartbeat_template", "Who you are", "You are M7 test Builder, Builder."), section("task_brief", "Task brief", "null")]);
 
 /** The Runtime section's other reads, which no other spec visits yet: empty answers. */
 function runtimeReads(api: MockApi) {
@@ -179,7 +179,7 @@ test("the Prompt part drafts the next run for a picked task and kind, marking wh
   const prompt = page.locator("section.rp-prompt");
   await expect(prompt.getByRole("heading", { name: "Prompt", exact: true })).toBeVisible();
   // Without a task: the draft of a run without one.
-  await expect(prompt.locator(".ps-label", { hasText: "Heartbeat template" })).toBeVisible();
+  await expect(prompt.locator(".ps-label", { hasText: "Who you are" })).toBeVisible();
   await expect(prompt.getByLabel("Kind")).toBeDisabled();
 
   // The agent's own task, then a comment on it.
