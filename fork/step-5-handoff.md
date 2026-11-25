@@ -1,6 +1,6 @@
 # Step 5, phase 2: the handoff
 
-**Approved by the user, 2026-11-24.** The second section reworked in phase 2 of step 5, after
+**Approved by the user, 2026-11-24; built the same day ([Built](#built)).** The second section reworked in phase 2 of step 5, after
 the wake ([step-5-wake.md](step-5-wake.md)). The user chose approach A (below) on 2026-11-24, and
 asked for the `paperclip_read_task` change to be part of it.
 
@@ -19,6 +19,7 @@ asked for the `paperclip_read_task` change to be part of it.
   - [How it's checked](#how-its-checked)
 - [Left to the builder](#left-to-the-builder)
 - [Calls made in this design](#calls-made-in-this-design)
+- [Built](#built)
 
 ## Intent
 
@@ -292,3 +293,37 @@ Made by me while writing it; check these while reading.
 - **`paperclip_read_task` reads requests without the route's declined-read record.**
 - **Documents are listed, not quoted;** the plan is in the brief, and the rest are a tool call away.
 - **The cap stays 12,000 characters** for the whole section, with the new parts first.
+
+## Built
+
+Built 2026-11-24 on `feat/step-5-handoff` by two agents (server, renderer), merged into `main` as
+`1b837a07d6`. Plan: [step-5-handoff-plan.md](step-5-handoff-plan.md).
+
+- **Where it lives:** `server/src/services/task-request-history.ts` (the requests, the last run and
+  the documents, with the exclusions and trust rule), the payload's `history` field
+  (`run-preparation.ts`), the route `GET /issues/:id/request-history` (records nothing), and
+  `paperclip_read_task` (`requests: true`, `authorName`, `askedByName`, `decidedByName`). The
+  rendering is in the wake renderer (`wake.last_run`, `wake.requests`, `wake.open_requests`,
+  `wake.documents`, `wake.history_comments`); `wakeHistoryReplacesHandoff` (`legacy-prompt.ts`) is
+  the one switch the CLI and the builder share.
+- **Calls made while building:**
+  - A run that didn't succeed says how it ended ("failed, and ended with:").
+  - A rejected plan review reads "sent back"; an approval with `revision_requested`, "sent back for
+    changes"; a question with no answer, "(no answer)". Free-text option ids are never shown.
+  - A request from a lower-trust run is shown by the quarantine note only, beyond what the design
+    asked.
+  - Open requests are capped at 20.
+  - The 12,000-character cap can still be passed in the worst case (a full run summary, eight full
+    requests, and the comments' original request and latest one, which are always kept).
+- **Not carried:** which boxes a checkbox confirmation ticked (only its outcome and reason).
+- **Real run** on the desktop dev instance with "M7 test sealed runner" (paused afterwards), on
+  `2453f5583d`: TES-45 with a plan document added, reassigned to start a fresh session (`28353f5e`). The
+  first message was 12,035 characters (20,234 in `e365cdbd`), with no handoff, one history (last
+  run, both answered requests, the documents line, the comments) and `matchedPlan` true. The agent
+  answered from the earlier answer and the plan, asked nothing, and finished the task.
+- **Checks:** the local checks passed on `2453f5583d`, plus the four extended files covering the
+  wake payload (54 tests). One core file, `agent-file-checkpoint-locking.test.ts`, timed out
+  starting its embedded database while the machine was loaded (core took 537 s against 207 s), and
+  passed alone in 10 s.
+- **Still to look at:** the history keeps every agent comment, including repeated "Waiting on
+  feedback." notes, which make up much of a long task's history.

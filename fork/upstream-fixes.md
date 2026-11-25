@@ -1575,7 +1575,7 @@ Found 2026-11-23 by the step 5 research.
 
 ### 89. Stop prompt texts naming Runner tools and curl recipes runs don't use
 
-Found 2026-11-23 by the step 5 research. **Partly fixed** in step 5's wake rework (`feat/step-5-wake`, 2026-11-24): `claude_local`'s new wake names no REST paths or Runner tools (a test checks), so the comments recipe, the rejected-plan steps and the Runner reviewer text are gone from its runs (the shared renderer, for ACP and the dormant adapters, still has them). The handoff, plan-truncation, attachment and chat texts remain.
+Found 2026-11-23 by the step 5 research. **Partly fixed** in step 5's wake rework (`feat/step-5-wake`, 2026-11-24): `claude_local`'s new wake names no REST paths or Runner tools (a test checks), so the comments recipe, the rejected-plan steps and the Runner reviewer text are gone from its runs (the shared renderer, for ACP and the dormant adapters, still has them). The plan-truncation, attachment and chat texts remain. The handoff (with the Runner's tool names) no longer reaches `claude_local` CLI runs on the agent's own task since step 5's handoff rework (2026-11-24, [step-5-handoff.md](step-5-handoff.md#built)); chat tasks still get it.
 
 - **Problem:** since step 4a, runs work through the `paperclip_*` MCP tools, but several prompt
   texts still describe other tools:
