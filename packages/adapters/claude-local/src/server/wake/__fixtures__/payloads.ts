@@ -289,6 +289,13 @@ export const fixtures = {
     },
     continuationSummary: { body: "Toggle added; persistence half done in src/theme.ts." },
   },
+  /** paperclip_report_progress with continue: true (or the assigned-work sweep): no recovery. */
+  continue: {
+    ...base,
+    reason: "issue_continuation_needed",
+    issue,
+    checkedOutByHarness: true,
+  },
   recovery: {
     ...base,
     reason: "source_scoped_recovery_action",

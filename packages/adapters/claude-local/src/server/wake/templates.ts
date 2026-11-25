@@ -38,8 +38,8 @@ export const COMMENTS = {
   seen: "(you've seen this)",
   cutShort: "(This comment was cut short; `paperclip_read_task` has all of it.)",
   others: "Other new comments on {{taskRef}}:",
-  omitted: "{{count}} more comments on {{taskRef}} aren't shown here; `paperclip_task_context` has them.",
-  omittedOne: "1 more comment on {{taskRef}} isn't shown here; `paperclip_task_context` has it.",
+  omitted: "{{count}} more comments on {{taskRef}} aren't shown here; `paperclip_read_task` reads up to 100.",
+  omittedOne: "1 more comment on {{taskRef}} isn't shown here; `paperclip_read_task` reads up to 100.",
 } as const;
 
 export const WHERE_THINGS_STAND = {
@@ -84,7 +84,7 @@ export const EVENTS = {
   questions_answered: {
     onTask: "{{who}} answered your questions on {{taskRef}}:",
     plain: "{{who}} answered your questions:",
-    cutShort: "(The answers were cut short; `paperclip_task_context` has all of them.)",
+    cutShort: "(The answers were cut short; `paperclip_read_task` has the task's comments.)",
     rules: ["Continue with these answers. Don't ask these questions again."],
   },
   options_picked: {
@@ -174,6 +174,10 @@ export const EVENTS = {
     plain: "Your last run on {{taskRef}} stopped before finishing.",
     rules: ["Continue from where it stopped. Don't redo finished steps, and don't narrate the recovery: at most one short sentence in your next comment."],
   },
+  continue: {
+    text: "Paperclip woke you to continue {{taskRef}} from where your last run left off.",
+    rules: ["Pick up where you left off; don't redo finished steps."],
+  },
   recovery: {
     text: "{{task}} ({{assignee}}'s task) is stuck: {{cause}}.",
     textNoAssignee: "{{task}} is stuck: {{cause}}.",
@@ -201,6 +205,8 @@ export const EVENTS = {
     document: "There are open comments on the document \"{{title}}\":",
     thread: "On \"{{selected}}\":",
     threadPlain: "A thread:",
+    // `paperclip_task_context` is the tool that returns review threads (its heartbeat context's
+    // planReviewContext and documentReviewContext); `paperclip_read_task` returns comments only.
     cut: "(Some threads or comments are left out here; `paperclip_task_context` has them.)",
     rules: ["Answer or resolve each thread."],
     rulesDocument: ["A document's comments allow edits to that document and replies to its threads, not code changes."],

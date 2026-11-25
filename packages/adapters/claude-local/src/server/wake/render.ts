@@ -74,6 +74,7 @@ const EVENT_LABELS: Record<ClaudeWakeEventKind, string> = {
   retry_workspace: "Retry in a fresh workspace",
   retry: "Retry of a failed run",
   run_stopped: "Your last run stopped",
+  continue: "Continue the work",
   recovery: "A task needs recovering",
   run_only_planned: "Run only planned",
   run_unfinished: "Run didn't finish properly",
@@ -107,6 +108,7 @@ const EVENT_SOURCES: Record<ClaudeWakeEventKind, string> = {
   retry_workspace: "wake payload: executionContinuation.priorWorkspace, recoveredFiles",
   retry: "wake payload: executionContinuation.trigger.retriedReason",
   run_stopped: "wake payload: recovery, reason",
+  continue: "wake payload: reason (a continuation with no recovery)",
   recovery: "wake payload: recovery, executionContinuation.recoveryOutcomes",
   run_only_planned: "wake payload: livenessContinuation",
   run_unfinished: "wake payload: dispositionRepair",
@@ -492,6 +494,8 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
         rules: EVENTS.run_stopped.rules,
       };
     }
+    case "continue":
+      return { text: t(EVENTS.continue.text, data), rules: EVENTS.continue.rules };
     case "recovery":
       return renderRecovery(ctx);
     case "run_only_planned": {

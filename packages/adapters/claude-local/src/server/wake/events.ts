@@ -8,7 +8,7 @@ export type ClaudeWakeEventKind =
   | "assigned" | "comment" | "mentioned" | "reopened" | "questions_answered" | "options_picked"
   | "plan_accepted" | "plan_rejected" | "approval" | "connection_review" | "review_requested"
   | "changes_requested" | "children_done" | "blocker_resolved" | "blocker_stalled"
-  | "comment_edited" | "interrupted" | "retry_workspace" | "retry" | "run_stopped" | "recovery"
+  | "comment_edited" | "interrupted" | "retry_workspace" | "retry" | "run_stopped" | "continue" | "recovery"
   | "run_only_planned" | "run_unfinished" | "review_comments" | "status_changed" | "monitor_due"
   | "watchdog" | "held" | "chat_message" | "other";
 
@@ -17,7 +17,7 @@ export const CLAUDE_WAKE_EVENT_ORDER: readonly ClaudeWakeEventKind[] = [
   "assigned", "comment", "mentioned", "reopened", "questions_answered", "options_picked",
   "plan_accepted", "plan_rejected", "approval", "connection_review", "review_requested",
   "changes_requested", "children_done", "blocker_resolved", "blocker_stalled", "comment_edited",
-  "interrupted", "retry_workspace", "retry", "run_stopped", "recovery", "run_only_planned",
+  "interrupted", "retry_workspace", "retry", "run_stopped", "continue", "recovery", "run_only_planned",
   "run_unfinished", "review_comments", "status_changed", "monitor_due", "watchdog", "held",
   "chat_message", "other",
 ];
@@ -142,7 +142,12 @@ const REASON_EVENTS: Record<string, ClaudeWakeEventKind> = {
   issue_disposition_repair: "run_unfinished",
 };
 
-const RUN_STOPPED_REASONS = new Set(["issue_continuation_needed", "issue_recovery_action_restored"]);
+/**
+ * Wakes to carry on with no recovery cause: `paperclip_report_progress` with `continue: true`,
+ * the assigned-work sweep, or a recovery action that was restored (its repair done). They are
+ * "continue", not "run_stopped": with no `recovery` object nothing failed that the wake can name.
+ */
+const CONTINUE_REASONS = new Set(["issue_continuation_needed", "issue_recovery_action_restored"]);
 
 export function isMonitorReason(reason: string | null): boolean {
   return Boolean(reason?.startsWith("issue_monitor_"));
@@ -222,8 +227,8 @@ export function detectClaudeWakeEvents(
   if (continuation?.trigger?.retriedReason) found.add("retry");
   if (payload.recovery || reason === "source_scoped_recovery_action") {
     found.add(payload.recovery && isOwnRecovery(payload, agentId) ? "run_stopped" : "recovery");
-  } else if (reason && RUN_STOPPED_REASONS.has(reason) && !payload.livenessContinuation && !payload.dispositionRepair) {
-    found.add("run_stopped");
+  } else if (reason && CONTINUE_REASONS.has(reason) && !payload.livenessContinuation && !payload.dispositionRepair) {
+    found.add("continue");
   }
   if (payload.livenessContinuation) found.add("run_only_planned");
   if (payload.dispositionRepair) found.add("run_unfinished");
