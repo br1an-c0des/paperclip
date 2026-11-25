@@ -25,8 +25,6 @@ export async function attachClaudeRunPromptPlan(input: {
   adapterContext: Record<string, unknown>;
   executionTarget: unknown;
   legacyRemoteExecution: unknown;
-  /** The run token the adapter gets, if any: it puts PAPERCLIP_API_KEY in the run's env. */
-  authToken: string | null | undefined;
   getFreshSessionHandoff: (() => Promise<string | null>) | undefined;
   onWarning: (message: string) => Promise<void>;
 }): Promise<RunPromptPlan | null> {

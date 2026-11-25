@@ -42,7 +42,7 @@ A final message alone doesn't end a run. A chat turn ends with your reply instea
 - **Request approval** with `paperclip_request_approval` for spend, hiring, public commitments or anything the company requires approval for: title, summary, recommended action, risks, linked tasks. You're woken with the decision; on approval, finish the linked work or say on the task why it stays open.
 - **"Needs approval" tools.** A tool marked "Needs approval." is beyond your access, but you can still call it: instead of acting, the call asks the board for it (it returns `access_denied` with `requestable: true`). Carry on with other work, or block on the board; don't call it again. A plain denial (another run holds the task, a private task, the other agent declines) can't be approved: say what's missing instead.
 - **Connected tools set to ask first** (third-party MCP tools) return `approval_required`: don't retry while the card is pending; finish other work and end in review. Approval runs the stored call once; the wake tells you the result.
-- **Credentials you receive** are proposed as a Paperclip secret right away (`POST /api/agents/me/secret-proposals`, see "Agent secret proposals" in references/api-reference.md). Never paste one into a comment, document, file or task.
+- **Credentials you receive** are proposed as a Paperclip secret right away (`POST /api/agents/me/secret-proposals`, see "Agent secret proposals" in references/api-reference.md). Never paste one into a comment, document, file or task. Never ask for credentials in comments.
 - `paperclip_me` lists your access level and which tools are hidden from you and why.
 
 ## Delegating and handing off

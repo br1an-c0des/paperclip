@@ -8,7 +8,7 @@ import { execute as executeClaudeLocal, PAPERCLIP_RUN_PROMPT_PLAN_KEY } from "@p
 import { createPromptContextFixture } from "@paperclipai/adapter-utils/test-fixtures/prompt-context";
 import { attachClaudeRunPromptPlan } from "../services/run-prompt/attach-claude-run-prompt.js";
 import { copyTaskMarkdownParts, PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_PARTS_KEY } from "../services/heartbeat/task-context.js";
-import { SEALED_TEST_RUN_TOKEN, withSealedRunInputs } from "./helpers/claude-local-sealed-run.js";
+import { withSealedRunInputs } from "./helpers/claude-local-sealed-run.js";
 
 // Step 5, Task 7: a claude_local CLI run records what it sent as the heartbeat's prompt sections
 // (adapter.prompt), checked against the text it sends, which never changes.
@@ -99,7 +99,7 @@ async function adapterContextWithPlan(
   const adapterContext: Record<string, unknown> = { ...heartbeat };
   const plan = await attachClaudeRunPromptPlan({
     agent, runId: "run-1", config: runConfig, context: heartbeat, adapterContext,
-    executionTarget: null, legacyRemoteExecution: null, authToken: SEALED_TEST_RUN_TOKEN,
+    executionTarget: null, legacyRemoteExecution: null,
     getFreshSessionHandoff, onWarning: async () => {},
   });
   return { adapterContext, plan: plan! };
@@ -225,7 +225,7 @@ describe("attachClaudeRunPromptPlan", () => {
     const onWarning = vi.fn(async () => {});
     const pending = attachClaudeRunPromptPlan({
       agent, runId: "run-1", config: config(), context: heartbeat, adapterContext,
-      executionTarget: null, legacyRemoteExecution: null, authToken: SEALED_TEST_RUN_TOKEN,
+      executionTarget: null, legacyRemoteExecution: null,
       getFreshSessionHandoff: undefined, onWarning, ...overrides,
     });
     return { pending, adapterContext, onWarning };
