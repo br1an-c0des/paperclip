@@ -239,6 +239,7 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
         }
       : null,
     exposeLowTrustRaw,
+    lowTrust: exposeLowTrustRaw,
     simplifiedEnglishInteractions:
       experimentalInstanceSettings.enableSimplifiedEnglishInteractions ===
       true,

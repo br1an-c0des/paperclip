@@ -7,10 +7,14 @@ import {
   authUsers,
   companies,
   createDb,
+  documents,
   EMBEDDED_POSTGRES_TEST_TIMEOUT_MS,
   heartbeatRuns,
+  issueApprovals,
   issueComments,
+  issueDocuments,
   issues,
+  issueThreadInteractions,
   routines,
   userWorkspacePreferences,
 } from "@paperclipai/db";
@@ -224,5 +228,129 @@ describe.skipIf(!support.supported)("wake payload: the fields the new wake reads
     expect(JSON.stringify(payload)).not.toContain(secret);
     expect(payload?.approval?.decisionNote).toBe(`Approved, token ${REDACTED_EVENT_VALUE}`);
     expect(payload?.issue?.routineName).toBe(`Routine ${REDACTED_EVENT_VALUE}`);
+  });
+
+  // Step 5 phase 2: the task's history (fork/step-5-handoff-plan.md, Task 1, "The contract").
+  async function question(f: { companyId: string; issueId: string; agentId: string }, values: Partial<typeof issueThreadInteractions.$inferInsert> = {}) {
+    const [row] = await db.insert(issueThreadInteractions).values({
+      companyId: f.companyId, issueId: f.issueId, kind: "ask_user_questions", status: "pending", createdByAgentId: f.agentId,
+      payload: { version: 1, questions: [{ id: "where", prompt: "Where should the switch go?", selectionMode: "single",
+        options: [{ id: "both", label: "Both places" }] }] },
+      ...values,
+    } as typeof issueThreadInteractions.$inferInsert).returning();
+    return row!;
+  }
+
+  it("adds history on the assignee's own task", async () => {
+    const f = await seed();
+    const brian = await user("Brian");
+    for (let index = 0; index < 10; index += 1) {
+      await question(f, { status: "answered", resolvedByUserId: brian, title: `Answered ${index}`,
+        createdAt: new Date(Date.UTC(2026, 10, 24, 9, index)), resolvedAt: new Date(Date.UTC(2026, 10, 24, 10, index)),
+        result: { version: 1, answers: [{ questionId: "where", optionIds: ["both"] }] } });
+    }
+    const open = await question(f, { title: "Still open", createdAt: new Date(Date.UTC(2026, 10, 24, 11, 0)) });
+    const [run] = await db.insert(heartbeatRuns).values({
+      companyId: f.companyId, agentId: f.agentId, status: "succeeded", contextSnapshot: { issueId: f.issueId },
+      finishedAt: new Date("2026-11-24T17:52:00Z"), runnerProfileJson: { sessionCheckpoint: { semanticResult: { summary: "Posted the plan." } } },
+    }).returning();
+    for (const key of ["plan", "continuation-summary"]) {
+      const [doc] = await db.insert(documents).values({ companyId: f.companyId, title: null, latestBody: key }).returning();
+      await db.insert(issueDocuments).values({ companyId: f.companyId, issueId: f.issueId, documentId: doc!.id, key });
+    }
+    const payload = await buildPaperclipWakePayload({
+      db, companyId: f.companyId, agentId: f.agentId, contextSnapshot: { wakeReason: "issue_assigned", issueId: f.issueId },
+    });
+    expect(payload?.history?.lastRun).toEqual({ runId: run!.id, agentId: f.agentId, ownRun: true, status: "succeeded",
+      finishedAt: "2026-11-24T17:52:00.000Z", body: "Posted the plan.", bodyTruncated: false });
+    expect(payload?.history?.answered).toHaveLength(8);
+    expect(payload?.history?.answered[0]).toMatchObject({ title: "Answered 9", decidedBy: { type: "user", id: brian },
+      answers: [{ questionId: "where", optionIds: ["both"], otherText: null }] });
+    expect(payload?.history?.answeredOmitted).toBe(2);
+    expect(payload?.history?.open.map(row => row.id)).toEqual([open.id]);
+    expect(payload?.history?.documents).toEqual([{ key: "plan", title: null, inBrief: true }]);
+  });
+
+  it("no history on a chat task", async () => {
+    const f = await seed();
+    await db.update(issues).set({ conversationAgentId: f.agentId, conversationUserId: await user("Brian"), conversationState: "active" })
+      .where(eq(issues.id, f.issueId));
+    await question(f);
+    const payload = await buildPaperclipWakePayload({
+      db, companyId: f.companyId, agentId: f.agentId, contextSnapshot: { wakeReason: "issue_commented", issueId: f.issueId },
+    });
+    expect(payload).not.toBeNull();
+    expect(payload?.history).toBeNull();
+    // A chat wake says so in its context too, even before the task row does.
+    const plain = await seed();
+    await question(plain);
+    expect((await buildPaperclipWakePayload({ db, companyId: plain.companyId, agentId: plain.agentId,
+      contextSnapshot: { wakeReason: "issue_commented", issueId: plain.issueId, conversationMode: true } }))?.history).toBeNull();
+  });
+
+  it("no history when the agent isn't the assignee", async () => {
+    const f = await seed();
+    await question(f);
+    const [reviewer] = await db.insert(agents).values({ companyId: f.companyId, name: "Reviewer", adapterType: "process" }).returning();
+    const payload = await buildPaperclipWakePayload({
+      db, companyId: f.companyId, agentId: reviewer!.id, contextSnapshot: { wakeReason: "execution_review_requested", issueId: f.issueId },
+    });
+    expect(payload?.history).toBeNull();
+  });
+
+  it("a low-trust run's history has only its own requests and no approvals", async () => {
+    const f = await seed();
+    const [planner] = await db.insert(agents).values({ companyId: f.companyId, name: "Planner", adapterType: "process" }).returning();
+    const own = await question(f);
+    await question(f, { createdByAgentId: planner!.id });
+    const row = await approval(f.companyId, { status: "pending" });
+    await db.insert(issueApprovals).values({ companyId: f.companyId, issueId: f.issueId, approvalId: row.id });
+    const context = { wakeReason: "issue_assigned", issueId: f.issueId };
+    expect((await buildPaperclipWakePayload({ db, companyId: f.companyId, agentId: f.agentId, contextSnapshot: context }))
+      ?.history?.open).toHaveLength(3);
+    const lowTrust = await buildPaperclipWakePayload({ db, companyId: f.companyId, agentId: f.agentId, contextSnapshot: context,
+      exposeLowTrustRaw: true, lowTrust: true });
+    expect(lowTrust?.history?.open.map(request => request.id)).toEqual([own.id]);
+  });
+
+  it("names the history's people", async () => {
+    const f = await seed();
+    const brian = await user("Brian");
+    const [planner] = await db.insert(agents).values({ companyId: f.companyId, name: "Planner", adapterType: "process" }).returning();
+    await question(f, { createdByAgentId: planner!.id, status: "answered", resolvedByUserId: brian, resolvedAt: new Date(),
+      result: { version: 1, answers: [] } });
+    // The task was handed over: the previous assignee's last run stands in, and is named.
+    const [previous] = await db.insert(agents).values({ companyId: f.companyId, name: "Coder 1", adapterType: "process" }).returning();
+    await db.insert(heartbeatRuns).values({ companyId: f.companyId, agentId: previous!.id, status: "failed",
+      contextSnapshot: { issueId: f.issueId }, finishedAt: new Date(), nextAction: "Finish the tests." });
+    const payload = await buildPaperclipWakePayload({
+      db, companyId: f.companyId, agentId: f.agentId, contextSnapshot: { wakeReason: "issue_assigned", issueId: f.issueId },
+    });
+    expect(payload?.history?.lastRun).toMatchObject({ agentId: previous!.id, ownRun: false, body: "Finish the tests." });
+    expect(payload?.names).toMatchObject({
+      [`user:${brian}`]: "Brian", [`agent:${planner!.id}`]: "Planner", [`agent:${previous!.id}`]: "Coder 1",
+    });
+  });
+
+  it("redacts a registered secret in an answer and a run summary", async () => {
+    const f = await seed();
+    const secret = "history-secret-canary";
+    const [run] = await db.insert(heartbeatRuns).values({
+      companyId: f.companyId, agentId: f.agentId, status: "succeeded", contextSnapshot: { issueId: f.issueId },
+      finishedAt: new Date(), runnerProfileJson: { sessionCheckpoint: { semanticResult: { summary: `Used token ${secret}` } } },
+    }).returning();
+    await createRunSecretRedactionRegistry(db).register(f.companyId, run!.id, secret);
+    await question(f, { status: "answered", resolvedByUserId: await user("Brian"), resolvedAt: new Date(),
+      result: { version: 1, answers: [{ questionId: "where", optionIds: [], otherText: `The key is ${secret}` }] } });
+    await db.insert(issueThreadInteractions).values({ companyId: f.companyId, issueId: f.issueId, kind: "request_confirmation",
+      status: "rejected", createdByAgentId: f.agentId, resolvedAt: new Date(), payload: { version: 1, prompt: "Go?" },
+      result: { version: 1, outcome: "rejected", reason: `Not with ${secret}` } } as typeof issueThreadInteractions.$inferInsert);
+    const payload = await buildPaperclipWakePayload({
+      db, companyId: f.companyId, agentId: f.agentId, contextSnapshot: { wakeReason: "issue_assigned", issueId: f.issueId },
+    });
+    expect(JSON.stringify(payload?.history)).not.toContain(secret);
+    expect(payload?.history?.lastRun?.body).toBe(`Used token ${REDACTED_EVENT_VALUE}`);
+    expect(payload?.history?.answered.map(request => request.answers?.[0]?.otherText ?? request.note))
+      .toEqual(expect.arrayContaining([`The key is ${REDACTED_EVENT_VALUE}`, `Not with ${REDACTED_EVENT_VALUE}`]));
   });
 });
