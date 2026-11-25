@@ -34,18 +34,18 @@ describe("the Paperclip catalog", () => {
     }
   });
 
-  it("a worker run sees 22 tools and 4 more marked as needing approval", () => {
+  it("a worker run sees 23 tools and 4 more marked as needing approval", () => {
     const tools = listTools(testCaller({ access: { level: "worker" } }), catalog);
     const needsApproval = tools.filter(definition => definition.annotations?.paperclipNeedsApproval).map(definition => definition.name);
-    expect(tools.length - needsApproval.length).toBe(22);
+    expect(tools.length - needsApproval.length).toBe(23);
     expect(needsApproval.sort()).toEqual([
       "paperclip_create_project", "paperclip_delete_task", "paperclip_manage_labels", "paperclip_update_project",
     ]);
     const names = tools.map(definition => definition.name);
     expect(names).not.toContain("paperclip_call_api");
-    // File links belong to an outside connection's grant.
+    // An upload link belongs to an outside connection's grant; a download link to the run or the grant.
     expect(names).not.toContain("paperclip_file_upload");
-    expect(names).not.toContain("paperclip_file_download");
+    expect(names).toContain("paperclip_file_download");
     // Skills and deliverables are listed for their reads; their changes need approval.
     expect(tools.find(definition => definition.name === "paperclip_skills")!.description).toMatch(/Changes need approval\.$/);
     expect(tools.find(definition => definition.name === "paperclip_deliverables")!.description).not.toMatch(/approval/);
@@ -84,7 +84,7 @@ describe("the Paperclip catalog", () => {
     const caller = testCaller({ access: { level: "admin", overrides: { "tasks:delete": true } } });
     let writes = 0;
     for (const definition of boundCatalog) {
-      if (definition.name === "paperclip_call_api" || definition.name === "paperclip_search_api" || definition.needsGrant) continue;
+      if (definition.name === "paperclip_call_api" || definition.name === "paperclip_search_api" || definition.needsGrant || definition.needsRunOrGrant) continue;
       const api = recordingDispatch(({ method }) => method === "GET" ? [] : { id: "x" });
       await definition.run(caller, definition.input.parse(sampleArgs[definition.name] ?? {}), api);
       const actions = typeof definition.action === "string" ? [definition.action] : definition.action;
