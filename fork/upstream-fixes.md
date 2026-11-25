@@ -131,6 +131,12 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 90 | [Keep the agent's instructions after Claude compacts a session](#90-keep-the-agents-instructions-after-claude-compacts-a-session) | candidate | | | 2026-11-23 | | |
 | 91 | [Show a run's whole prompt size in the Transcript tab's prompt card](#91-show-a-runs-whole-prompt-size-in-the-transcript-tabs-prompt-card) | candidate | | | 2026-11-24 | | |
 | 92 | [List the whole company skill library in a run's system prompt, as intended](#92-list-the-whole-company-skill-library-in-a-runs-system-prompt-as-intended) | candidate | | | 2026-11-24 | | |
+| 93 | [A run preview on a finished task fails with a server error](#93-a-run-preview-on-a-finished-task-fails-with-a-server-error) | candidate | | | 2026-11-24 | | |
+| 94 | [An "Other" answer shows its option id in the answer summary](#94-an-other-answer-shows-its-option-id-in-the-answer-summary) | candidate | | | 2026-11-24 | | |
+| 95 | [A comment an earlier run handled is sent again as new](#95-a-comment-an-earlier-run-handled-is-sent-again-as-new) | candidate | | | 2026-11-24 | | |
+| 96 | [Paperclip doesn't record when Claude compacts a CLI session](#96-paperclip-doesnt-record-when-claude-compacts-a-cli-session) | candidate | | | 2026-11-24 | | |
+| 97 | [Drop the double brackets on the run message's documents line](#97-drop-the-double-brackets-on-the-run-messages-documents-line) | candidate | | | 2026-11-25 | | |
+| 98 | [Don't repeat the last run's summary when the agent's comment says the same](#98-dont-repeat-the-last-runs-summary-when-the-agents-comment-says-the-same) | candidate | | | 2026-11-25 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1706,3 +1712,28 @@ Found 2026-11-24 by step 5's task-brief work (the Data agent, `step5-brief/data`
 - **Likely fix:** have the `claude_local` parser record a `context.compacted` run event when the
   stream carries `compact_boundary`, then set `compactedSinceLastRun` from it
   (`server/src/services/heartbeat/run-task-facts.ts`).
+
+### 97. Drop the double brackets on the run message's documents line
+
+Found 2026-11-24 in the task brief's real runs (TES-48, desktop dev instance). Candidate.
+
+- **Problem:** under "Where things stand", a document whose title differs from its key gets its
+  title in brackets, and the plan, with the task's facts, gets a second bracket saying where it's
+  quoted: `plan ("Compact mode plan") (under "The task" below)`.
+- **Likely fix:** fold both into one bracket or move the pointer out of it, for example
+  `plan ("Compact mode plan", quoted under "The task" below)`. `renderDocuments` in
+  `packages/adapters/claude-local/src/server/wake/where-things-stand.ts` and the
+  `documentInTask` template in `wake/templates.ts`, with a case in `wake/render.test.ts`.
+
+### 98. Don't repeat the last run's summary when the agent's comment says the same
+
+Found 2026-11-24 in the task brief's real runs (TES-48, desktop dev instance). Candidate.
+
+- **Problem:** "Where things stand" quotes the last run's summary (`history.lastRun`) and then the
+  task's comments, which include the comment the agent posted in that run. An agent usually ends a
+  run by posting its result as a comment, and the run summary is the same text, so the history
+  says it twice and spends the history's 12,000-character budget on it.
+- **Likely fix:** when the last run posted a comment, leave the run's summary out (or show only
+  its first line) and keep the comment; otherwise keep the summary. Decided on the server, where
+  the wake payload's `history` is built, so the comment ids of that run are known; a test with a
+  run that commented and one that didn't.

@@ -403,4 +403,4 @@ as `ec7da981f8`. Plan: [step-5-brief-plan.md](step-5-brief-plan.md).
   `d9326d16ce`. The four extended files covering the wake payload passed (54 tests).
 - **Seen in the runs:** the documents line reads `plan ("Compact mode plan") (under "The task"
   below)`, two brackets in a row; and the agent's run summary and its own comment repeat each other
-  in the history. Both for a later pass.
+  in the history. Both on the bug list: 97 and 98.
