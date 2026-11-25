@@ -118,6 +118,7 @@ import {
 } from "../source-trust.js";
 import { redactSensitiveText } from "../../redaction.js";
 import { createRunSecretRedactionRegistry } from "../run-secret-redaction.js";
+import { historyPeople, readTaskHistory } from "../task-request-history.js";
 import {
   readPaperclipSkillSyncPreference,
   writePaperclipSkillSyncPreference,
@@ -2390,6 +2391,11 @@ export async function buildPaperclipWakePayload(input: {
     responsibleUserId?: string | null;
   } | null;
   exposeLowTrustRaw?: boolean;
+  /**
+   * The run's trust preset is low-trust review (task-context.ts computes it). The history then
+   * holds only this agent's requests and no approvals. Left out, it follows `exposeLowTrustRaw`.
+   */
+  lowTrust?: boolean;
   // Experimental: agents write user-interaction content in ASD-STE100
   // Simplified Technical English (rendered as a prompt directive downstream).
   simplifiedEnglishInteractions?: boolean;
@@ -2440,11 +2446,17 @@ export async function buildPaperclipWakePayload(input: {
     !approval
   )
     return null;
-  const [issueContext, actor] = await Promise.all([
+  const [issueContext, actor, history] = await Promise.all([
     issueSummary
       ? readWakeIssueContext(input.db, input.companyId, issueSummary)
       : Promise.resolve(null),
     readWakeActor(input.db, input.companyId, input.runId ?? null),
+    // The task's history for a fresh session (step 5 phase 2): on every run of the assignee's own
+    // non-chat task, since a failed resume retries fresh with this same payload.
+    issueId && issueSummary?.id === issueId && input.agentId && !conversationMode
+      ? readTaskHistory(input.db, { companyId: input.companyId, issueId, agentId: input.agentId,
+          lowTrust: input.lowTrust ?? input.exposeLowTrustRaw === true })
+      : Promise.resolve(null),
   ]);
 
   const commentRows = input.wakeCommentRows
@@ -2861,6 +2873,7 @@ export async function buildPaperclipWakePayload(input: {
       wakeStagePrincipal(executionStage.currentParticipant),
       wakeStagePrincipal(executionStage.returnAssignee),
       originalAssigneeId ? { type: "agent", id: originalAssigneeId } : null,
+      ...historyPeople(history),
     ]),
     timeZone: issueContext?.timeZone ?? null,
     agentMessage: agentMessageText
@@ -2987,6 +3000,7 @@ export async function buildPaperclipWakePayload(input: {
           updatedAt: safeContinuationSummary.updatedAt.toISOString(),
         }
       : null,
+    history,
     commentIds,
     latestCommentId: commentIds[commentIds.length - 1] ?? null,
     comments,
