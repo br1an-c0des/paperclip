@@ -45,8 +45,8 @@ describePostgres("the run preview's prompt draft", () => {
     const companyId = randomUUID(), agentId = randomUUID(), userId = randomUUID();
     await db.insert(authUsers).values({ id: userId, name: "M7 test owner", email: `${userId}@example.test`, createdAt: new Date(), updatedAt: new Date() });
     await db.insert(companies).values({ id: companyId, name: "M7 test preview prompt", issuePrefix: `Q${companyId.slice(0, 6)}` });
-    await db.insert(agents).values({ id: agentId, companyId, name: "M7 test agent", adapterType: "claude_local", status: "idle" });
-    const agent = { id: agentId, companyId, name: "M7 test agent", adapterType: "claude_local", adapterConfig: {} };
+    await db.insert(agents).values({ id: agentId, companyId, name: "M7 test agent", title: "QA engineer", adapterType: "claude_local", status: "idle" });
+    const agent = { id: agentId, companyId, name: "M7 test agent", title: "QA engineer", adapterType: "claude_local", adapterConfig: {} };
     return { companyId, agentId, userId, agent };
   }
 
@@ -66,7 +66,8 @@ describePostgres("the run preview's prompt draft", () => {
     return id;
   }
 
-  const config = () => ({ instructionsFilePath, promptTemplate: "Do the work." });
+  // No promptTemplate: the run sends the identity line (step 5 phase 2, the light sections).
+  const config = () => ({ instructionsFilePath });
 
   async function draft(
     seeded: Awaited<ReturnType<typeof seed>>,
@@ -127,10 +128,14 @@ describePostgres("the run preview's prompt draft", () => {
     expect(previewed.firstMessageChars).toBe(joinRunPromptSections(plan.fresh).length);
     // The claude_local wake's four headings are sections (step 5 phase 2, the task brief); with
     // the task's facts on the context, a non-chat task has no brief.
+    // Who the agent is, the instructions location and the tools note come first (step 5 phase 2,
+    // the light sections).
     expect(previewed.firstMessage.map((section) => section.id)).toEqual([
-      "instructions_directive", "communication_guidance", "what_happened", "the_task", "to_do",
-      ...(context.paperclipRunTask ? [] : ["task_brief"]), "mcp_note", "heartbeat_template",
+      "heartbeat_template", "instructions_directive", "mcp_note", "communication_guidance", "what_happened", "the_task", "to_do",
+      ...(context.paperclipRunTask ? [] : ["task_brief"]),
     ]);
+    expect(previewed.firstMessage[0]).toMatchObject({ label: "Who you are", text: "You are M7 test agent, QA engineer." });
+    expect(previewed.firstMessage[2]).toMatchObject({ label: "Paperclip tools" });
     // The checkout is the harness's, at launch.
     const theTask = previewed.firstMessage.find((section) => section.id === "the_task")!;
     // The claude_local wake holds both on its task line.

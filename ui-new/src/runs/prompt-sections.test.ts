@@ -114,6 +114,11 @@ describe("promptViewFromRecord", () => {
     expect(old!.sections.map((section) => section.info).every((tip) => tip !== sectionInfo("unknown_section"))).toBe(true);
   });
 
+  it("describes who the agent is and the Paperclip tools note (step 5 phase 2, the light sections)", () => {
+    expect(sectionInfo("heartbeat_template")).toBe("Who the agent is: its name and job title, or the agent's own prompt template.");
+    expect(sectionInfo("mcp_note")).toBe("How the run works with Paperclip: its paperclip_* tools, and how to end the run.");
+  });
+
   it("keeps a section's pending marker for the preview to show", () => {
     const view = promptViewFromRecord({
       ...freshRecord,

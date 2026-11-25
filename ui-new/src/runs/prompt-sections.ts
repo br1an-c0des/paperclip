@@ -83,8 +83,8 @@ const SECTION_INFO: Record<RunPromptSectionId, string> = {
   wake: "Why the agent was woken: the comments, continuation and review threads behind this run (runs recorded before the wake was split into four sections, and external chat turns).",
   session_rotation_note: "A note carried over when Paperclip starts a new session in place of a long one.",
   task_brief: "The task the run is for: its title, description, plan and surroundings.",
-  mcp_note: "How the run reaches Paperclip through its MCP server.",
-  heartbeat_template: "The agent's heartbeat prompt: its own setting, or Paperclip's default.",
+  mcp_note: "How the run works with Paperclip: its paperclip_* tools, and how to end the run.",
+  heartbeat_template: "Who the agent is: its name and job title, or the agent's own prompt template.",
   unsplit: "The prompt as it was sent, in one piece.",
 };
 

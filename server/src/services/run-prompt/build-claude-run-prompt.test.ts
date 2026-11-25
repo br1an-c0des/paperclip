@@ -5,8 +5,13 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { agents, companies, createDb, heartbeatRuns, issues } from "@paperclipai/db";
 import { FAST_RESPONSE_AGENT_GUIDANCE, joinRunPromptSections, type RunPromptPlan, type RunPromptSection } from "@paperclipai/shared";
-import { composeClaudeCliPrompt, planClaudeInstructionsDirective, resolveClaudePromptTemplate } from "@paperclipai/adapter-claude-local/server";
-import { asString, hydrateFreshSessionHandoff } from "@paperclipai/adapter-utils/server-utils";
+import {
+  buildClaudePromptRecord,
+  composeClaudeCliPrompt,
+  planClaudeInstructionsDirective,
+  resolveClaudePromptTemplate,
+} from "@paperclipai/adapter-claude-local/server";
+import { hydrateFreshSessionHandoff } from "@paperclipai/adapter-utils/server-utils";
 import { createPromptContextFixture } from "@paperclipai/adapter-utils/test-fixtures/prompt-context";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "../../__tests__/helpers/embedded-postgres.js";
 import { createRunSecretRedactionRegistry } from "../run-secret-redaction.js";
@@ -30,7 +35,7 @@ afterAll(async () => {
   await fs.rm(instructionsDir, { recursive: true, force: true });
 });
 
-const agent = { id: "agent-1", companyId: "company-1", name: "Ada", adapterType: "claude_local" };
+const agent = { id: "agent-1", companyId: "company-1", name: "Ada", title: "Release manager", adapterType: "claude_local" };
 
 /** What execute.ts sends for one attempt: the same inputs, through today's join. */
 async function sentPrompt(input: ClaudeRunPromptInput, resumed: boolean): Promise<string> {
@@ -47,8 +52,7 @@ async function sentPrompt(input: ClaudeRunPromptInput, resumed: boolean): Promis
     context,
     resumed,
     instructionsPathDirective: directive,
-    bootstrapPromptTemplate: asString(input.config.bootstrapPromptTemplate, ""),
-    promptTemplate: resolveClaudePromptTemplate(input.config, input.context),
+    promptTemplate: resolveClaudePromptTemplate(input.config),
     templateData: {
       agentId: input.agent.id,
       companyId: input.agent.companyId,
@@ -137,7 +141,7 @@ function runInput(context: Record<string, unknown>, overrides: Partial<ClaudeRun
 const kinds: RunKind[] = [
   {
     name: "fresh assignment",
-    shows: ["## What happened", "You've been assigned PAP-1 \"Release ledger\".", "branch `pap-1-release-ledger`", "Task plan document doc-1", "Paperclip API access note:", "You are agent agent-1 (Ada)."],
+    shows: ["## What happened", "You've been assigned PAP-1 \"Release ledger\".", "branch `pap-1-release-ledger`", "Task plan document doc-1", "`paperclip_read_task` and `paperclip_task_context` read more", "You are Ada, Release manager."],
     input: () => runInput(withBrief({
       issueId: issue.id,
       wakeReason: "issue_assigned",
@@ -256,7 +260,8 @@ const kinds: RunKind[] = [
   },
   {
     name: "routine",
-    shows: ["Hello Ada.", "Routine run for Ada (run-1).", "Task title directive:"],
+    // The bootstrap template it sets isn't sent (step 5 phase 2, the light sections).
+    shows: ["Routine run for Ada (run-1).", "Task title directive:"],
     input: () => runInput(withBrief({
       paperclipTaskCommunicationGuidance: guidance,
       routineId: "routine-1",
@@ -268,7 +273,8 @@ const kinds: RunKind[] = [
   },
   {
     name: "no task",
-    shows: ["\n\nnull\n\n"],
+    // The brief is now last (step 5 phase 2, the light sections).
+    shows: ["\n\nnull"],
     // An unscoped timer: no issue and no wake payload. Every variant is "" + null + "" (bug 84).
     input: () => {
       const context: Record<string, unknown> = {
@@ -453,6 +459,16 @@ describe("buildClaudeRunPromptPlan", () => {
     expect(joinRunPromptSections(plan.fresh)).toBe(await sentPrompt(kind.input(), false));
     for (const marker of kind.shows) expect(joinRunPromptSections(plan.fresh)).toContain(marker);
     expect(joinRunPromptSections(plan.resumed)).toBe(await sentPrompt(kind.input(), true));
+    // The record the run keeps matches the plan, fresh and resumed.
+    for (const resumed of [false, true]) {
+      const record = buildClaudePromptRecord({ plan, resumed, prompt: await sentPrompt(kind.input(), resumed), systemPrompt: [] });
+      expect(record.matchedPlan, resumed ? "resumed" : "fresh").toBe(true);
+    }
+    // Never the bootstrap template or the rotation note (step 5 phase 2, the light sections).
+    for (const section of [...plan.fresh, ...plan.resumed]) {
+      expect(["bootstrap_template", "session_rotation_note"]).not.toContain(section.id);
+    }
+    expect(joinRunPromptSections(plan.fresh)).not.toContain("Connection tools:");
     expectPartsJoin(plan.fresh);
     expectPartsJoin(plan.resumed);
     // The builder doesn't change the context it was given.
@@ -478,30 +494,36 @@ describe("buildClaudeRunPromptPlan", () => {
   it("labels a fresh assignment's sections in order, with their delivery", async () => {
     const plan = await buildClaudeRunPromptPlan(kinds[0]!.input());
     expect(plan.fresh.map((section) => section.id)).toEqual([
+      "heartbeat_template",
       "instructions_directive",
+      "mcp_note",
       "communication_guidance",
       "what_happened",
       "the_task",
       "to_do",
       "task_brief",
-      "mcp_note",
-      "heartbeat_template",
     ]);
     expect(plan.resumed.map((section) => section.id)).toEqual(["instructions_directive", "what_happened", "the_task", "to_do", "task_brief"]);
     const delivery = Object.fromEntries(plan.fresh.map((section) => [section.id, section.delivery]));
     expect(delivery).toEqual({
+      heartbeat_template: "fresh_only",
       instructions_directive: "every_run",
+      mcp_note: "fresh_only",
       communication_guidance: "fresh_only",
       what_happened: "every_run",
       the_task: "every_run",
       to_do: "every_run",
       task_brief: "every_run",
-      mcp_note: "fresh_only",
-      heartbeat_template: "fresh_only",
     });
     const heartbeat = plan.fresh.find((section) => section.id === "heartbeat_template")!;
-    expect(heartbeat.source).toContain("default");
-    expect(heartbeat.parts?.map((part) => part.id)).toEqual(["heartbeat_template.identity", "heartbeat_template.connection_guidance"]);
+    expect(heartbeat).toMatchObject({ label: "Who you are", text: "You are Ada, Release manager." });
+    expect(heartbeat.source).toContain("Ada");
+    expect(heartbeat.source).toContain("Release manager");
+    expect(heartbeat.parts?.map((part) => part.id)).toEqual(["heartbeat_template.identity"]);
+    const tools = plan.fresh.find((section) => section.id === "mcp_note")!;
+    expect(tools.label).toBe("Paperclip tools");
+    expect(tools.text).toContain("`paperclip_finish`");
+    expect(plan.fresh.find((section) => section.id === "instructions_directive")?.label).toBe("Instructions file location");
     const brief = plan.fresh.find((section) => section.id === "task_brief")!;
     expect(brief.source).toBe("context: paperclipTaskMarkdownAssignment");
     expect(brief.parts?.map((part) => part.id)).toEqual([
@@ -606,7 +628,7 @@ describe("buildClaudeRunPromptPlan", () => {
     it("a fresh and a resumed run on a non-chat task have no task brief", async () => {
       const plan = await buildClaudeRunPromptPlan(kind("fresh assignment with the task's facts").input());
       expect(plan.fresh.map((section) => section.id)).toEqual([
-        "instructions_directive", "communication_guidance", "what_happened", "the_task", "to_do", "mcp_note", "heartbeat_template",
+        "heartbeat_template", "instructions_directive", "mcp_note", "communication_guidance", "what_happened", "the_task", "to_do",
       ]);
       expect(plan.resumed.map((section) => section.id)).toEqual(["instructions_directive", "what_happened", "the_task", "to_do"]);
       for (const set of [plan.fresh, plan.resumed]) expect(joinRunPromptSections(set)).not.toContain("Paperclip task context");
@@ -643,15 +665,72 @@ describe("buildClaudeRunPromptPlan", () => {
     });
   });
 
-  it("says when the templates are the agent's own settings", async () => {
+  it("says when the prompt template is the agent's own setting, and sends no bootstrap template", async () => {
     const plan = await buildClaudeRunPromptPlan(kinds[6]!.input());
-    expect(plan.fresh.find((section) => section.id === "heartbeat_template")).toMatchObject({
-      source: "agent setting: promptTemplate", text: "Routine run for Ada (run-1).",
+    expect(plan.fresh[0]).toMatchObject({
+      id: "heartbeat_template", label: "Prompt template (agent setting)", source: "agent setting: promptTemplate",
+      text: "Routine run for Ada (run-1).",
     });
-    expect(plan.fresh.find((section) => section.id === "bootstrap_template")).toMatchObject({
-      source: "agent setting: bootstrapPromptTemplate", text: "Hello Ada.", delivery: "fresh_only",
+    expect(plan.fresh[0]?.parts).toBeUndefined();
+    expect(plan.fresh.some((section) => section.id === "bootstrap_template")).toBe(false);
+    expect(joinRunPromptSections(plan.fresh)).not.toContain("Hello Ada.");
+  });
+
+  describe("the light sections (step 5 phase 2)", () => {
+    it("a blank promptTemplate counts as not set: the identity line", async () => {
+      for (const promptTemplate of ["", "  \n "]) {
+        const input = runInput(kinds[0]!.input().context, { config: { instructionsFilePath, promptTemplate } });
+        const plan = await buildClaudeRunPromptPlan(input);
+        expect(plan.fresh[0]).toMatchObject({ id: "heartbeat_template", label: "Who you are", text: "You are Ada, Release manager." });
+        expect(joinRunPromptSections(plan.fresh)).toBe(await sentPrompt(input, false));
+      }
     });
-    expect(plan.fresh.find((section) => section.id === "heartbeat_template")?.parts).toBeUndefined();
+
+    it("an agent without a title is named alone", async () => {
+      const input = runInput(kinds[0]!.input().context, { agent: { ...agent, title: null } });
+      const plan = await buildClaudeRunPromptPlan(input);
+      expect(plan.fresh[0]).toMatchObject({ id: "heartbeat_template", text: "You are Ada." });
+      expect(plan.fresh[0]?.source).not.toContain("title");
+      expect(joinRunPromptSections(plan.fresh)).toBe(await sentPrompt(input, false));
+    });
+
+    it("a recovery wake: no identity line, and a tools note without the end-of-run line", async () => {
+      for (const name of ["recovery", "recovery by another agent with the task's facts"]) {
+        const plan = await buildClaudeRunPromptPlan(kind(name).input());
+        expect(plan.fresh.some((section) => section.id === "heartbeat_template"), name).toBe(false);
+        expect(plan.fresh[0]?.id).toBe("instructions_directive");
+        const tools = plan.fresh.find((section) => section.id === "mcp_note")!;
+        expect(tools.text).not.toContain("paperclip_finish");
+        expect(tools.reason).toContain("recovery");
+      }
+    });
+
+    it("a chat task: the identity line and a tools note without the end-of-run line", async () => {
+      const plan = await buildClaudeRunPromptPlan(kind("chat turn").input());
+      expect(plan.fresh.slice(0, 3).map((section) => section.id)).toEqual(["heartbeat_template", "instructions_directive", "mcp_note"]);
+      expect(plan.fresh[0]?.text).toBe("You are Ada, Release manager.");
+      expect(plan.fresh[2]?.text).not.toContain("paperclip_finish");
+      expect(plan.fresh[2]?.reason).toContain("chat");
+    });
+
+    it("a resumed comment wake starts with the instructions line", async () => {
+      const plan = await buildClaudeRunPromptPlan(kind("resumed comment wake").input());
+      expect(plan.resumed[0]?.id).toBe("instructions_directive");
+      expect(plan.resumed.some((section) => section.id === "heartbeat_template" || section.id === "mcp_note")).toBe(false);
+    });
+
+    it("leaves out the bootstrap template and the rotation note even when the config and context carry them", async () => {
+      const context = { ...kinds[0]!.input().context, paperclipSessionHandoffMarkdown: "## Rotated\n\nRotation note." };
+      const input = runInput(context, { config: { instructionsFilePath, bootstrapPromptTemplate: "Hello {{agent.name}}." } });
+      const plan = await buildClaudeRunPromptPlan(input);
+      for (const set of [plan.fresh, plan.resumed]) {
+        expect(set.some((section) => section.id === "bootstrap_template" || section.id === "session_rotation_note")).toBe(false);
+        expect(joinRunPromptSections(set)).not.toContain("Hello Ada.");
+        expect(joinRunPromptSections(set)).not.toContain("Rotation note.");
+      }
+      expect(joinRunPromptSections(plan.fresh)).toBe(await sentPrompt(input, false));
+      expect(joinRunPromptSections(plan.resumed)).toBe(await sentPrompt(input, true));
+    });
   });
 
   it("leaves out the MCP note without Paperclip API access, and the directive without an instructions file", async () => {
@@ -736,7 +815,7 @@ describePostgres("buildClaudeRunPromptPlan on a prepared context", () => {
       policy: { trustPreset: { kind: "standard" } as never, experimentalInstanceSettings: {} },
       services: { issuesSvc: { getAncestors: async () => [] }, getPinnedSkillTestContext: async () => null },
     });
-    const input = runInput(context, { agent: { id: agentId, companyId, name: "Ada" }, runId });
+    const input = runInput(context, { agent: { id: agentId, companyId, name: "Ada", title: "Release manager" }, runId });
     const plan: RunPromptPlan = await buildClaudeRunPromptPlan(input);
     expect(joinRunPromptSections(plan.fresh)).toBe(await sentPrompt(input, false));
     expect(joinRunPromptSections(plan.resumed)).toBe(await sentPrompt(input, true));

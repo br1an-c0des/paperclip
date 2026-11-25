@@ -163,7 +163,7 @@ function wakeRequest(target: PreviewPromptTarget) {
 }
 
 export interface RunPreviewPromptInput {
-  agent: { id: string; companyId: string; name: string; adapterType: string; adapterConfig: unknown };
+  agent: { id: string; companyId: string; name: string; title?: string | null; adapterType: string; adapterConfig: unknown };
   target: PreviewPromptTarget;
   /** The runtime config the adapter would get (the preview's, with secrets as placeholders). */
   config: Record<string, unknown>;
@@ -171,7 +171,7 @@ export interface RunPreviewPromptInput {
   context: Record<string, unknown>;
   /** The system prompt's sections, from the adapter's run plan. */
   systemPrompt: RunPromptSection[];
-  /** Whether the run would get a run token (and so the Paperclip MCP note). */
+  /** Whether the run would get a run token (and so the Paperclip tools note). */
   runTokenAvailable: boolean;
   trustPreset: Pick<TrustPresetResolution, "kind">;
   /** The task worktree's branch a run in the project would get: a placeholder until the run names it. */
@@ -303,7 +303,7 @@ export async function buildRunPreviewPrompt(db: Db, input: RunPreviewPromptInput
   };
 
   const plan = await buildClaudeRunPromptPlan({
-    agent: { id: agent.id, companyId: agent.companyId, name: agent.name, adapterType: agent.adapterType, adapterConfig: agent.adapterConfig },
+    agent: { id: agent.id, companyId: agent.companyId, name: agent.name, title: agent.title ?? null, adapterType: agent.adapterType, adapterConfig: agent.adapterConfig },
     runId: CLAUDE_RUN_PREVIEW_RUN_ID,
     config: input.config,
     context,

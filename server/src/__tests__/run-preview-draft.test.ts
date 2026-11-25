@@ -85,8 +85,9 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview of a task being
       defaultResponsibleUserId: userId, requireBoardApprovalForNewAgents: false });
     await db.insert(companyMemberships).values({ companyId, principalId: userId, principalType: "user", membershipRole: "owner", status: "active" });
     await db.insert(agents).values({
-      id: agentId, companyId, name: "M7 test draft agent", status: "idle", adapterType: "claude_local",
-      adapterConfig: { engine: "cli", command: fakeClaude, promptTemplate: "Do the work.", env: { CLAUDE_CODE_OAUTH_TOKEN: "test-oauth-token" } },
+      id: agentId, companyId, name: "M7 test draft agent", title: "QA engineer", status: "idle", adapterType: "claude_local",
+      // No promptTemplate: the identity line, with the agent's title (step 5 phase 2, the light sections).
+      adapterConfig: { engine: "cli", command: fakeClaude, env: { CLAUDE_CODE_OAUTH_TOKEN: "test-oauth-token" } },
       runtimeConfig: { heartbeat: { wakeOnDemand: false } },
       permissions: { access: { level: "worker" } },
     });
@@ -181,6 +182,8 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview of a task being
 
     // The whole first message matches, apart from the id; so does the system prompt.
     expect(comparable(drafted.prompt.firstMessage)).toEqual(comparable(real.prompt.firstMessage, created.id));
+    // It opens with who the agent is, its title included.
+    expect(drafted.prompt.firstMessage[0]).toMatchObject({ id: "heartbeat_template", text: "You are M7 test draft agent, QA engineer." });
     expect(drafted.prompt.systemPrompt).toEqual(real.prompt.systemPrompt);
     expect(drafted.manifest).toEqual(real.manifest);
 
