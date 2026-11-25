@@ -868,7 +868,8 @@ describe("claude remote execution", () => {
     expect(retry).toContain("## Owned assignment");
     expect(retry).toContain("Explain the next step before starting work.");
     expect(retry).not.toContain("## Compact assignment");
-    expect(retry.indexOf("comment-first")).toBeLessThan(retry.indexOf("comment-second"));
+    // The claude_local wake quotes the comments, oldest first (step 5 phase 2), not their ids.
+    expect(retry.indexOf("> Append the same ledger entry.")).toBeLessThan(retry.indexOf("> Change the final scope to the launch checklist."));
     expect(retry.split("Append the same ledger entry.")).toHaveLength(3);
   });
 
