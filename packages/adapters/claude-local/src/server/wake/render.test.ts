@@ -1792,9 +1792,6 @@ describe("templates", () => {
       "utf8",
     );
     const known = new Set(catalog.match(/"paperclip_[a-z_]+"/g)!.map((name) => name.slice(1, -1)));
-    // Added to tool-names.ts on its own branch (step 5 phase 2, the task brief, Task 3); the
-    // planning rules name it. Drop this line once that branch is merged.
-    known.add("paperclip_request_plan_review");
     expect(known.size).toBeGreaterThan(20);
     const named = new Set(strings.flatMap((text) => text.match(/paperclip_[a-z_]+/g) ?? []));
     expect(named.size).toBeGreaterThan(5);
