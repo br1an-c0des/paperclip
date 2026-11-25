@@ -1,6 +1,6 @@
 # Step 5, phase 2: the task brief
 
-**Approved by the user, 2026-11-24.** The third section reworked in phase 2 of step 5, after
+**Approved by the user, 2026-11-24; built the same day ([Built](#built)).** The third section reworked in phase 2 of step 5, after
 the wake ([step-5-wake.md](step-5-wake.md)) and the handoff ([step-5-handoff.md](step-5-handoff.md)).
 The user chose approach C (below) on 2026-11-24, with two additions: each of the wake's headings
 becomes its own section in the record and the preview, and the renderer is split into one module
@@ -27,6 +27,7 @@ per heading. After the builder check, the user also chose (2026-11-24) to open
   - [How it's checked](#how-its-checked)
 - [Left to the builder](#left-to-the-builder)
 - [Calls made in this design](#calls-made-in-this-design)
+- [Built](#built)
 
 ## Intent
 
@@ -358,3 +359,48 @@ Made by me while writing it; check these while reading.
 - **The shared-workspace note becomes a rule** with its own context field.
 - **The skill's plan line changes in this work,** rather than in the system-prompt review, so the
   skill and the prompt don't disagree; it costs each agent one fresh session.
+
+## Built
+
+Built 2026-11-24 on `feat/step-5-brief` by three agents (data, tools, renderer), merged into `main`
+as `ec7da981f8`. Plan: [step-5-brief-plan.md](step-5-brief-plan.md).
+
+- **Where it lives:**
+  - the task's facts: `server/src/services/heartbeat/run-task-facts.ts`, set as
+    `paperclipRunTask` in `task-context.ts`; `briefPlanState` in `task-markdown.ts` serves the
+    brief and the facts; `paperclipSharedWorkspaceNote` in `environment-selection.ts`;
+  - the renderer: `wake/context.ts`, `what-happened.ts`, `where-things-stand.ts`, `the-task.ts`,
+    `to-do.ts`, with `renderClaudeRunMessageSections` returning the four sections;
+    `runTaskReplacesBrief` (`legacy-prompt.ts`) is the switch the CLI and the builder share;
+  - the tools: `server/src/services/run-file-links.ts` (run download links) and
+    `paperclip_request_plan_review` in `server/src/mcp/catalog/requests.ts`; the skill's "Plans:"
+    line names it.
+- **Calls made while building:**
+  - The task rules also skip review, recovery and watchdog wakes, since a review stage hands the
+    task to the reviewer; the question, attachment and shared-workspace rules go to any woken agent.
+  - A task rule replaces the event rule it covers (a rejected plan gets one combined rule, its
+    reason quoted once).
+  - A change the session's own previous run made doesn't count as "changed since your last run".
+  - Run download links are kept in memory (the links table needs an OAuth grant); a restart drops
+    them and the agent asks again. A link names one file, lasts ten minutes, and is checked again
+    when served (the run still running, its agent still able to read the task).
+  - The plan-review tool returns the card's real status and accepts a task identifier; one card per
+    revision.
+- **Not done:** a session Claude compacted isn't detected (`compactedSinceLastRun` is always
+  false), because Paperclip doesn't record CLI compactions: bug 96.
+- **Real runs** on the desktop dev instance with "M7 test sealed runner" (paused between runs), on
+  `d9326d16ce`, a planning-mode task (TES-48), each with four sections, no brief and `matchedPlan`
+  true:
+  1. `483a9b54`, fresh, 5,188 characters: the agent wrote the plan and asked with
+     `paperclip_request_plan_review`; the task went to review;
+  2. sent back with a change; `d41ee22e`, resumed, 1,871 characters: "Board sent your plan back"
+     with the reason quoted, "The task" one line; the agent revised it (revision 2) and asked again;
+  3. accepted; `79b4da63`, fresh (accepting a plan starts a fresh session): the plan (revision 2)
+     under "The task", "implement revision 2" under "What to do now"; the agent posted it and
+     finished the task.
+- **Checks:** the local checks passed on `53d30a7847` except one core test (the draft preview
+  route test still expected a brief section), fixed in `5cc6e5b5fb`; the core tier passed again on
+  `d9326d16ce`. The four extended files covering the wake payload passed (54 tests).
+- **Seen in the runs:** the documents line reads `plan ("Compact mode plan") (under "The task"
+  below)`, two brackets in a row; and the agent's run summary and its own comment repeat each other
+  in the history. Both for a later pass.

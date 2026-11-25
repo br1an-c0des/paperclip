@@ -272,7 +272,7 @@ Nothing agents receive changes.
 here as the options discussed, so the decision starts from them.
 
 **Started 2026-11-24 as phase 2,** one section at a time: the wake is designed and built
-([step-5-wake.md](step-5-wake.md)), then the handoff ([step-5-handoff.md](step-5-handoff.md)); the task brief is next.
+([step-5-wake.md](step-5-wake.md)), then the handoff ([step-5-handoff.md](step-5-handoff.md)), then the task brief ([step-5-brief.md](step-5-brief.md)); the light sections are next.
 
 - **Ideas discussed:**
   - drop text for features this setup doesn't use (about 10 of the renderer's 33 sections can't
