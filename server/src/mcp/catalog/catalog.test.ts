@@ -34,10 +34,10 @@ describe("the Paperclip catalog", () => {
     }
   });
 
-  it("a worker run sees 23 tools and 4 more marked as needing approval", () => {
+  it("a worker run sees 24 tools and 4 more marked as needing approval", () => {
     const tools = listTools(testCaller({ access: { level: "worker" } }), catalog);
     const needsApproval = tools.filter(definition => definition.annotations?.paperclipNeedsApproval).map(definition => definition.name);
-    expect(tools.length - needsApproval.length).toBe(23);
+    expect(tools.length - needsApproval.length).toBe(24);
     expect(needsApproval.sort()).toEqual([
       "paperclip_create_project", "paperclip_delete_task", "paperclip_manage_labels", "paperclip_update_project",
     ]);
@@ -76,6 +76,7 @@ describe("the Paperclip catalog", () => {
       paperclip_create_project: { name: "Website" },
       paperclip_update_project: { projectId, changes: { name: "Site" } },
       paperclip_ask_board: { taskId: "TES-1", question: "Which?" },
+      paperclip_request_plan_review: { taskId: "TES-1" },
       paperclip_request_approval: { title: "Spend", summary: "Hosting" },
       paperclip_deliverables: { taskId: "TES-1", register: { type: "artifact", provider: "paperclip", title: "Report" } },
       paperclip_configure_agent: { agentId: projectId, changes: { title: "Editor" } },
@@ -85,7 +86,9 @@ describe("the Paperclip catalog", () => {
     let writes = 0;
     for (const definition of boundCatalog) {
       if (definition.name === "paperclip_call_api" || definition.name === "paperclip_search_api" || definition.needsGrant || definition.needsRunOrGrant) continue;
-      const api = recordingDispatch(({ method }) => method === "GET" ? [] : { id: "x" });
+      const plan = { id: projectId, issueId: TEST_TASK_ID, latestRevisionId: labelId, latestRevisionNumber: 1 };
+      const api = recordingDispatch(({ method, path }) => method !== "GET" ? { id: "x", status: "pending" }
+        : path.endsWith("/documents/plan") ? plan : []);
       await definition.run(caller, definition.input.parse(sampleArgs[definition.name] ?? {}), api);
       const actions = typeof definition.action === "string" ? [definition.action] : definition.action;
       for (const call of api.calls.filter(recorded => recorded.method !== "GET")) {

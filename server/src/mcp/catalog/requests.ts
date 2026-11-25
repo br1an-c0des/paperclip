@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { McpToolError } from "../dispatch.js";
+import type { CatalogDispatch } from "./types.js";
 import { object, pathId, pick, rows, taskId, tool } from "./util.js";
 
 const APPROVAL_FIELDS = ["id", "type", "status", "createdAt"] as const;
@@ -15,7 +17,29 @@ function questionSet(question: string, choices: string[] | undefined, multiple: 
   };
 }
 
-/** Questions to the board and approval requests. */
+const noPlan = () => new McpToolError({
+  status: 409, code: "plan_missing",
+  message: "This task has no plan document to review. Write it first with paperclip_write_document (key plan).",
+});
+
+/** The task's `plan` document: the ids its latest revision's review card points at. */
+async function readPlan(api: CatalogDispatch, task: string) {
+  let plan: Record<string, unknown>;
+  try {
+    plan = object(await api("GET", `/issues/${pathId(task)}/documents/plan`));
+  } catch (error) {
+    // The route's answer when the task exists but has no such document.
+    if (error instanceof McpToolError && error.status === 404 && error.message === "Document not found") throw noPlan();
+    throw error;
+  }
+  const { issueId, id: documentId, latestRevisionId: revisionId, latestRevisionNumber: revisionNumber } = plan;
+  if (typeof issueId !== "string" || typeof documentId !== "string" || typeof revisionId !== "string" || typeof revisionNumber !== "number") {
+    throw noPlan();
+  }
+  return { issueId, documentId, revisionId, revisionNumber };
+}
+
+/** Questions to the board, plan reviews and approval requests. */
 export const REQUEST_TOOLS = [
   tool({
     name: "paperclip_list_requests",
@@ -52,6 +76,51 @@ export const REQUEST_TOOLS = [
       });
       if (args.wait) await api("PATCH", `/issues/${pathId(args.taskId)}`, { status: "in_review" });
       return { interaction: pick(interaction, ["id", "kind", "status"]), waiting: args.wait };
+    },
+  }),
+  tool({
+    name: "paperclip_request_plan_review",
+    description: "Ask for a review of the task's plan document (its latest revision), as a card in the thread, and put the task in review to wait for it.",
+    action: "requests:create",
+    input: z.object({
+      taskId,
+      note: z.string().trim().min(1).max(2000).optional().describe("Optional: what the reviewer should look at"),
+    }).strict(),
+    run: async (_caller, args, api) => {
+      const plan = await readPlan(api, args.taskId);
+      const issueId = pathId(plan.issueId);
+      // One card per revision: a retry, another note or another run asking again finds the same card.
+      const idempotencyKey = `mcp-plan-review:${plan.issueId}:${plan.revisionId}`;
+      let card: Record<string, unknown>;
+      try {
+        card = object(await api("POST", `/issues/${issueId}/interactions`, {
+          kind: "request_confirmation",
+          idempotencyKey,
+          resolverPolicy: "human_only",
+          continuationPolicy: "wake_assignee",
+          payload: {
+            version: 1,
+            prompt: `Review the plan (revision ${plan.revisionNumber}): accept it, or request changes.`,
+            acceptLabel: "Accept plan",
+            rejectLabel: "Request changes",
+            rejectRequiresReason: true,
+            rejectReasonLabel: "What should change?",
+            ...(args.note ? { detailsMarkdown: args.note } : {}),
+            target: {
+              type: "issue_document", key: "plan", issueId: plan.issueId, documentId: plan.documentId,
+              revisionId: plan.revisionId, revisionNumber: plan.revisionNumber,
+            },
+          },
+        }));
+      } catch (error) {
+        if (!(error instanceof McpToolError && error.status === 409)) throw error;
+        const existing = rows(await api("GET", `/issues/${issueId}/interactions`)).map(object)
+          .find(row => row.idempotencyKey === idempotencyKey);
+        if (!existing) throw error;
+        card = existing;
+      }
+      if (card.status === "pending") await api("PATCH", `/issues/${issueId}`, { status: "in_review" });
+      return { interactionId: card.id, revisionNumber: plan.revisionNumber, status: card.status };
     },
   }),
   tool({

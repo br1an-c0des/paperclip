@@ -16,6 +16,7 @@ export const PAPERCLIP_TOOL_NAMES = [
   "paperclip_list_agents",
   "paperclip_list_projects",
   "paperclip_ask_board",
+  "paperclip_request_plan_review",
   "paperclip_request_approval",
   "paperclip_report_progress",
   "paperclip_finish",
