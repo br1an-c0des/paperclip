@@ -16,6 +16,12 @@ export type {
   ClaudeWakeRenderOptions,
 } from "./wake/render.js";
 export type { ClaudeCliPromptInput, ClaudeCliPromptSectionTexts } from "./legacy-prompt.js";
+export {
+  claudeIdentityLine,
+  claudeInstructionsLocation,
+  claudeToolsNote,
+  claudeToolsNoteEndsRun,
+} from "./standing-texts.js";
 export { planClaudeInstructionsDirective, planClaudeRunSkillsAndInstructions } from "./run-plan.js";
 export { buildClaudePromptRecord, PAPERCLIP_RUN_PROMPT_PLAN_KEY, readRunPromptPlan } from "./prompt-record.js";
 export * from "./acp.js";

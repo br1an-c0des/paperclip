@@ -1,32 +1,125 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
-  DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE,
-  hydrateFreshSessionHandoff,
-} from "@paperclipai/adapter-utils/server-utils";
+import { hydrateFreshSessionHandoff } from "@paperclipai/adapter-utils/server-utils";
 import { createPromptContextFixture } from "@paperclipai/adapter-utils/test-fixtures/prompt-context";
 import { composeClaudeCliPrompt, resolveClaudePromptTemplate, type ClaudeCliPromptInput } from "./legacy-prompt.js";
+import { claudeInstructionsLocation, claudeToolsNote } from "./standing-texts.js";
 import { renderClaudeWake } from "./wake/render.js";
 
 // Pins today's `claude --print` prompt (the join moved out of execute.ts) on the shared fixture.
 // The snapshots are the text Claude receives; a change to them changes what agents get.
 
 const env = { PAPERCLIP_API_URL: "http://127.0.0.1:3100", PAPERCLIP_API_KEY: "run-token" };
+const IDENTITY = "You are Ada, Release manager.";
+const INSTRUCTIONS = claudeInstructionsLocation("/agents/a/AGENTS.md");
+const TOOLS_NOTE = claudeToolsNote({ env, endOfRunLine: true });
+const TOOLS_NOTE_NO_END = claudeToolsNote({ env, endOfRunLine: false });
 
 function input(overrides: Partial<ClaudeCliPromptInput> & { context?: Record<string, unknown> } = {}): ClaudeCliPromptInput {
   const context = overrides.context ?? createPromptContextFixture();
   return {
     context,
     resumed: false,
-    instructionsPathDirective: "Agent instructions for this run were loaded from /agents/a/AGENTS.md.",
-    bootstrapPromptTemplate: "Bootstrap for {{agent.name}}.",
-    promptTemplate: "Heartbeat for {{agent.name}} on run {{runId}}.",
-    templateData: { agentId: "agent-1", runId: "run-1", agent: { id: "agent-1", name: "Ada" }, context },
+    instructionsPathDirective: INSTRUCTIONS,
+    promptTemplate: null,
+    templateData: { agentId: "agent-1", runId: "run-1", agent: { id: "agent-1", name: "Ada", title: "Release manager" }, context },
     sealed: true,
     env,
     ...overrides,
   };
 }
+
+const recoveryContext = () => {
+  const fixture = createPromptContextFixture();
+  return {
+    ...fixture,
+    paperclipWake: {
+      reason: "issue_continuation_needed",
+      issue: fixture.paperclipWake.issue,
+      recovery: {
+        cause: "process_lost",
+        failureSummary: "the process exited",
+        originalAssignee: { id: "agent-1", name: "Ada" },
+        attemptCount: 1,
+        maxAttempts: 3,
+        nextAction: "retry",
+      },
+      comments: [],
+      fallbackFetchNeeded: false,
+    },
+  };
+};
+
+describe("composeClaudeCliPrompt: the light sections (step 5 phase 2)", () => {
+  it("a fresh assignment opens with the identity line, the instructions line and the tools note, then the wake", () => {
+    const result = composeClaudeCliPrompt(input());
+    expect(result.prompt.startsWith(`${IDENTITY}\n\n${INSTRUCTIONS}\n\n${TOOLS_NOTE}\n\n`)).toBe(true);
+    expect(TOOLS_NOTE.split("\n")).toHaveLength(3);
+    // The chat sections (the communication guidance here) keep their place before the wake.
+    const afterStanding = result.prompt.slice(`${IDENTITY}\n\n${INSTRUCTIONS}\n\n${TOOLS_NOTE}\n\n`.length);
+    expect(afterStanding.startsWith(`${result.sections.communicationGuidance}\n\n## What happened`)).toBe(true);
+    expect(result.prompt).not.toContain("Connection tools:");
+    expect(result.prompt).not.toContain("Paperclip API access note:");
+    expect(result.prompt).not.toContain("You are agent agent-1");
+    expect(result.sections.heartbeatTemplate).toBe(IDENTITY);
+    expect(result.sections.mcpNote).toBe(TOOLS_NOTE);
+  });
+
+  it("an agent without a title is named alone", () => {
+    const context = createPromptContextFixture();
+    const result = composeClaudeCliPrompt(input({
+      context,
+      templateData: { agentId: "agent-1", runId: "run-1", agent: { id: "agent-1", name: "Ada", title: "  " }, context },
+    }));
+    expect(result.prompt.startsWith("You are Ada.\n\n")).toBe(true);
+  });
+
+  it("an agent's own template is rendered and sent first; a blank one counts as not set", () => {
+    const own = composeClaudeCliPrompt(input({ promptTemplate: "Mine {{agent.name}}." }));
+    expect(own.prompt.startsWith(`Mine Ada.\n\n${INSTRUCTIONS}\n\n`)).toBe(true);
+    expect(own.sections.heartbeatTemplate).toBe("Mine Ada.");
+    expect(own.prompt).not.toContain(IDENTITY);
+    const blank = composeClaudeCliPrompt(input({ promptTemplate: "  " }));
+    expect(blank.prompt.startsWith(`${IDENTITY}\n\n${INSTRUCTIONS}\n\n`)).toBe(true);
+  });
+
+  it("a chat task gets the identity line and a tools note without the end-of-run line", () => {
+    const context = { ...createPromptContextFixture(), conversationMode: true };
+    const result = composeClaudeCliPrompt(input({ context }));
+    expect(result.prompt.startsWith(`${IDENTITY}\n\n${INSTRUCTIONS}\n\n${TOOLS_NOTE_NO_END}\n\n`)).toBe(true);
+    expect(result.sections.mcpNote).not.toContain("paperclip_finish");
+    expect(result.prompt).not.toContain("Connection tools:");
+  });
+
+  it("a recovery wake gets no identity line and a tools note without the end-of-run line", () => {
+    const result = composeClaudeCliPrompt(input({ context: recoveryContext() }));
+    expect(result.prompt.startsWith(`${INSTRUCTIONS}\n\n${TOOLS_NOTE_NO_END}\n\n`)).toBe(true);
+    expect(result.sections.heartbeatTemplate).toBe("");
+    expect(result.prompt).not.toContain("You are Ada");
+    expect(result.prompt).not.toContain("paperclip_finish");
+  });
+
+  it("a resumed comment wake starts with the instructions line: no identity line, no tools note", () => {
+    const result = composeClaudeCliPrompt(input({ resumed: true }));
+    expect(result.prompt.startsWith(`${INSTRUCTIONS}\n\n## What happened`)).toBe(true);
+    expect(result.sections.heartbeatTemplate).toBe("");
+    expect(result.sections.mcpNote).toBe("");
+  });
+
+  it("sends neither the bootstrap template nor the rotation note", () => {
+    const context = { ...createPromptContextFixture(), paperclipSessionHandoffMarkdown: "## Rotation\n\nRotated session note." };
+    const result = composeClaudeCliPrompt({
+      ...input({ context }),
+      // A legacy caller's extra field is ignored.
+      ...({ bootstrapPromptTemplate: "Bootstrap for {{agent.name}}." } as Record<string, unknown>),
+    } as ClaudeCliPromptInput);
+    expect(result.prompt).not.toContain("Bootstrap for");
+    expect(result.prompt).not.toContain("Rotated session note.");
+    expect(result.promptMetrics.bootstrapPromptChars).toBe(0);
+    expect(result.promptMetrics.sessionHandoffChars).toBe(0);
+    expect(Object.keys(result.sections)).not.toContain("bootstrapTemplate");
+    expect(Object.keys(result.sections)).not.toContain("sessionRotationNote");
+  });
+});
 
 describe("composeClaudeCliPrompt", () => {
   it("joins a fresh session's sections", () => {
@@ -36,9 +129,13 @@ describe("composeClaudeCliPrompt", () => {
     };
     const result = composeClaudeCliPrompt(input({ context }));
     expect(result.prompt).toMatchInlineSnapshot(`
-      "Agent instructions for this run were loaded from /agents/a/AGENTS.md.
+      "You are Ada, Release manager.
 
-      Bootstrap for Ada.
+      Your instructions file this run is /agents/a/AGENTS.md; resolve relative paths in it from /agents/a/.
+
+      Work with Paperclip through the \`paperclip\` MCP server's \`paperclip_*\` tools, not HTTP requests. This message has what's new and the task; \`paperclip_read_task\` and \`paperclip_task_context\` read more when you need it.
+      End the run with \`paperclip_finish\`, \`paperclip_block\` (if you're waiting on someone) or \`paperclip_report_progress\` with \`continue: true\`.
+      PAPERCLIP_API_KEY is there for scripts that need the REST API.
 
       Explain the next step before starting work.
 
@@ -79,29 +176,22 @@ describe("composeClaudeCliPrompt", () => {
 
       Keep this deliberate repetition. Keep this deliberate repetition.
 
-      Plan revision: approved-revision-2
-
-      Paperclip API access note:
-      Work with Paperclip through the \`paperclip\` MCP server's \`paperclip_*\` tools, not HTTP requests.
-      Start with \`paperclip_task_context\`; end the run with \`paperclip_finish\`, \`paperclip_block\`, or \`paperclip_report_progress\` with \`continue: true\`.
-      PAPERCLIP_API_KEY is there for scripts that need the REST API.
-
-      Heartbeat for Ada on run run-1."
+      Plan revision: approved-revision-2"
     `);
     expect(result.promptMetrics).toEqual({
       promptChars: result.prompt.length,
-      bootstrapPromptChars: "Bootstrap for Ada.".length,
+      bootstrapPromptChars: 0,
       wakePromptChars: result.sections.wake.length,
       sessionHandoffChars: 0,
       taskContextChars: result.sections.taskBrief.length,
-      heartbeatPromptChars: "Heartbeat for Ada on run run-1.".length,
+      heartbeatPromptChars: IDENTITY.length,
     });
   });
 
   it("joins a resumed session with a wake: resume delta, compact brief, no template", () => {
     const result = composeClaudeCliPrompt(input({ resumed: true }));
     expect(result.prompt).toMatchInlineSnapshot(`
-      "Agent instructions for this run were loaded from /agents/a/AGENTS.md.
+      "Your instructions file this run is /agents/a/AGENTS.md; resolve relative paths in it from /agents/a/.
 
       ## What happened
 
@@ -140,46 +230,29 @@ describe("composeClaudeCliPrompt", () => {
     expect(result.promptMetrics.bootstrapPromptChars).toBe(0);
   });
 
-  it("joins a resumed session without a wake: the heartbeat template stays", () => {
+  it("joins a resumed session without a wake: the identity line stays", () => {
     const { paperclipWake: _wake, ...context } = createPromptContextFixture();
     const result = composeClaudeCliPrompt(input({ resumed: true, context }));
     expect(result.prompt).toMatchInlineSnapshot(`
-      "Agent instructions for this run were loaded from /agents/a/AGENTS.md.
+      "You are Ada, Release manager.
+
+      Your instructions file this run is /agents/a/AGENTS.md; resolve relative paths in it from /agents/a/.
 
       ## Owned assignment
 
       Keep this deliberate repetition. Keep this deliberate repetition.
 
-      Plan revision: approved-revision-2
-
-      Heartbeat for Ada on run run-1."
+      Plan revision: approved-revision-2"
     `);
   });
 
-  it("drops the heartbeat template on a recovery wake", () => {
-    const fixture = createPromptContextFixture();
-    const context = {
-      ...fixture,
-      paperclipWake: {
-        reason: "issue_continuation_needed",
-        issue: fixture.paperclipWake.issue,
-        recovery: {
-          cause: "process_lost",
-          failureSummary: "the process exited",
-          originalAssignee: { id: "agent-1", name: "Ada" },
-          attemptCount: 1,
-          maxAttempts: 3,
-          nextAction: "retry",
-        },
-        comments: [],
-        fallbackFetchNeeded: false,
-      },
-    };
-    const result = composeClaudeCliPrompt(input({ context }));
+  it("drops the identity line on a recovery wake", () => {
+    const result = composeClaudeCliPrompt(input({ context: recoveryContext() }));
     expect(result.prompt).toMatchInlineSnapshot(`
-      "Agent instructions for this run were loaded from /agents/a/AGENTS.md.
+      "Your instructions file this run is /agents/a/AGENTS.md; resolve relative paths in it from /agents/a/.
 
-      Bootstrap for Ada.
+      Work with Paperclip through the \`paperclip\` MCP server's \`paperclip_*\` tools, not HTTP requests. This message has what's new and the task; \`paperclip_read_task\` and \`paperclip_task_context\` read more when you need it.
+      PAPERCLIP_API_KEY is there for scripts that need the REST API.
 
       Explain the next step before starting work.
 
@@ -202,17 +275,12 @@ describe("composeClaudeCliPrompt", () => {
 
       Keep this deliberate repetition. Keep this deliberate repetition.
 
-      Plan revision: approved-revision-2
-
-      Paperclip API access note:
-      Work with Paperclip through the \`paperclip\` MCP server's \`paperclip_*\` tools, not HTTP requests.
-      Start with \`paperclip_task_context\`; end the run with \`paperclip_finish\`, \`paperclip_block\`, or \`paperclip_report_progress\` with \`continue: true\`.
-      PAPERCLIP_API_KEY is there for scripts that need the REST API."
+      Plan revision: approved-revision-2"
     `);
     expect(result.promptMetrics.heartbeatPromptChars).toBe(0);
   });
 
-  it("leaves the MCP note out of an external chat turn", () => {
+  it("leaves the tools note out of an external chat turn", () => {
     const fixture = createPromptContextFixture();
     const context = {
       ...fixture,
@@ -232,9 +300,9 @@ describe("composeClaudeCliPrompt", () => {
     expect(result.prompt).not.toContain("Paperclip API access note:");
     expect(result.sections.mcpNote).toBe("");
     expect(result.prompt).toMatchInlineSnapshot(`
-      "Agent instructions for this run were loaded from /agents/a/AGENTS.md.
+      "You are Ada, Release manager.
 
-      Bootstrap for Ada.
+      Your instructions file this run is /agents/a/AGENTS.md; resolve relative paths in it from /agents/a/.
 
       Explain the next step before starting work.
 
@@ -273,16 +341,14 @@ describe("composeClaudeCliPrompt", () => {
 
       Keep this deliberate repetition. Keep this deliberate repetition.
 
-      Plan revision: approved-revision-2
-
-      Heartbeat for Ada on run run-1."
+      Plan revision: approved-revision-2"
     `);
   });
 
-  it("leaves the MCP note out of an unsealed run", () => {
+  it("leaves the tools note out of an unsealed run", () => {
     const result = composeClaudeCliPrompt(input({ sealed: false }));
     expect(result.sections.mcpNote).toBe("");
-    expect(result.prompt).not.toContain("Paperclip API access note:");
+    expect(result.prompt).not.toContain("paperclip_*");
     expect(result.prompt).toBe(
       composeClaudeCliPrompt(input()).prompt.replace(
         `\n\n${composeClaudeCliPrompt(input()).sections.mcpNote}`,
@@ -293,20 +359,19 @@ describe("composeClaudeCliPrompt", () => {
 
   it("reproduces the \"null\" brief of a no-task run (bug 84)", () => {
     const context = { paperclipTaskMarkdownAssignment: "null", paperclipTaskCommunicationGuidance: "Be quick." };
-    const result = composeClaudeCliPrompt(input({ context, bootstrapPromptTemplate: "" }));
+    const result = composeClaudeCliPrompt(input({ context }));
     expect(result.prompt).toMatchInlineSnapshot(`
-      "Agent instructions for this run were loaded from /agents/a/AGENTS.md.
+      "You are Ada, Release manager.
+
+      Your instructions file this run is /agents/a/AGENTS.md; resolve relative paths in it from /agents/a/.
+
+      Work with Paperclip through the \`paperclip\` MCP server's \`paperclip_*\` tools, not HTTP requests. This message has what's new and the task; \`paperclip_read_task\` and \`paperclip_task_context\` read more when you need it.
+      End the run with \`paperclip_finish\`, \`paperclip_block\` (if you're waiting on someone) or \`paperclip_report_progress\` with \`continue: true\`.
+      PAPERCLIP_API_KEY is there for scripts that need the REST API.
 
       Be quick.
 
-      null
-
-      Paperclip API access note:
-      Work with Paperclip through the \`paperclip\` MCP server's \`paperclip_*\` tools, not HTTP requests.
-      Start with \`paperclip_task_context\`; end the run with \`paperclip_finish\`, \`paperclip_block\`, or \`paperclip_report_progress\` with \`continue: true\`.
-      PAPERCLIP_API_KEY is there for scripts that need the REST API.
-
-      Heartbeat for Ada on run run-1."
+      null"
     `);
   });
 });
@@ -469,12 +534,13 @@ describe("composeClaudeCliPrompt: no brief on a non-chat task (step 5 phase 2, t
 });
 
 describe("resolveClaudePromptTemplate", () => {
-  it("uses the agent's own template when set", () => {
-    expect(resolveClaudePromptTemplate({ promptTemplate: "Mine." }, {})).toBe("Mine.");
+  it("is the agent's own template when set", () => {
+    expect(resolveClaudePromptTemplate({ promptTemplate: "Mine." })).toBe("Mine.");
   });
-  it("defaults to the heartbeat template, or the conversation one for a chat turn", () => {
-    expect(resolveClaudePromptTemplate({}, {})).toBe(DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE);
-    expect(resolveClaudePromptTemplate({}, { conversationMode: true })).toBe(DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE);
-    expect(resolveClaudePromptTemplate({ promptTemplate: 42 }, {})).toBe(DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE);
+  it("is null when unset, blank or not a string (the identity line is sent instead)", () => {
+    expect(resolveClaudePromptTemplate({})).toBeNull();
+    expect(resolveClaudePromptTemplate({ promptTemplate: "" })).toBeNull();
+    expect(resolveClaudePromptTemplate({ promptTemplate: "  " })).toBeNull();
+    expect(resolveClaudePromptTemplate({ promptTemplate: 42 })).toBeNull();
   });
 });
