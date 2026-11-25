@@ -358,4 +358,27 @@ describe.skipIf(!support.supported)("heartbeat environment selection boundary", 
       expect((await db.select().from(issues).where(eq(issues.id, issue.id)))[0].executionWorkspaceId).toBeNull();
     }
   });
+
+  it("sets paperclipSharedWorkspaceNote when another run holds the shared workspace, and still appends today's note to the brief", async () => {
+    const { input, project } = await fixture();
+    const local = await environmentService(db).ensureLocalEnvironment(input.agent.companyId);
+    input.agent.defaultEnvironmentId = local.id;
+    const [source] = await db.insert(projectWorkspaces).values({ companyId: input.agent.companyId, projectId: project.id,
+      name: "Shared source", cwd: home, sourceType: "local_path", isPrimary: true }).returning();
+    input.task.issueRef!.projectWorkspaceId = source.id;
+    input.task.context.paperclipTaskMarkdown = "brief";
+    input.task.context.paperclipTaskMarkdownAssignment = "assignment brief";
+    const holderRunId = randomUUID();
+    input.services.findSharedWorkspaceHolder = vi.fn(async () => ({ runId: holderRunId, agentId: randomUUID(), issueId: randomUUID(), issueIdentifier: "ENV-9" }));
+    await selectHeartbeatEnvironment(db, input);
+    expect(input.task.context.paperclipSharedWorkspaceNote).toEqual({ heldByRunId: holderRunId, heldByIssue: "ENV-9" });
+    expect(input.task.context.paperclipTaskMarkdown).toBe(
+      `brief\nshared workspace is concurrently held by run ${holderRunId} (issue ENV-9); expect concurrent mutations, coordinate via commits`);
+    expect(input.task.context.paperclipTaskMarkdownAssignment).toContain(`concurrently held by run ${holderRunId}`);
+
+    // No holder on a later selection: the note goes.
+    input.services.findSharedWorkspaceHolder = vi.fn(async () => null);
+    await selectHeartbeatEnvironment(db, input);
+    expect(input.task.context.paperclipSharedWorkspaceNote).toBeUndefined();
+  });
 });
