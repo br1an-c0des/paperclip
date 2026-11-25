@@ -130,8 +130,11 @@ describePostgres("the run preview's prompt draft", () => {
     ]);
     // The checkout is the harness's, at launch.
     const wake = previewed.firstMessage.find((section) => section.id === "wake")!;
-    expect(wake.parts?.find((part) => part.id === "wake.checkout_line")?.pending).toMatch(/checks the task out/);
-    expect(wake.parts?.find((part) => part.id === "wake.issue_state")?.pending).toMatch(/status/);
+    // The claude_local wake holds both on its task line.
+    const taskLine = wake.parts?.find((part) => part.id === "wake.task");
+    expect(taskLine?.text).toContain("already checked out to you");
+    expect(taskLine?.pending).toMatch(/checks the task out/);
+    expect(taskLine?.pending).toMatch(/status/);
   });
 
   it("drafts a chat turn with the chat directive, woken by the person's latest message", async () => {
@@ -201,8 +204,9 @@ describePostgres("the run preview's prompt draft", () => {
     const byId = (id: string) => previewed.firstMessage.find((section) => section.id === id)!;
     expect(byId("instructions_directive").pending).toMatch(/working copy/);
     expect(byId("wake").pending).toMatch(/connections/);
-    const branch = byId("wake").parts?.find((part) => part.id === "wake.workspace_branch");
-    expect(branch?.text).toContain("<task branch>");
+    // The branch is on the claude_local wake's task line.
+    const branch = byId("wake").parts?.find((part) => part.id === "wake.task");
+    expect(branch?.text).toContain("branch `<task branch>`");
     expect(branch?.pending).toMatch(/names the branch/);
   });
 });

@@ -1,6 +1,8 @@
 export { claudeSessionCwdMatchesExecutionTarget, execute, runClaudeLogin } from "./execute.js";
 export { previewClaudeRun, CLAUDE_RUN_PREVIEW_RUN_ID } from "./preview.js";
-export { composeClaudeCliPrompt, resolveClaudePromptTemplate } from "./legacy-prompt.js";
+export { claudeWakeOptions, composeClaudeCliPrompt, resolveClaudePromptTemplate, usesSharedWake } from "./legacy-prompt.js";
+export { detectClaudeWakeEvents, renderClaudeWake, renderClaudeWakeParts } from "./wake/render.js";
+export type { ClaudeWakeEventKind, ClaudeWakeRenderOptions } from "./wake/render.js";
 export type { ClaudeCliPromptInput, ClaudeCliPromptSectionTexts } from "./legacy-prompt.js";
 export { planClaudeInstructionsDirective, planClaudeRunSkillsAndInstructions } from "./run-plan.js";
 export { buildClaudePromptRecord, PAPERCLIP_RUN_PROMPT_PLAN_KEY, readRunPromptPlan } from "./prompt-record.js";

@@ -1,8 +1,11 @@
 import type { RunPromptDelivery, RunPromptPart, RunPromptPlan, RunPromptSection, RunPromptSectionId } from "@paperclipai/shared";
 import {
+  claudeWakeOptions,
   composeClaudeCliPrompt,
   planClaudeInstructionsDirective,
+  renderClaudeWakeParts,
   resolveClaudePromptTemplate,
+  usesSharedWake,
 } from "@paperclipai/adapter-claude-local/server";
 import {
   asString,
@@ -91,7 +94,7 @@ export async function buildClaudeRunPromptPlan(input: ClaudeRunPromptInput): Pro
       sealed,
       env,
     });
-    const labelled = describeSections({ texts, context: setContext, resumed, config, templateData, promptTemplate });
+    const labelled = describeSections({ texts, context: setContext, resumed, config, templateData, promptTemplate, agentId: agent.id });
     return labelled.filter((section) => section.text.length > 0);
   };
 
@@ -116,6 +119,7 @@ function describeSections(input: {
   config: Record<string, unknown>;
   templateData: Record<string, unknown>;
   promptTemplate: string;
+  agentId: string;
 }): RunPromptSection[] {
   const { texts, context, resumed, config } = input;
   const wake = normalizePaperclipWakePayload(context.paperclipWake);
@@ -144,16 +148,24 @@ function describeSections(input: {
           asString(context.paperclipFreshSessionHandoffMarkdown, "")),
       ]),
     }),
-    section("wake", texts.wake, {
-      label: resumed ? "Wake (resume delta)" : "Wake",
-      reason: wakeReason(wake?.reason ?? null, resumed),
-      source: "context: paperclipWake, rendered by renderPaperclipWakePrompt",
-      parts: renderPaperclipWakePromptParts(context.paperclipWake, {
-        resumedSession: resumed,
-        conversationMode: context.conversationMode === true,
-        suppressIssueDescription: texts.taskBrief.length > 0,
+    // The same renderer and options composeClaudeCliPrompt used for this text.
+    usesSharedWake(context)
+      ? section("wake", texts.wake, {
+        label: resumed ? "Wake (resume delta)" : "Wake",
+        reason: wakeReason(wake?.reason ?? null, resumed),
+        source: "context: paperclipWake, rendered by renderPaperclipWakePrompt (external chat)",
+        parts: renderPaperclipWakePromptParts(context.paperclipWake, {
+          resumedSession: resumed,
+          conversationMode: context.conversationMode === true,
+          suppressIssueDescription: texts.taskBrief.length > 0,
+        }),
+      })
+      : section("wake", texts.wake, {
+        label: resumed ? "Wake (resumed session)" : "Wake",
+        reason: wakeReason(wake?.reason ?? null, resumed),
+        source: "context: paperclipWake, rendered by renderClaudeWake",
+        parts: renderClaudeWakeParts(context.paperclipWake, claudeWakeOptions({ context, resumed, agentId: input.agentId })),
       }),
-    }),
     section("session_rotation_note", texts.sessionRotationNote, {
       label: "Session rotation note",
       reason: "the session was rotated",
@@ -250,7 +262,7 @@ const WAKE_REASONS: Record<string, string> = {
 
 function wakeReason(reason: string | null, resumed: boolean): string {
   const what = reason ? WAKE_REASONS[reason] ?? `wake reason: ${reason}` : "a wake payload";
-  return resumed ? `${what}; a resumed session gets the resume delta` : what;
+  return resumed ? `${what}; a resumed session gets only the news` : what;
 }
 
 // --- Helpers --------------------------------------------------------------------
