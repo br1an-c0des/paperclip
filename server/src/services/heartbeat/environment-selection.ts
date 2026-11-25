@@ -35,6 +35,7 @@ import type { TrustPresetResolution } from "../trust-preset-resolver.js";
 import { WORKSPACE_BUSY_RETRY_REASON } from "../../modules/run-dispatch/index.js";
 import { WorkspaceBusyDeferral, type createHeartbeatRetries } from "./retries.js";
 import { ConfigurationIncompleteFailure } from "./run-preparation.js";
+import type { PaperclipSharedWorkspaceNote } from "./run-task-facts.js";
 import { resolveNativeRecoveryExecutionWorkspaceBinding, resolveExecutionWorkspaceReuseRequestForIssue, WorkspaceValidationFailure } from "./workspaces.js";
 
 type Issue = typeof issues.$inferSelect;
@@ -427,6 +428,8 @@ export async function selectHeartbeatEnvironment(db: Db, input: HeartbeatEnviron
       });
     }
   }
+  // Set below when another run holds the shared workspace; never carried from an earlier selection.
+  delete context.paperclipSharedWorkspaceNote;
   // A live holder is always consulted for shared workspaces. Depending on policy and the final
   // execution target it either remains the existing deferral gate or becomes dispatch context.
   // Local/SSH folders never take an exclusive workspace lock, including when older
@@ -471,6 +474,12 @@ export async function selectHeartbeatEnvironment(db: Db, input: HeartbeatEnviron
 
       const holderIssueLabel =
         workspaceHolder.issueIdentifier ?? workspaceHolder.issueId;
+      // The same note as its own field, for claude_local's "What to do now" (step 5 phase 2);
+      // the brief keeps the appended text below for the other readers.
+      context.paperclipSharedWorkspaceNote = {
+        heldByRunId: workspaceHolder.runId,
+        heldByIssue: holderIssueLabel ?? null,
+      } satisfies PaperclipSharedWorkspaceNote;
       const concurrentWorkspaceNote =
         `shared workspace is concurrently held by run ${workspaceHolder.runId} (issue ${holderIssueLabel}); ` +
         "expect concurrent mutations, coordinate via commits";

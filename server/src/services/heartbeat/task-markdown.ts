@@ -119,6 +119,53 @@ const TASK_MARKDOWN_PART_META: Readonly<Record<string, Pick<PaperclipPromptPart,
   "task_brief.closing": { label: "Closing line", source: "task brief: fixed closing line" },
 };
 
+/** The wake comments the brief speaks of: non-empty ones trimmed, and the latest (or the single wake comment). */
+function briefWakeComments(input: PaperclipTaskMarkdownInput) {
+  const wakeComments = (input.wakeComments ?? [])
+    .filter(
+      (comment) =>
+        comment.body.trim().length > 0 || Boolean(comment.attachments?.length),
+    )
+    .map((comment) => ({ ...comment, body: comment.body.trim() }));
+  const wakeComment =
+    wakeComments.at(-1) ??
+    (input.wakeComment?.body.trim()
+      ? { ...input.wakeComment, body: input.wakeComment.body.trim() }
+      : null);
+  return { wakeComments, wakeComment };
+}
+
+/**
+ * Where the task's plan stands, as the brief reads it: rejected (revise it), accepted and to be
+ * implemented on this task, or an accepted chat plan to hand off. The brief and the run's task
+ * facts (`run-task-facts.ts`) both use it, so the two can't disagree.
+ */
+export function briefPlanState(input: PaperclipTaskMarkdownInput): {
+  rejectedPlan: boolean;
+  acceptedPlanContinuation: boolean;
+  acceptedChatPlan: boolean;
+} {
+  const issue = input.issue;
+  const { wakeComment } = briefWakeComments(input);
+  const rejectedPlan = input.planReview?.status === "rejected";
+  const acceptedPlanContinuation = Boolean(
+    !rejectedPlan && !issue?.conversationAgentId && !wakeComment &&
+    (input.acceptedPlanContinuation ||
+      (input.interaction?.kind === "request_confirmation" &&
+        input.interaction.status === "accepted" &&
+        issue?.workMode === "planning")),
+  );
+  const acceptedChatPlan = Boolean(
+    !rejectedPlan && issue?.conversationAgentId &&
+    issue.workMode !== "ask" &&
+    !wakeComment &&
+    input.interaction?.kind === "request_confirmation" &&
+    input.interaction.status === "accepted" &&
+    (input.acceptedPlan?.revisionId || input.acceptedPlanContinuation),
+  );
+  return { rejectedPlan, acceptedPlanContinuation, acceptedChatPlan };
+}
+
 function buildPaperclipTaskMarkdownLines(
   input: PaperclipTaskMarkdownInput,
 ): { lines: string[]; marks: Array<{ id: string; index: number }> } | null {
@@ -139,35 +186,11 @@ function buildPaperclipTaskMarkdownLines(
   const companyPages = (text: string) =>
     companyPagePrefix ? text.replaceAll("/<prefix>/", `/${companyPagePrefix}/`) : text;
   const ancestors = (input.ancestors ?? []).slice(0, 6);
-  const wakeComments = (input.wakeComments ?? [])
-    .filter(
-      (comment) =>
-        comment.body.trim().length > 0 || Boolean(comment.attachments?.length),
-    )
-    .map((comment) => ({ ...comment, body: comment.body.trim() }));
-  const wakeComment =
-    wakeComments.at(-1) ??
-    (input.wakeComment?.body.trim()
-      ? { ...input.wakeComment, body: input.wakeComment.body.trim() }
-      : null);
+  const { wakeComments, wakeComment } = briefWakeComments(input);
   const effectiveWakeComments =
     wakeComments.length > 0 ? wakeComments : wakeComment ? [wakeComment] : [];
   const renderWakeCommentBodies = input.includeWakeComments !== false;
-  const rejectedPlan = input.planReview?.status === "rejected";
-  const acceptedPlanContinuation =
-    !rejectedPlan && !issue?.conversationAgentId && !wakeComment &&
-    (input.acceptedPlanContinuation ||
-      (input.interaction?.kind === "request_confirmation" &&
-        input.interaction.status === "accepted" &&
-        issue?.workMode === "planning"));
-  const acceptedChatPlan = Boolean(
-    !rejectedPlan && issue?.conversationAgentId &&
-    issue.workMode !== "ask" &&
-    !wakeComment &&
-    input.interaction?.kind === "request_confirmation" &&
-    input.interaction.status === "accepted" &&
-    (input.acceptedPlan?.revisionId || input.acceptedPlanContinuation),
-  );
+  const { rejectedPlan, acceptedPlanContinuation, acceptedChatPlan } = briefPlanState(input);
   if (!issue && effectiveWakeComments.length === 0) return null;
 
   // The marks name each block for buildPaperclipTaskMarkdownParts; they never change the text.
