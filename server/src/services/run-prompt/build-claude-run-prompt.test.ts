@@ -107,6 +107,12 @@ function withBrief(
 const issue = { id: "issue-1", identifier: "PAP-1", title: "Release ledger", status: "in_progress", priority: "medium", workMode: "standard" };
 const description = "Keep the release ledger current and publish the launch checklist.";
 const guidance = FAST_RESPONSE_AGENT_GUIDANCE;
+/** The payload's history (step 5 phase 2, the handoff), as buildPaperclipWakePayload adds it. */
+const wakeHistory = {
+  lastRun: { runId: "prior-run", agentId: agent.id, ownRun: true, status: "succeeded", finishedAt: "2026-11-20T09:00:00.000Z",
+    body: "Drafted the ledger.", bodyTruncated: false },
+  answered: [], answeredOmitted: 0, open: [], documents: [{ key: "notes", title: null, inBrief: false }],
+};
 
 interface RunKind {
   name: string;
@@ -307,6 +313,39 @@ const kinds: RunKind[] = [
     }, { issue: { ...issue, description }, interaction: { kind: "ask_user_questions", status: "answered" } })),
   },
   {
+    // Step 5 phase 2, the handoff: the payload's history replaces the handoff the loader returns.
+    name: "fresh session with history",
+    shows: ["## Where things stand", "Your last run on PAP-1 (Nov 20, 09:00 UTC) ended with:", "the task's history is under \"Where things stand\""],
+    input: () => {
+      const fixture = createPromptContextFixture();
+      const comments = fixture.paperclipWake.comments.map(({ id, body }) => ({ id, body }));
+      return runInput(withBrief({ ...fixture, paperclipTaskCommunicationGuidance: guidance, paperclipWake: { ...fixture.paperclipWake, history: wakeHistory } }, {
+        issue: { ...issue, description: fixture.paperclipWake.issue.description },
+        wakeComments: comments,
+      }), { loadFreshSessionHandoff: async () => "## Earlier runs\n\nThe ledger was drafted in run prior-run." });
+    },
+  },
+  {
+    // A chat task gets no history, so its fresh session keeps the handoff.
+    name: "chat turn with a handoff",
+    shows: ["## Earlier runs", "This is a new session; the handoff above has the task's history."],
+    input: () => runInput(withBrief({
+      conversationMode: true,
+      paperclipTaskCommunicationGuidance: `Reply in the chat.\n\n${guidance}`,
+      paperclipWake: {
+        reason: "issue_commented",
+        issue: { ...issue, identifier: "PAP-7", title: "Chat with Ada" },
+        comments: [{ id: "chat-1", body: "What's left on the ledger?", authorType: "user", authorId: "user-1", createdAt: "2026-11-20T10:00:00.000Z" }],
+        commentWindow: { requestedCount: 1, includedCount: 1, missingCount: 0 },
+        latestCommentId: "chat-1",
+        fallbackFetchNeeded: false,
+      },
+    }, {
+      issue: { ...issue, id: "chat-issue", identifier: "PAP-7", title: "Chat with Ada", conversationAgentId: agent.id, description: "Not shown." },
+      wakeComments: [{ id: "chat-1", body: "What's left on the ledger?" }],
+    }), { loadFreshSessionHandoff: async () => "## Earlier runs\n\nThe chat started yesterday." }),
+  },
+  {
     name: "execution review stage",
     shows: ["You're the reviewer for PAP-1 \"Release ledger\", which an agent worked on.", "Instructions for the review:", "`paperclip_update_task`"],
     input: () => runInput(withBrief({
@@ -433,6 +472,32 @@ describe("buildClaudeRunPromptPlan", () => {
     expect(section.parts?.map((part) => part.id)).toEqual(["communication_guidance.guidance", "communication_guidance.handoff"]);
     expect(section.reason).toContain("handoff");
     expect(plan.resumed.some((entry) => entry.id === "communication_guidance")).toBe(false);
+  });
+
+  it("leaves out the handoff where the wake has the history (step 5 phase 2)", async () => {
+    const kind = (name: string) => kinds.find((entry) => entry.name === name)!;
+    const plan = await buildClaudeRunPromptPlan(kind("fresh session with history").input());
+    const section = plan.fresh.find((entry) => entry.id === "communication_guidance")!;
+    expect(section.parts?.map((part) => part.id)).toEqual(["communication_guidance.guidance"]);
+    expect(section.reason).not.toContain("handoff follows");
+    expect(joinRunPromptSections(plan.fresh)).not.toContain("## Earlier runs");
+    const wake = plan.fresh.find((entry) => entry.id === "wake")!;
+    expect(wake.parts?.map((part) => part.id)).toEqual(expect.arrayContaining(["wake.where_things_stand", "wake.last_run", "wake.documents"]));
+    // A chat task's fresh session keeps it.
+    const chat = await buildClaudeRunPromptPlan(kind("chat turn with a handoff").input());
+    expect(chat.fresh.find((entry) => entry.id === "communication_guidance")?.parts?.map((part) => part.id))
+      .toEqual(["communication_guidance.guidance", "communication_guidance.handoff"]);
+  });
+
+  it("a resume that fails and retries fresh: the fresh set has the history and no handoff", async () => {
+    // The retry is the fresh set: the builder hydrates the handoff onto the fresh context, as
+    // execute.ts does before the retry, and the history still wins.
+    const input = kinds.find((entry) => entry.name === "fresh session with history")!.input();
+    const plan = await buildClaudeRunPromptPlan(input);
+    expect(joinRunPromptSections(plan.fresh)).toBe(await sentPrompt(input, false));
+    expect(joinRunPromptSections(plan.fresh)).toContain("## Where things stand");
+    expect(joinRunPromptSections(plan.fresh)).not.toContain("The ledger was drafted in run prior-run.");
+    expect(joinRunPromptSections(plan.resumed)).not.toContain("## Where things stand");
   });
 
   it("reproduces the \"null\" brief of a no-task run (bug 84)", async () => {

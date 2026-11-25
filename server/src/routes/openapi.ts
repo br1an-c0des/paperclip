@@ -8916,6 +8916,17 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: "get",
+  path: "/api/issues/{id}/request-history",
+  tags: ["issues"],
+  summary: "Read a task's request history",
+  description:
+    "The task's questions, confirmations, connection requests and linked approvals, every status, newest first, at most 50, as `{ requests, names }`; `names` covers the requests' people and the task's comment authors. Requests carrying a tool action, secret proposal or connection authorization are left out. A low-trust agent gets only its own requests and no approvals. Read-only: unlike `GET /api/issues/{id}/interactions` it records nothing.",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
+});
+
+registry.registerPath({
   method: "post",
   path: "/api/issues/{id}/interactions",
   tags: ["issues"],

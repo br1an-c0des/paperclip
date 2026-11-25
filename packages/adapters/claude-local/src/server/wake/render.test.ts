@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 import { joinPaperclipPromptParts, normalizePaperclipWakePayload } from "@paperclipai/adapter-utils/server-utils";
 import * as templates from "./templates.js";
 import { detectClaudeWakeEvents, renderClaudeWake, renderClaudeWakeParts, type ClaudeWakeRenderOptions } from "./render.js";
-import { BRIAN, CODER, SELF, continuation, fixtures, issue, names, type WakeFixtureName } from "./__fixtures__/payloads.js";
+import {
+  BRIAN, CODER, SELF, adaRef, answeredQuestion, approvedRequest, brianRef, continuation, fixtures, historyFixtures, issue, names,
+  tes45History, type WakeFixtureName,
+} from "./__fixtures__/payloads.js";
 
 // The claude_local wake's golden tests (step 5 phase 2, fork/step-5-wake-plan.md Task 2): each
 // event row of fork/step-5-wake.md renders the expected text from a fixed payload. The text is
@@ -1166,6 +1169,292 @@ describe("renderClaudeWake: the shape", () => {
   });
 });
 
+describe("renderClaudeWake: the task's history (step 5 phase 2, the handoff)", () => {
+  const tes45 = historyFixtures.tes45;
+  const withHistory = (history: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+    ({ ...tes45, ...extra, history: { ...tes45History, ...history } });
+  const where = (text: string) => text.slice(text.indexOf("## Where things stand"), text.indexOf("## The task"));
+
+  it("the TES-45 history", () => {
+    const text = renderClaudeWake(tes45, fresh);
+    const section = where(text);
+    expect(section).toContain("Your last run on TES-45 (Nov 24, 17:40) ended with:\n\n> I posted a four-step plan for the Light / Dark / System switch");
+    expect(section).toContain("Answered requests:");
+    expect(section).toContain("  > Where should the switch go? → Both places");
+    expect(section).toContain("- Your approval request \"Build the switch\", approved by Brian on Nov 24, 17:40, with the note:\n  > Fine, but plan only.");
+    expect(section).toContain("Documents on this task: plan (in the brief below), notes.");
+    expect(section).toContain("The task's comments so far, oldest first:");
+    expect(section).not.toContain("Summary from earlier runs");
+    expect(section).not.toContain("Continuation Summary");
+    // In order: the last run, the requests, the documents, the comments.
+    const order = ["Your last run on TES-45", "Answered requests:", "Documents on this task:", "The task's comments so far"].map((marker) => section.indexOf(marker));
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    expect(renderClaudeWakeParts(tes45, fresh).map((part) => part.id)).toEqual([
+      "wake.what_happened", "wake.event.assigned", "wake.session_note", "wake.where_things_stand",
+      "wake.last_run", "wake.requests", "wake.documents", "wake.history_comments",
+      "wake.task", "wake.to_do", "wake.common_rules",
+    ]);
+    // Run e365cdbd's "Where things stand" was 4,961 characters beside an 8,919-character handoff.
+    expect(section.length).toBeLessThan(5_500);
+    expect(section).toMatchInlineSnapshot(`
+      "## Where things stand
+
+      Your last run on TES-45 (Nov 24, 17:40) ended with:
+
+      > I posted a four-step plan for the Light / Dark / System switch as a comment on TES-45, and the task is now marked done. I wrote no code, as you asked.
+      >
+      > The plan:
+      > 1. **Storage:** keep one \`theme\` preference in localStorage, defaulting to \`system\`.
+      > 2. **Applying it:** on load, resolve the theme and set a \`data-theme\` attribute on the root element. While on \`system\`, it follows OS changes.
+      > 3. **UI:** one shared three-option switch component, shown in both the header dropdown and the settings page. Both read and write the same stored preference.
+      > 4. **Check:** each option applies, the choice survives a reload, and the two switches stay in sync.
+
+      Answered requests:
+
+      - Your approval request "Build the switch", approved by Brian on Nov 24, 17:40, with the note:
+        > Fine, but plan only.
+      - Your question, answered by Brian on Nov 24, 17:39:
+        > Where should the switch go? → Both places
+
+      Documents on this task: plan (in the brief below), notes. Read the rest with \`paperclip_read_document\`.
+
+      The task's comments so far, oldest first:
+
+      From you, Nov 24, 17:37:
+
+      > Three dark mode toggle ideas:
+      > 1. A sun/moon icon button in the header that flips theme instantly and remembers the choice in localStorage.
+      > 2. A three-way switch (Light / Dark / System) in settings that follows the OS \`prefers-color-scheme\` by default.
+      > 3. A keyboard shortcut (e.g. Ctrl+Shift+D) with a brief toast confirming the active theme.
+
+      From you, Nov 24, 17:37:
+
+      > Posted three dark mode toggle ideas in a comment. Leaving the task open for your feedback.
+
+      From you, Nov 24, 17:37:
+
+      > Ideas already posted above; waiting on your feedback.
+
+      From you, Nov 24, 17:37:
+
+      > Still waiting on board feedback; nothing new to do.
+
+      From you, Nov 24, 17:37:
+
+      > There's still no feedback on TES-45. The three ideas are posted and the task is open. The earlier recovery flag is cleared, so I'm not posting another comment. I'm waiting for your reply.
+
+      From you, Nov 24, 17:37:
+
+      > Waiting on feedback.
+
+      From you, Nov 24, 17:37:
+
+      > Three ideas posted; waiting on board feedback.
+
+      From Brian, Nov 24, 17:39:
+
+      > Thanks. Go with idea 2, the three-way switch. Before you write anything else, ask me one question about it with paperclip_ask_board (give me two or three choices), and wait for my answer.
+
+      From you, Nov 24, 17:39:
+
+      > I asked you one question on TES-45 and I'm waiting for your answer. I haven't written anything else yet.
+      >
+      > The question: where should the Light / Dark / System switch live in the UI? The choices are:
+      > - Settings page only
+      > - Header dropdown, always visible
+      > - Both: header dropdown and settings page
+
+      From you, Nov 24, 17:40:
+
+      > I've requested your approval on TES-45 to build the switch, and I'm waiting for your decision before building anything.
+      >
+      > The request covers a Light / Dark / System switch in both the header dropdown and the settings page, as you answered. System follows the OS \`prefers-color-scheme\` by default, and the choice is saved in localStorage. I listed one risk: the two entry points must stay in sync with the same stored preference.
+
+      From you, Nov 24, 17:40:
+
+      > Plan for the Light / Dark / System switch:
+      > 1. Store one \`theme\` preference (\`light\` | \`dark\` | \`system\`) in localStorage, defaulting to \`system\`.
+      > 2. On load, resolve the theme (using \`prefers-color-scheme\` for \`system\`) and set a \`data-theme\` attribute on the root element; listen for OS changes while on \`system\`.
+      > 3. Build one shared three-option switch component and render it in both the header dropdown and the settings page, both reading and writing the same stored preference.
+      > 4. Quick manual check: each option applies, the choice survives reload, and the two switches stay in sync.
+
+      From you, Nov 24, 17:40:
+
+      > Posted a short plan for the Light/Dark/System switch (header dropdown and settings page, shared stored preference), as approved. No code written.
+
+      From Brian, Nov 24, 17:41:
+
+      > Reopening this for one last step: in a single comment, sum up what we agreed (where the switch lives and what you planned), then finish the task.
+
+      "
+    `);
+  });
+
+  it("another agent's last run is named", () => {
+    const text = renderClaudeWake(withHistory({ lastRun: { ...tes45History.lastRun, agentId: CODER, ownRun: false } }), fresh);
+    expect(text).toContain("The agent Coder's last run on TES-45 (Nov 24, 17:40) ended with:");
+    const failed = renderClaudeWake(withHistory({ lastRun: { ...tes45History.lastRun, status: "failed" } }), fresh);
+    expect(failed).toContain("Your last run on TES-45 (Nov 24, 17:40) failed, and ended with:");
+  });
+
+  it("an Other answer shows the typed text", () => {
+    const question = { ...answeredQuestion, answers: [{ questionId: "q-where", optionIds: ["paperclip_custom_answer"], otherText: "Both, please" }] };
+    const text = renderClaudeWake(withHistory({ answered: [question] }), fresh);
+    expect(text).toContain("  > Where should the switch go? → Both, please");
+    expect(text).not.toContain("paperclip_custom_answer");
+    expect(text).not.toContain("→ Other");
+  });
+
+  it("an unknown option id reads \"(an option no longer listed)\"", () => {
+    const question = { ...answeredQuestion, answers: [{ questionId: "q-where", optionIds: ["gone-option", "header"], otherText: null }] };
+    const text = renderClaudeWake(withHistory({ answered: [question] }), fresh);
+    expect(text).toContain("  > Where should the switch go? → (an option no longer listed), Header dropdown");
+    expect(text).not.toContain("gone-option");
+    const unanswered = renderClaudeWake(withHistory({ answered: [{ ...answeredQuestion, answers: [] }] }), fresh);
+    expect(unanswered).toContain("  > Where should the switch go? → (no answer)");
+  });
+
+  it("an approval shows its decision and note", () => {
+    const sentBack = { ...approvedRequest, status: "revision_requested", outcome: "revision_requested", note: "Smaller, please." };
+    const text = renderClaudeWake(withHistory({ answered: [sentBack] }), fresh);
+    expect(text).toContain("- Your approval request \"Build the switch\", sent back for changes by Brian on Nov 24, 17:40, with the note:\n  > Smaller, please.");
+    const noNote = renderClaudeWake(withHistory({ answered: [{ ...approvedRequest, note: null }] }), fresh);
+    expect(noNote).toContain("- Your approval request \"Build the switch\", approved by Brian on Nov 24, 17:40.");
+  });
+
+  it("a plan review reads as a review of the plan", () => {
+    const review = {
+      id: "interaction-plan", kind: "request_confirmation", status: "rejected", title: "Review the plan", aboutPlan: true,
+      outcome: "rejected", note: "Split the theme tokens out first.", askedBy: adaRef, decidedBy: brianRef,
+      askedAt: "2026-11-25T00:38:00.000Z", decidedAt: "2026-11-25T00:38:30.000Z",
+    };
+    const text = renderClaudeWake(withHistory({ answered: [review, { ...review, id: "accepted", status: "accepted", outcome: "accepted", note: null }] }), fresh);
+    expect(text).toContain("- Your plan review \"Review the plan\", sent back by Brian on Nov 24, 17:38, with the reason:\n  > Split the theme tokens out first.");
+    expect(text).toContain("- Your plan review \"Review the plan\", accepted by Brian on Nov 24, 17:38.");
+    // Another agent's confirmation, and a connection request.
+    const other = renderClaudeWake(withHistory({ answered: [
+      { ...review, aboutPlan: false, title: "Deploy now?", askedBy: { type: "agent", id: CODER }, outcome: "accepted", status: "accepted", note: null },
+      { id: "conn", kind: "connection_intent", status: "accepted", title: "Connect GitHub", aboutPlan: false, outcome: "connected",
+        askedBy: adaRef, decidedBy: brianRef, askedAt: "2026-11-25T00:38:00.000Z", decidedAt: "2026-11-25T00:38:30.000Z" },
+    ] }), fresh);
+    expect(other).toContain("- The agent Coder's confirmation request \"Deploy now?\", accepted by Brian on Nov 24, 17:38.");
+    expect(other).toContain("- Your connection request \"Connect GitHub\", connected by Brian on Nov 24, 17:38.");
+  });
+
+  it("open requests read \"Still waiting: …\"", () => {
+    const open = { ...answeredQuestion, status: "pending", answers: undefined, decidedBy: null, decidedAt: null, askedAt: "2026-11-25T00:41:00.000Z" };
+    const text = renderClaudeWake(withHistory({ open: [open, { ...approvedRequest, status: "pending", outcome: null, note: null, decidedBy: null, decidedAt: null }] }), fresh);
+    expect(text).toContain("Still waiting: your question \"Where should the switch go?\", asked Nov 24, 17:41.\nStill waiting: your approval request \"Build the switch\", asked Nov 24, 17:40.");
+    expect(renderClaudeWakeParts(withHistory({ open: [open] }), fresh).map((part) => part.id)).toContain("wake.open_requests");
+  });
+
+  it("a workflow document says to read it", () => {
+    const text = renderClaudeWake(withHistory({ documents: [
+      { key: "plan", title: "Plan", inBrief: true }, { key: "notes", title: "Release notes", inBrief: false }, { key: "workflow", title: "Workflow", inBrief: false },
+    ] }), fresh);
+    expect(text).toContain("Documents on this task: plan (in the brief below), notes (\"Release notes\"), workflow. Read the rest with `paperclip_read_document`.");
+    expect(text).toContain("Read the workflow document with `paperclip_read_document` before choosing the next step.");
+    const plain = renderClaudeWake(withHistory({ documents: [{ key: "notes", title: null, inBrief: false }] }), fresh);
+    expect(plain).toContain("Documents on this task: notes. Read them with `paperclip_read_document`.");
+    const briefOnly = renderClaudeWake(withHistory({ documents: [{ key: "plan", title: "Plan", inBrief: true }] }), fresh);
+    expect(briefOnly).toContain("Documents on this task: plan (in the brief below).\n");
+  });
+
+  it("only an open question, no comments", () => {
+    const open = { ...answeredQuestion, status: "pending", answers: undefined, decidedBy: null, decidedAt: null };
+    const payload = {
+      ...tes45, executionContinuation: continuation({ issueId: tes45.issue.id, messages: [] }),
+      history: { lastRun: null, answered: [], answeredOmitted: 0, open: [open], documents: [] },
+    };
+    const text = renderClaudeWake(payload, fresh);
+    expect(where(text)).toBe("## Where things stand\n\nStill waiting: your question \"Where should the switch go?\", asked Nov 24, 17:39.\n\n");
+    expect(text).not.toContain("The task's comments so far");
+    expect(text).toContain("This is a new session; the task's history is under \"Where things stand\".");
+    // Only a last run.
+    const lastRunOnly = renderClaudeWake({ ...payload, history: { ...payload.history, open: [], lastRun: tes45History.lastRun } }, fresh);
+    expect(where(lastRunOnly)).toMatch(/^## Where things stand\n\nYour last run on TES-45 \(Nov 24, 17:40\) ended with:\n\n> I posted/);
+    expect(lastRunOnly).not.toContain("The task's comments so far");
+    // Nothing at all: no section, and no note pointing at it.
+    const empty = renderClaudeWake({ ...payload, history: { ...payload.history, open: [] } }, fresh);
+    expect(empty).not.toContain("## Where things stand");
+    expect(empty).not.toContain("This is a new session");
+  });
+
+  it("answered requests beyond 8 are counted", () => {
+    const answered = Array.from({ length: 8 }, (_, index) => ({ ...approvedRequest, id: `approval-${index}`, title: `Request ${index}` }));
+    const text = renderClaudeWake(withHistory({ answered, answeredOmitted: 2 }), fresh);
+    expect(text).toContain("2 more answered requests: `paperclip_read_task` with `requests: true` reads them.");
+    expect(text).toContain("\"Request 7\"");
+    expect(renderClaudeWake(withHistory({ answeredOmitted: 1 }), fresh))
+      .toContain("1 more answered request: `paperclip_read_task` with `requests: true` reads it.");
+    // The normalizer keeps 8 and counts the rest.
+    const ten = Array.from({ length: 10 }, (_, index) => ({ ...approvedRequest, id: `approval-${index}`, title: `Request ${index}` }));
+    const normalized = normalizePaperclipWakePayload(withHistory({ answered: ten, answeredOmitted: 0 }))!;
+    expect(normalized.history?.answered).toHaveLength(8);
+    expect(normalized.history?.answeredOmitted).toBe(2);
+  });
+
+  it("the section stays under 12,000 characters", () => {
+    const long = (index: number) => ({
+      id: `h-${index}`, body: `Comment ${index}. ${"Padding text. ".repeat(80)}`, authorType: "user", authorId: BRIAN,
+      createdAt: new Date(Date.UTC(2026, 10, 1, 0, index)).toISOString(), updatedAt: new Date(Date.UTC(2026, 10, 1, 0, index)).toISOString(),
+      deleted: false, sourceTrust: "human",
+    });
+    const answered = Array.from({ length: 4 }, (_, index) => ({ ...approvedRequest, id: `approval-${index}`, title: `Request ${index}`, note: `Note ${index}. ${"Long note. ".repeat(200)}` }));
+    const payload = withHistory(
+      { answered, lastRun: { ...tes45History.lastRun, body: "Done. ".repeat(500) } },
+      { executionContinuation: continuation({ issueId: tes45.issue.id, messages: Array.from({ length: 40 }, (_, index) => long(index)) }) },
+    );
+    const section = where(renderClaudeWake(payload, fresh));
+    expect(section.length).toBeLessThan(12_000);
+    expect(section.length).toBeGreaterThan(10_000);
+    // The run summary (cut at 2,000), every request (each cut at 1,000) and the documents stay.
+    expect(section).toContain("(The summary was cut short.)");
+    for (let index = 0; index < 4; index += 1) expect(section).toContain(`"Request ${index}"`);
+    for (const item of section.split("\n- ").slice(1, 4)) expect(item.length).toBeLessThanOrEqual(1_000);
+    expect(section).toContain("(Cut short; `paperclip_read_task` with `requests: true` reads the rest.)");
+    expect(section).toContain("Documents on this task:");
+    // The comments are cut as today: the original request and the latest.
+    expect(section).toContain("> Comment 0.");
+    expect(section).toContain("> Comment 39.");
+    expect(section).toMatch(/\(\d+ comments in between are left out here; `paperclip_read_task` reads up to 100\.\)/);
+  });
+
+  it("a resumed session renders no history", () => {
+    const text = renderClaudeWake(tes45, resumed);
+    expect(text).not.toContain("## Where things stand");
+    expect(text).not.toContain("Answered requests:");
+    expect(text).not.toContain("Your last run on TES-45");
+    expect(text).toContain("Your session continues from your last run.");
+  });
+
+  it("the session note", () => {
+    const parts = renderClaudeWakeParts(tes45, fresh);
+    const what = parts.slice(0, parts.findIndex((part) => part.id === "wake.where_things_stand"));
+    expect(what.at(-1)).toMatchObject({ id: "wake.session_note", text: "\n\nThis is a new session; the task's history is under \"Where things stand\"." });
+    // The handoff note never shows beside the history, even if the options say a handoff is there.
+    expect(renderClaudeWake(tes45, { ...fresh, handoffPresent: true })).not.toContain("the handoff above");
+  });
+
+  it("without history, Where things stand renders as before (older payloads)", () => {
+    const { history: _history, ...older } = tes45;
+    const text = renderClaudeWake(older, fresh);
+    expect(text).toContain("Summary from earlier runs:\n\n> # Continuation Summary");
+    expect(text).not.toContain("Answered requests:");
+    expect(renderClaudeWake({ ...tes45, history: null }, fresh)).toBe(text);
+    expect(normalizePaperclipWakePayload(older)).not.toHaveProperty("history");
+  });
+
+  it("parts join to the text, and nothing reads undefined", () => {
+    for (const options of [fresh, resumed, { ...fresh, handoffPresent: true }]) {
+      const parts = renderClaudeWakeParts(tes45, options);
+      expect(joinPaperclipPromptParts(parts)).toBe(renderClaudeWake(tes45, options));
+      expect(new Set(parts.map((part) => part.id)).size).toBe(parts.length);
+      expect(renderClaudeWake(tes45, options)).not.toMatch(/undefined|\bnull\b|\[object Object\]|\{\{/);
+    }
+  });
+});
+
 describe("templates", () => {
   const strings: string[] = [];
   const collect = (value: unknown) => {
@@ -1177,8 +1466,11 @@ describe("templates", () => {
 
   it("no template names a REST path or a Runner tool", () => {
     expect(strings.length).toBeGreaterThan(50);
+    // The history's templates are collected too (step 5 phase 2, the handoff).
+    for (const text of Object.values(templates.HISTORY)) expect(strings).toContain(text);
     for (const text of strings) {
-      expect(text).not.toMatch(/\/api\/|curl|\bPATCH\b|\bPOST\b|Runner|get_task_history|get_task_context|list_documents|read_document|fallbackFetchNeeded/);
+      // The Runner's tools have no prefix; `paperclip_read_document` is the MCP server's.
+      expect(text).not.toMatch(/\/api\/|curl|\bPATCH\b|\bPOST\b|Runner|get_task_history|get_task_context|list_documents|(?<!paperclip_)read_document|fallbackFetchNeeded/);
     }
   });
 

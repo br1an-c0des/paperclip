@@ -6,6 +6,7 @@ import {
   renderClaudeWakeParts,
   resolveClaudePromptTemplate,
   usesSharedWake,
+  wakeHistoryReplacesHandoff,
 } from "@paperclipai/adapter-claude-local/server";
 import {
   asString,
@@ -124,6 +125,9 @@ function describeSections(input: {
   const { texts, context, resumed, config } = input;
   const wake = normalizePaperclipWakePayload(context.paperclipWake);
   const ownTemplate = typeof config.promptTemplate === "string" && config.promptTemplate.length > 0;
+  // The wake's history stands in for the handoff (step 5 phase 2), as composeClaudeCliPrompt does.
+  const historyReplacesHandoff = wakeHistoryReplacesHandoff(context);
+  const handoff = historyReplacesHandoff ? "" : asString(context.paperclipFreshSessionHandoffMarkdown, "");
   return [
     section("instructions_directive", texts.instructionsDirective, {
       label: "Instructions file location",
@@ -137,15 +141,16 @@ function describeSections(input: {
     }),
     section("communication_guidance", texts.communicationGuidance, {
       label: "Communication guidance",
-      reason: asString(context.paperclipFreshSessionHandoffMarkdown, "").trim()
+      reason: handoff.trim()
         ? "a fresh session; the task has history, so the handoff follows"
-        : "a fresh session",
+        : historyReplacesHandoff
+          ? "a fresh session; the wake's \"Where things stand\" carries the task's history, so no handoff"
+          : "a fresh session",
       source: "context: paperclipTaskCommunicationGuidance and the fresh-session handoff",
       parts: joinPaperclipPromptPartGroups([
         part("communication_guidance.guidance", "Guidance", "context: paperclipTaskCommunicationGuidance",
           asString(context.paperclipTaskCommunicationGuidance, "")),
-        part("communication_guidance.handoff", "Fresh-session handoff", "native session handoff: earlier runs on the task",
-          asString(context.paperclipFreshSessionHandoffMarkdown, "")),
+        part("communication_guidance.handoff", "Fresh-session handoff", "native session handoff: earlier runs on the task", handoff),
       ]),
     }),
     // The same renderer and options composeClaudeCliPrompt used for this text.

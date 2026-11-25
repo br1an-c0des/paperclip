@@ -658,6 +658,63 @@ export type PaperclipWakeApproval = {
   decidedByUserId: string | null;
 };
 
+/**
+ * Step 5 phase 2, the handoff (fork/step-5-handoff-plan.md, "The contract"): a task's history for
+ * a fresh session of its assignee, rendered by the claude_local wake under "Where things stand".
+ * The server's copy of these types is in server/src/services/task-request-history.ts.
+ */
+export type PaperclipWakeLastRun = {
+  runId: string;
+  agentId: string;
+  /** False: the previous assignee's run on a handed-over task. */
+  ownRun: boolean;
+  status: string;
+  finishedAt: string;
+  body: string;
+  bodyTruncated: boolean;
+};
+
+export const PAPERCLIP_WAKE_REQUEST_KINDS = [
+  "ask_user_questions",
+  "request_confirmation",
+  "request_checkbox_confirmation",
+  "connection_intent",
+  "approval",
+] as const;
+export type PaperclipWakeRequestKind = (typeof PAPERCLIP_WAKE_REQUEST_KINDS)[number];
+
+export type PaperclipWakeRequest = {
+  id: string;
+  kind: PaperclipWakeRequestKind;
+  status: string;
+  title: string | null;
+  /** A confirmation aimed at the plan document (a plan review). */
+  aboutPlan: boolean;
+  questions?: Array<{ id: string; prompt: string; options: Array<{ id: string; label: string }> }>;
+  answers?: Array<{ questionId: string; optionIds: string[]; otherText: string | null }>;
+  outcome?: string | null;
+  note?: string | null;
+  summary?: string | null;
+  askedBy: { type: "user" | "agent"; id: string } | null;
+  decidedBy: { type: "user" | "agent"; id: string } | null;
+  askedAt: string;
+  decidedAt: string | null;
+};
+
+export type PaperclipWakeTaskDocument = { key: string; title: string | null; inBrief: boolean };
+
+export type PaperclipWakeHistory = {
+  lastRun: PaperclipWakeLastRun | null;
+  /** Most recent first, at most 8. */
+  answered: PaperclipWakeRequest[];
+  /** Answered requests beyond the 8. */
+  answeredOmitted: number;
+  /** Oldest first. */
+  open: PaperclipWakeRequest[];
+  /** Without the continuation summary document. */
+  documents: PaperclipWakeTaskDocument[];
+};
+
 type PaperclipWakeExecutionPrincipal = {
   type: "agent" | "user" | null;
   agentId: string | null;
@@ -936,6 +993,12 @@ export type PaperclipWakePayload = {
   names?: Record<string, string>;
   /** An IANA zone for the wake's times. */
   timeZone?: string | null;
+  /**
+   * The task's history (step 5 phase 2, the handoff), on runs of the assignee's own non-chat
+   * task. Present only when the payload carries it; the claude_local CLI leaves the fresh-session
+   * handoff out whenever it is.
+   */
+  history?: PaperclipWakeHistory | null;
   executionContinuation: ExecutionContinuationEnvelope | null;
   reason: string | null;
   recovery: PaperclipWakeRecovery | null;
@@ -1106,6 +1169,115 @@ function normalizePaperclipWakeNames(value: unknown): Record<string, string> | n
     names[key] = name.trim();
   }
   return Object.keys(names).length > 0 ? names : null;
+}
+
+const HISTORY_TEXT_MAX = 4_000;
+
+function historyText(value: unknown, max = HISTORY_TEXT_MAX): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  return text ? text.slice(0, max) : null;
+}
+
+function historyRef(value: unknown): { type: "user" | "agent"; id: string } | null {
+  const ref = parseObject(value);
+  const id = asString(ref.id, "").trim();
+  return (ref.type === "user" || ref.type === "agent") && id ? { type: ref.type, id } : null;
+}
+
+function normalizePaperclipWakeLastRun(value: unknown): PaperclipWakeLastRun | null {
+  const run = parseObject(value);
+  const runId = asString(run.runId, "").trim();
+  const agentId = asString(run.agentId, "").trim();
+  const body = historyText(run.body);
+  if (!runId || !agentId || !body) return null;
+  return {
+    runId,
+    agentId,
+    ownRun: run.ownRun !== false,
+    status: asString(run.status, "").trim() || "succeeded",
+    finishedAt: asString(run.finishedAt, "").trim(),
+    body,
+    bodyTruncated: asBoolean(run.bodyTruncated, false) || asString(run.body, "").trim().length > HISTORY_TEXT_MAX,
+  };
+}
+
+function normalizePaperclipWakeRequest(value: unknown): PaperclipWakeRequest | null {
+  const request = parseObject(value);
+  const id = asString(request.id, "").trim();
+  const kind = asString(request.kind, "").trim() as PaperclipWakeRequestKind;
+  const status = asString(request.status, "").trim();
+  if (!id || !status || !(PAPERCLIP_WAKE_REQUEST_KINDS as readonly string[]).includes(kind)) return null;
+  const questions = Array.isArray(request.questions)
+    ? request.questions.slice(0, 20).flatMap((entry) => {
+        const question = parseObject(entry);
+        const questionId = asString(question.id, "").trim();
+        if (!questionId) return [];
+        return [{
+          id: questionId,
+          prompt: historyText(question.prompt, 1_000) ?? "",
+          options: Array.isArray(question.options)
+            ? question.options.slice(0, 50).flatMap((option) => {
+                const item = parseObject(option);
+                const optionId = asString(item.id, "").trim();
+                return optionId ? [{ id: optionId, label: historyText(item.label, 500) ?? "" }] : [];
+              })
+            : [],
+        }];
+      })
+    : null;
+  const answers = Array.isArray(request.answers)
+    ? request.answers.slice(0, 20).flatMap((entry) => {
+        const answer = parseObject(entry);
+        const questionId = asString(answer.questionId, "").trim();
+        if (!questionId) return [];
+        return [{
+          questionId,
+          optionIds: asStringArray(answer.optionIds).map((optionId) => optionId.trim()).filter(Boolean).slice(0, 50),
+          otherText: historyText(answer.otherText, 1_000),
+        }];
+      })
+    : null;
+  return {
+    id,
+    kind,
+    status,
+    title: historyText(request.title, 500),
+    aboutPlan: request.aboutPlan === true,
+    ...(questions ? { questions } : {}),
+    ...(answers ? { answers } : {}),
+    ...("outcome" in request ? { outcome: historyText(request.outcome, 100) } : {}),
+    ...("note" in request ? { note: historyText(request.note) } : {}),
+    ...("summary" in request ? { summary: historyText(request.summary) } : {}),
+    askedBy: historyRef(request.askedBy),
+    decidedBy: historyRef(request.decidedBy),
+    askedAt: asString(request.askedAt, "").trim(),
+    decidedAt: asString(request.decidedAt, "").trim() || null,
+  };
+}
+
+/** Absent, null or not an object: null (not the assignee's own non-chat task, or an older payload). */
+function normalizePaperclipWakeHistory(value: unknown): PaperclipWakeHistory | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const history = value as Record<string, unknown>;
+  const requests = (entries: unknown) => Array.isArray(entries)
+    ? entries.map(normalizePaperclipWakeRequest).filter((entry): entry is PaperclipWakeRequest => Boolean(entry))
+    : [];
+  const answered = requests(history.answered);
+  const answeredShown = answered.slice(0, 8);
+  return {
+    lastRun: normalizePaperclipWakeLastRun(history.lastRun),
+    answered: answeredShown,
+    answeredOmitted: Math.max(0, Math.floor(asNumber(history.answeredOmitted, 0))) + (answered.length - answeredShown.length),
+    open: requests(history.open).slice(0, 20),
+    documents: Array.isArray(history.documents)
+      ? history.documents.slice(0, 50).flatMap((entry) => {
+          const document = parseObject(entry);
+          const key = asString(document.key, "").trim();
+          return key ? [{ key, title: historyText(document.title, 300), inBrief: document.inBrief === true }] : [];
+        })
+      : [],
+  };
 }
 
 function normalizePaperclipWakeComment(
@@ -2031,6 +2203,7 @@ export function normalizePaperclipWakePayload(
   const actor = normalizePaperclipWakeActor(payload.actor);
   const names = normalizePaperclipWakeNames(payload.names);
   const timeZone = asString(payload.timeZone, "").trim() || null;
+  const history = normalizePaperclipWakeHistory(payload.history);
   const skillTest =
     issue?.workMode === "skill_test" ||
     payload.skillTest === true ||
@@ -2068,6 +2241,7 @@ export function normalizePaperclipWakePayload(
     ...(actor ? { actor } : {}),
     ...(names ? { names } : {}),
     ...(timeZone ? { timeZone } : {}),
+    ...(history ? { history } : {}),
     reason: asString(payload.reason, "").trim() || null,
     // Server-owned delivery snapshots also restore instructions for board wakes.
     // This field does not authenticate an external-chat turn or grant tools.
