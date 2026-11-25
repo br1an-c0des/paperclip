@@ -1,4 +1,8 @@
-import type { PaperclipWakePayload } from "@paperclipai/adapter-utils/server-utils";
+import type {
+  PaperclipRunTask,
+  PaperclipSharedWorkspaceNote,
+  PaperclipWakePayload,
+} from "@paperclipai/adapter-utils/server-utils";
 
 /**
  * Which events a wake holds (step 5 phase 2, fork/step-5-wake.md "Each kind of event"): one kind
@@ -29,6 +33,14 @@ export interface ClaudeWakeRenderOptions {
   conversationMode: boolean;
   /** A fresh session whose handoff text is present (context.paperclipFreshSessionHandoffMarkdown). */
   handoffPresent: boolean;
+  /**
+   * The task's facts (context.paperclipRunTask, step 5 phase 2, the task brief): with them, "The
+   * task" quotes the description, plan and parents and "What to do now" carries the brief's rules,
+   * since no brief is sent. Without them (chat tasks, older contexts), both are as before.
+   */
+  runTask?: PaperclipRunTask | null;
+  /** Another run holds the shared workspace (context.paperclipSharedWorkspaceNote); read only with `runTask`. */
+  sharedWorkspaceNote?: PaperclipSharedWorkspaceNote | null;
 }
 
 /** A comment or continuation message, as the wake quotes it. */

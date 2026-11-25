@@ -5,8 +5,10 @@ import {
   planClaudeInstructionsDirective,
   renderClaudeWakeParts,
   resolveClaudePromptTemplate,
+  runTaskReplacesBrief,
   usesSharedWake,
   wakeHistoryReplacesHandoff,
+  type ClaudeRunMessageSectionId,
 } from "@paperclipai/adapter-claude-local/server";
 import {
   asString,
@@ -16,6 +18,7 @@ import {
   isPaperclipRecoveryWakePayload,
   joinPaperclipPromptPartGroups,
   joinPaperclipPromptParts,
+  joinPromptSections,
   normalizePaperclipWakePayload,
   renderPaperclipWakePromptParts,
   renderTemplate,
@@ -33,6 +36,8 @@ import {
  * The first message of a `claude_local` CLI run, as labelled sections (step 5; README.md in this
  * folder). It reproduces today's prompt exactly: each set is `composeClaudeCliPrompt`'s eight
  * texts, the same selectors the run uses, with labels, reasons, sources and display parts added.
+ * The claude_local wake is four sections, one per heading (step 5 phase 2, the task brief); with
+ * the task's facts on a non-chat task there is no task brief.
  * It reads the agent's instructions file and nothing else; it writes nothing.
  */
 export interface ClaudeRunPromptInput {
@@ -154,8 +159,8 @@ function describeSections(input: {
       ]),
     }),
     // The same renderer and options composeClaudeCliPrompt used for this text.
-    usesSharedWake(context)
-      ? section("wake", texts.wake, {
+    ...(usesSharedWake(context)
+      ? [section("wake", texts.wake, {
         label: resumed ? "Wake (resume delta)" : "Wake",
         reason: wakeReason(wake?.reason ?? null, resumed),
         source: "context: paperclipWake, rendered by renderPaperclipWakePrompt (external chat)",
@@ -164,13 +169,8 @@ function describeSections(input: {
           conversationMode: context.conversationMode === true,
           suppressIssueDescription: texts.taskBrief.length > 0,
         }),
-      })
-      : section("wake", texts.wake, {
-        label: resumed ? "Wake (resumed session)" : "Wake",
-        reason: wakeReason(wake?.reason ?? null, resumed),
-        source: "context: paperclipWake, rendered by renderClaudeWake",
-        parts: renderClaudeWakeParts(context.paperclipWake, claudeWakeOptions({ context, resumed, agentId: input.agentId })),
-      }),
+      })]
+      : wakeSections({ texts, context, resumed, agentId: input.agentId, wakeReasonText: wakeReason(wake?.reason ?? null, resumed) })),
     section("session_rotation_note", texts.sessionRotationNote, {
       label: "Session rotation note",
       reason: "the session was rotated",
@@ -195,6 +195,55 @@ function describeSections(input: {
         : undefined,
     }),
   ];
+}
+
+const WAKE_SECTIONS: Record<ClaudeRunMessageSectionId, { label: string; source: string }> = {
+  what_happened: { label: "What happened", source: "context: paperclipWake, rendered by the claude_local wake" },
+  where_things_stand: { label: "Where things stand", source: "context: paperclipWake.history and the continuation record's comments" },
+  the_task: { label: "The task", source: "context: paperclipWake.issue and paperclipRunTask" },
+  to_do: { label: "What to do now", source: "the wake's events, paperclipRunTask, paperclipSharedWorkspaceNote and the common rules" },
+};
+
+/**
+ * The claude_local wake's four headings as four sections (step 5 phase 2, the task brief), from
+ * the parts composeClaudeCliPrompt joined. Should they not join to its text, the wake is one
+ * section, as before.
+ */
+function wakeSections(input: {
+  texts: SectionTexts;
+  context: Record<string, unknown>;
+  resumed: boolean;
+  agentId: string;
+  wakeReasonText: string;
+}): RunPromptSection[] {
+  const { texts, context, resumed } = input;
+  const joined = joinPromptSections(texts.wakeSections.map((entry) => joinPaperclipPromptParts(entry.parts)));
+  if (joined !== texts.wake.trim()) {
+    return [section("wake", texts.wake, {
+      label: resumed ? "Wake (resumed session)" : "Wake",
+      reason: input.wakeReasonText,
+      source: "context: paperclipWake, rendered by renderClaudeWake",
+      parts: renderClaudeWakeParts(context.paperclipWake, claudeWakeOptions({ context, resumed, agentId: input.agentId })),
+    })];
+  }
+  const facts = runTaskReplacesBrief(context);
+  const reasons: Record<ClaudeRunMessageSectionId, string> = {
+    what_happened: input.wakeReasonText,
+    where_things_stand: "a fresh session on a task with history",
+    the_task: facts
+      ? resumed
+        ? "the task in one line, with what changed since the session's last run; no separate brief"
+        : "the task with its parents, description and plan; no separate brief"
+      : "the task in one line; the task brief follows",
+    to_do: facts
+      ? "the wake's rules, the task's rules that apply, and the rules every wake keeps"
+      : "the wake's rules and the rules every wake keeps",
+  };
+  return texts.wakeSections.map((entry) => section(entry.id, joinPaperclipPromptParts(entry.parts), {
+    ...WAKE_SECTIONS[entry.id],
+    reason: reasons[entry.id],
+    parts: entry.parts,
+  }));
 }
 
 function taskBriefSection(text: string, context: Record<string, unknown>, resumed: boolean): RunPromptSection {

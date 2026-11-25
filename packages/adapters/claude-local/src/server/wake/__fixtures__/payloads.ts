@@ -539,3 +539,44 @@ export const historyFixtures = {
     history: tes45History,
   },
 } satisfies Record<string, Record<string, unknown>>;
+
+// --- The task's facts (step 5 phase 2, the task brief) ----------------------------------------
+
+/** Run 28353f5e on TES-45: the plan document as its brief quoted it (revision 1 there). */
+export const tes45PlanBody = "# Theme switch plan\n\n1. Store one `theme` preference (light, dark or system) in localStorage, defaulting to system.\n2. Apply it on load with a `data-theme` attribute on the root element.\n3. One shared switch component in the header dropdown and the settings page.\n4. Check each option, reloads and the two switches staying in sync.";
+
+/**
+ * `context.paperclipRunTask` as the contract shapes it (fork/step-5-brief-plan.md "The
+ * contract"), for `issue` by default: the description, nothing changed, no plan.
+ */
+export function runTask(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    issueId: issue.id,
+    ancestors: [],
+    ancestorsOmitted: 0,
+    description: issue.description,
+    descriptionChangedSinceLastRun: false,
+    plan: null,
+    workMode: "standard",
+    titleNeedsGeneration: false,
+    rejectedPlan: null,
+    acceptedPlan: null,
+    wakeCommentAttachments: [],
+    attachmentOmissions: [],
+    prefixParts: [],
+    compactedSinceLastRun: false,
+    ...overrides,
+  };
+}
+
+export function plan(revisionNumber: number, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { revisionNumber, body: tes45PlanBody, truncatedFrom: null, changedSinceLastRun: false, ...overrides };
+}
+
+export const parents = [
+  { identifier: "TES-40", title: "Theme work", status: "in_progress" },
+  { identifier: "TES-12", title: "Settings redesign", status: "todo" },
+];
+
+/** Run 28353f5e's task facts: TES-45 with its description and plan, for the TES-45 history fixture. */
+export const tes45RunTask = runTask({ issueId: tes45.id, description: tes45.description, plan: plan(1) });

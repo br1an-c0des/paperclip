@@ -125,13 +125,16 @@ describePostgres("the run preview's prompt draft", () => {
 
     expect(withoutPending(previewed.firstMessage)).toEqual(plan.fresh);
     expect(previewed.firstMessageChars).toBe(joinRunPromptSections(plan.fresh).length);
+    // The claude_local wake's four headings are sections (step 5 phase 2, the task brief); with
+    // the task's facts on the context, a non-chat task has no brief.
     expect(previewed.firstMessage.map((section) => section.id)).toEqual([
-      "instructions_directive", "communication_guidance", "wake", "task_brief", "mcp_note", "heartbeat_template",
+      "instructions_directive", "communication_guidance", "what_happened", "the_task", "to_do",
+      ...(context.paperclipRunTask ? [] : ["task_brief"]), "mcp_note", "heartbeat_template",
     ]);
     // The checkout is the harness's, at launch.
-    const wake = previewed.firstMessage.find((section) => section.id === "wake")!;
+    const theTask = previewed.firstMessage.find((section) => section.id === "the_task")!;
     // The claude_local wake holds both on its task line.
-    const taskLine = wake.parts?.find((part) => part.id === "wake.task");
+    const taskLine = theTask.parts?.find((part) => part.id === "wake.task");
     expect(taskLine?.text).toContain("already checked out to you");
     expect(taskLine?.pending).toMatch(/checks the task out/);
     expect(taskLine?.pending).toMatch(/status/);
@@ -149,6 +152,10 @@ describePostgres("the run preview's prompt draft", () => {
     const brief = previewed.firstMessage.find((section) => section.id === "task_brief")!;
     expect(brief.parts?.map((part) => part.id)).toContain("task_brief.chat_directive");
     expect(joinRunPromptSections(previewed.firstMessage)).toContain("What's left on the ledger?");
+    // A chat task keeps its brief, after the wake's four headings.
+    const ids = previewed.firstMessage.map((section) => section.id);
+    expect(ids.indexOf("to_do")).toBeGreaterThan(ids.indexOf("the_task"));
+    expect(ids.indexOf("task_brief")).toBeGreaterThan(ids.indexOf("to_do"));
   });
 
   it("drafts a comment wake on the task's latest comment", async () => {
@@ -158,8 +165,8 @@ describePostgres("the run preview's prompt draft", () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
     await comment(seeded, issueId, "M7 test: please add the March totals");
     const previewed = await draft(seeded, issueId, "comment");
-    const wake = previewed.firstMessage.find((section) => section.id === "wake")!;
-    expect(wake.text).toContain("please add the March totals");
+    const happened = previewed.firstMessage.find((section) => section.id === "what_happened")!;
+    expect(happened.text).toContain("please add the March totals");
   });
 
   it("answers 422 for a comment wake on a task without comments, and a chat turn on a task", async () => {
@@ -181,8 +188,10 @@ describePostgres("the run preview's prompt draft", () => {
     await createRunSecretRedactionRegistry(db).register(seeded.companyId, earlierRunId, secret);
 
     const previewed = await draft(seeded, issueId);
-    const brief = previewed.firstMessage.find((section) => section.id === "task_brief")!;
-    expect(brief.parts?.find((part) => part.id === "task_brief.description")?.text).toContain("Sign the ledger with");
+    // In the brief, or with the task's facts under "The task" (step 5 phase 2, the task brief).
+    const description = previewed.firstMessage.flatMap((section) => section.parts ?? [])
+      .find((part) => part.id === "task_brief.description" || part.id === "wake.task.description");
+    expect(description?.text).toContain("Sign the ledger with");
     expect(JSON.stringify(previewed)).not.toContain(secret);
   });
 
@@ -203,9 +212,11 @@ describePostgres("the run preview's prompt draft", () => {
     });
     const byId = (id: string) => previewed.firstMessage.find((section) => section.id === id)!;
     expect(byId("instructions_directive").pending).toMatch(/working copy/);
-    expect(byId("wake").pending).toMatch(/connections/);
+    // Connection instructions follow "What to do now".
+    expect(byId("to_do").pending).toMatch(/connections/);
+    expect(previewed.firstMessage.some((section) => section.id === "wake")).toBe(false);
     // The branch is on the claude_local wake's task line.
-    const branch = byId("wake").parts?.find((part) => part.id === "wake.task");
+    const branch = byId("the_task").parts?.find((part) => part.id === "wake.task");
     expect(branch?.text).toContain("branch `<task branch>`");
     expect(branch?.pending).toMatch(/names the branch/);
   });

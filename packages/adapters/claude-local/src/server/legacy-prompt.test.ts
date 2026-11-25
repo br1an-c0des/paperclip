@@ -395,6 +395,79 @@ describe("composeClaudeCliPrompt: the history replaces the handoff (step 5 phase
   });
 });
 
+describe("composeClaudeCliPrompt: no brief on a non-chat task (step 5 phase 2, the task brief)", () => {
+  const facts = {
+    issueId: "issue-1", ancestors: [{ identifier: "PAP-0", title: "Launch", status: "in_progress" }], ancestorsOmitted: 0,
+    description: "Keep this deliberate repetition.", descriptionChangedSinceLastRun: false,
+    plan: { revisionNumber: 2, body: "1. Write the ledger.", truncatedFrom: null, changedSinceLastRun: false },
+    workMode: "standard", titleNeedsGeneration: false, rejectedPlan: null, acceptedPlan: null,
+    wakeCommentAttachments: [], attachmentOmissions: [], prefixParts: [], compactedSinceLastRun: false,
+  };
+  const withFacts = (extra: Record<string, unknown> = {}) => ({ ...createPromptContextFixture(), paperclipRunTask: facts, ...extra });
+
+  it("a fresh run's text has no task brief; the task is under \"The task\"", () => {
+    const result = composeClaudeCliPrompt(input({ context: withFacts() }));
+    expect(result.sections.taskBrief).toBe("");
+    expect(result.prompt).not.toContain("Owned assignment");
+    expect(result.prompt).not.toContain("Paperclip task context");
+    expect(result.promptMetrics.taskContextChars).toBe(0);
+    expect(result.sections.wake).toContain("## The task\n\nPAP-1 \"Release ledger\" · in progress\n\nPart of PAP-0 \"Launch\" (in progress).\n\nThe description:\n\n> Keep this deliberate repetition.\n\nThe plan (revision 2):\n\n> 1. Write the ledger.\n\n## What to do now");
+    expect(result.sections.wakeSections.map((section) => section.id)).toEqual(["what_happened", "the_task", "to_do"]);
+  });
+
+  it("a resumed run gets the task in one line and no brief", () => {
+    const result = composeClaudeCliPrompt(input({ resumed: true, context: withFacts() }));
+    expect(result.sections.taskBrief).toBe("");
+    expect(result.prompt).not.toContain("Compact assignment");
+    expect(result.sections.wake).toContain("## The task\n\nPAP-1 \"Release ledger\" · in progress\n\n## What to do now");
+  });
+
+  it("the wake's sections join to the wake's text", () => {
+    for (const resumed of [false, true]) {
+      for (const context of [withFacts(), createPromptContextFixture()]) {
+        const { sections } = composeClaudeCliPrompt(input({ resumed, context }));
+        const joined = sections.wakeSections
+          .map((section) => section.parts.map((part) => part.text).join("").trim())
+          .filter(Boolean)
+          .join("\n\n");
+        expect(joined).toBe(sections.wake);
+        for (const section of sections.wakeSections) expect(section.parts[0]!.text).not.toMatch(/^\s/);
+      }
+    }
+  });
+
+  it("without the facts (a chat task, an older context) the brief is sent as before", () => {
+    const chat = { ...createPromptContextFixture(), conversationMode: true };
+    expect(composeClaudeCliPrompt(input({ context: chat })).sections.taskBrief).toContain("Owned assignment");
+    expect(composeClaudeCliPrompt(input()).sections.taskBrief).toContain("Owned assignment");
+    // Facts for another task don't replace this one's brief.
+    const other = withFacts({ paperclipRunTask: { ...facts, issueId: "issue-other" } });
+    expect(composeClaudeCliPrompt(input({ context: other })).sections.taskBrief).toContain("Owned assignment");
+    expect(composeClaudeCliPrompt(input({ context: other })).sections.wake).not.toContain("The description:");
+  });
+
+  it("an external chat turn keeps the shared wake and the brief (dormant here)", () => {
+    const context = withFacts({
+      paperclipWake: {
+        reason: "External chat message received", externalChatProvider: "slack", checkedOutByHarness: true,
+        issue: { id: "issue-1", identifier: "PAP-1", title: "Release ledger", status: "in_progress", workMode: "standard" },
+        commentWindow: { requestedCount: 1, includedCount: 1, missingCount: 0 }, commentIds: ["c"], latestCommentId: "c",
+        comments: [{ id: "c", issueId: "issue-1", body: "Hi.", bodyTruncated: false, authorType: "user" }], fallbackFetchNeeded: false,
+      },
+    });
+    const result = composeClaudeCliPrompt(input({ context }));
+    expect(result.sections.wake).toContain("## External chat response contract");
+    expect(result.sections.wakeSections).toEqual([]);
+    expect(result.sections.taskBrief).toContain("Owned assignment");
+  });
+
+  it("the shared-workspace rule comes from its own field", () => {
+    const context = withFacts({ paperclipSharedWorkspaceNote: { heldByRunId: "run-9", heldByIssue: "PAP-7" } });
+    expect(composeClaudeCliPrompt(input({ context })).sections.wake).toContain(
+      "- A run on PAP-7 is using this workspace too: expect changes you didn't make, and coordinate through commits.");
+  });
+});
+
 describe("resolveClaudePromptTemplate", () => {
   it("uses the agent's own template when set", () => {
     expect(resolveClaudePromptTemplate({ promptTemplate: "Mine." }, {})).toBe("Mine.");

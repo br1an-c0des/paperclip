@@ -1,6 +1,9 @@
 import {
   asString,
+  joinPaperclipPromptParts,
   joinPromptSections,
+  normalizePaperclipRunTask,
+  normalizePaperclipSharedWorkspaceNote,
   renderTemplate,
   isPaperclipExternalChatQuestionResponseTurn,
   isPaperclipExternalChatTurn,
@@ -12,7 +15,12 @@ import {
   DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
   DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE,
 } from "@paperclipai/adapter-utils/server-utils";
-import { renderClaudeWake, type ClaudeWakeRenderOptions } from "./wake/render.js";
+import {
+  renderClaudeRunMessageSections,
+  runTaskForWake,
+  type ClaudeRunMessageSection,
+  type ClaudeWakeRenderOptions,
+} from "./wake/render.js";
 
 /**
  * Today's `claude --print` first message, as one pure function (step 5, Task 1). The CLI engine
@@ -38,8 +46,15 @@ export interface ClaudeCliPromptSectionTexts {
   instructionsDirective: string;
   bootstrapTemplate: string;
   communicationGuidance: string;
+  /** The wake's text: `wakeSections` joined, or the shared wake on an external chat turn. */
   wake: string;
+  /**
+   * The claude_local wake's four sections (what happened, where things stand, the task, what to
+   * do now), empty ones left out; [] on an external chat turn. Display only: the prompt joins `wake`.
+   */
+  wakeSections: ClaudeRunMessageSection[];
   sessionRotationNote: string;
+  /** "" when the task's facts replace it (`runTaskReplacesBrief`). */
   taskBrief: string;
   mcpNote: string;
   heartbeatTemplate: string;
@@ -61,9 +76,14 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
   });
   // The claude_local wake (step 5 phase 2), except for an external chat turn, which keeps the
   // shared renderer's contract (dormant here).
+  const wakeSections = usesSharedWake(context)
+    ? []
+    : renderClaudeRunMessageSections(context.paperclipWake, claudeWakeOptions({ context, resumed, agentId: asString(templateData.agentId, "") }));
   const wakePrompt = usesSharedWake(context)
     ? sharedWakePrompt
-    : renderClaudeWake(context.paperclipWake, claudeWakeOptions({ context, resumed, agentId: asString(templateData.agentId, "") }));
+    : joinPromptSections(wakeSections.map((section) => joinPaperclipPromptParts(section.parts)));
+  // With the task's facts, the wake carries the task and its rules: no separate brief.
+  const taskBrief = runTaskReplacesBrief(context) ? "" : taskContextNote;
   const shouldUseResumeDeltaPrompt = resumed && wakePrompt.length > 0;
   const renderedPrompt = shouldUseResumeDeltaPrompt || isPaperclipRecoveryWakePayload(context.paperclipWake)
     ? ""
@@ -82,8 +102,9 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
       { resumedSession: resumed },
     ),
     wake: wakePrompt,
+    wakeSections,
     sessionRotationNote: sessionHandoffNote,
-    taskBrief: taskContextNote,
+    taskBrief,
     mcpNote: paperclipMcpNote,
     heartbeatTemplate: renderedPrompt,
   };
@@ -102,7 +123,7 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
     bootstrapPromptChars: renderedBootstrapPrompt.length,
     wakePromptChars: wakePrompt.length,
     sessionHandoffChars: sessionHandoffNote.length,
-    taskContextChars: taskContextNote.length,
+    taskContextChars: taskBrief.length,
     heartbeatPromptChars: renderedPrompt.length,
   };
   return { prompt, promptMetrics, sections };
@@ -122,6 +143,18 @@ export function usesSharedWake(context: Record<string, unknown>): boolean {
  */
 export function wakeHistoryReplacesHandoff(context: Record<string, unknown>): boolean {
   return !usesSharedWake(context) && Boolean(normalizePaperclipWakePayload(context.paperclipWake)?.history);
+}
+
+/**
+ * Whether the task's facts replace the task brief (step 5 phase 2, the task brief; plan decision
+ * 1): the context carries `paperclipRunTask` for the wake's task (the server sets it on a non-chat
+ * task only) and the claude_local wake renders it. The brief's variants are still built and set
+ * on the context, for chat tasks, ACP and the others; the CLI and the run prompt builder leave
+ * the brief out of the first message.
+ */
+export function runTaskReplacesBrief(context: Record<string, unknown>): boolean {
+  return !usesSharedWake(context) &&
+    runTaskForWake(normalizePaperclipWakePayload(context.paperclipWake), context.paperclipRunTask) !== null;
 }
 
 function withoutFreshSessionHandoff(context: Record<string, unknown>): Record<string, unknown> {
@@ -145,6 +178,8 @@ export function claudeWakeOptions(input: {
     conversationMode: input.context.conversationMode === true,
     handoffPresent: !input.resumed && !wakeHistoryReplacesHandoff(input.context) &&
       asString(input.context.paperclipFreshSessionHandoffMarkdown, "").trim().length > 0,
+    runTask: normalizePaperclipRunTask(input.context.paperclipRunTask),
+    sharedWorkspaceNote: normalizePaperclipSharedWorkspaceNote(input.context.paperclipSharedWorkspaceNote),
   };
 }
 
