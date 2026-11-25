@@ -119,9 +119,21 @@ export function accessText(access: ClaudeRunManifest["access"] | undefined): str
   return overrides.length === 0 ? level : `${level} · ${overrides.map(([action, value]) => overrideText(action, value)).join(", ")}`;
 }
 
-/** The instructions line: the entry file, and whether it was sent (fresh sessions only). */
-export function instructionsText(instructions: ClaudeRunManifest["instructions"] | undefined): string {
+/**
+ * The instructions line: the entry file, and whether the system prompt file was sent. Sealed runs
+ * send it with every run, and a resumed session uses it only after a compaction (step 5 phase 2,
+ * bug 90); older records of a resume say it wasn't sent.
+ */
+export function instructionsText(
+  instructions: ClaudeRunManifest["instructions"] | undefined,
+  session?: ClaudeRunManifest["session"],
+): string {
   if (!instructions) return "Not recorded";
+  const resumed = session?.mode === "resumed";
+  if (instructions.sent && resumed) {
+    const sent = "system prompt file sent; a resumed session uses it only after a compaction";
+    return instructions.entryFile ? `${instructions.entryFile}, ${sent}` : `Sent; a resumed session uses it only after a compaction`;
+  }
   if (!instructions.entryFile) return instructions.sent ? "Sent" : "None";
   return instructions.sent ? `${instructions.entryFile}, sent` : `${instructions.entryFile}, not sent: the resumed session already has it`;
 }

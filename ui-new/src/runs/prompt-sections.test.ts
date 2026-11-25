@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { freshRecord, promptSection, resumedRecord, unmatchedRecord } from "./fixtures/prompt-records";
+import { freshRecord, promptSection, resumedRecord, sealedResumedRecord, unmatchedRecord } from "./fixtures/prompt-records";
 import { promptSize } from "./invocation";
 import { promptViewFromLegacyPrompt, promptViewFromRecord, sectionInfo } from "./prompt-sections";
 
@@ -67,6 +67,30 @@ describe("promptViewFromRecord", () => {
     expect(first!.sections).toHaveLength(1);
   });
 
+  it("shows a sealed resumed run's system prompt, each section's tip saying when Claude uses it", () => {
+    const [system] = promptViewFromRecord(sealedResumedRecord).groups;
+    expect(system!.sections.map((section) => section.id)).toEqual(["identity", "working_in_paperclip", "skill_library"]);
+    expect(system!.note).toBeNull();
+    for (const section of system!.sections) {
+      expect(section.info.endsWith("Sent with every run; a resumed session keeps its own copy until it's compacted.")).toBe(true);
+    }
+  });
+
+  it("has tips for the sealed system prompt's sections (step 5 phase 2, the system prompt)", () => {
+    expect(sectionInfo("identity")).toBe(
+      "Who the agent is: its name and job title. Sent with every run; a resumed session keeps its own copy until it's compacted.",
+    );
+    expect(sectionInfo("working_in_paperclip")).toBe(
+      "Paperclip's rules for every run: how to end it, comments and commits, and when to open the paperclip skill. " +
+        "Sent with every run; a resumed session keeps its own copy until it's compacted.",
+    );
+    expect(sectionInfo("skill_library")).toBe(
+      "The skills enabled for this agent, and where to find the rest of the company's library. " +
+        "Sent with every run; a resumed session keeps its own copy until it's compacted.",
+    );
+    expect(sectionInfo("agent_instructions")).toMatch(/Sent with every run; a resumed session keeps its own copy until it's compacted\.$/);
+  });
+
   it("says when a fresh run's system prompt had nothing added", () => {
     const [system] = promptViewFromRecord({ ...freshRecord, systemPrompt: [] }).groups;
     expect(system!.note).toBe("Nothing added to Claude's own");
@@ -115,7 +139,7 @@ describe("promptViewFromRecord", () => {
   });
 
   it("describes who the agent is and the Paperclip tools note (step 5 phase 2, the light sections)", () => {
-    expect(sectionInfo("heartbeat_template")).toBe("Who the agent is: its name and job title, or the agent's own prompt template.");
+    expect(sectionInfo("heartbeat_template")).toBe("The agent's own prompt template, a legacy setting. Older runs: who the agent is.");
     expect(sectionInfo("mcp_note")).toBe("How the run works with Paperclip: its paperclip_* tools, and how to end the run.");
   });
 

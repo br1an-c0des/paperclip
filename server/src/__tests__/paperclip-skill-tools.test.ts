@@ -9,7 +9,8 @@ describe("the paperclip skill teaches the MCP tools", () => {
     const named = new Set(skill.match(/\bpaperclip_[a-z_]+\b/g) ?? []);
     const known = new Set<string>(PAPERCLIP_TOOL_NAMES);
     expect([...named].filter(name => !known.has(name))).toEqual([]);
-    for (const tool of ["paperclip_task_context", "paperclip_finish", "paperclip_block", "paperclip_report_progress", "paperclip_ask_board", "paperclip_request_approval"]) {
+    // paperclip_task_context is named in the system prompt's "Working in Paperclip" (step 5 phase 2).
+    for (const tool of ["paperclip_finish", "paperclip_block", "paperclip_report_progress", "paperclip_ask_board", "paperclip_request_approval"]) {
       expect(named).toContain(tool);
     }
   });
@@ -27,7 +28,7 @@ describe("the paperclip skill teaches the MCP tools", () => {
   });
 
   it("says every run ends with finish, block or progress with continue", () => {
-    expect(skill).toContain("**End the run with exactly one of:**");
+    expect(skill).toContain("End every task run with exactly one of:");
     expect(skill).toContain("`continue: true`");
     expect(skill).toContain("A final message alone doesn't end a run");
   });

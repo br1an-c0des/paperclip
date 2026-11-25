@@ -120,7 +120,7 @@ describePostgres("the run preview's prompt draft", () => {
       services: { issuesSvc: { getAncestors: async () => [] }, getPinnedSkillTestContext: async () => null },
     });
     const plan = await buildClaudeRunPromptPlan({
-      agent: seeded.agent, runId: "preview", config: config(), context, sealed: true, paperclipApiReachable: true,
+      agent: seeded.agent, runId: "preview", config: config(), context, sealed: true,
       loadFreshSessionHandoff: async () => null,
     });
 
@@ -128,14 +128,12 @@ describePostgres("the run preview's prompt draft", () => {
     expect(previewed.firstMessageChars).toBe(joinRunPromptSections(plan.fresh).length);
     // The claude_local wake's four headings are sections (step 5 phase 2, the task brief); with
     // the task's facts on the context, a non-chat task has no brief.
-    // Who the agent is, the instructions location and the tools note come first (step 5 phase 2,
-    // the light sections).
+    // The instructions line comes first; who the agent is and the tools note are in the system
+    // prompt (step 5 phase 2), and the fast-response note only goes out with fast responses on.
     expect(previewed.firstMessage.map((section) => section.id)).toEqual([
-      "heartbeat_template", "instructions_directive", "mcp_note", "communication_guidance", "what_happened", "the_task", "to_do",
+      "instructions_directive", "what_happened", "the_task", "to_do",
       ...(context.paperclipRunTask ? [] : ["task_brief"]),
     ]);
-    expect(previewed.firstMessage[0]).toMatchObject({ label: "Who you are", text: "You are M7 test agent, QA engineer." });
-    expect(previewed.firstMessage[2]).toMatchObject({ label: "Paperclip tools" });
     // The checkout is the harness's, at launch.
     const theTask = previewed.firstMessage.find((section) => section.id === "the_task")!;
     // The claude_local wake holds both on its task line.

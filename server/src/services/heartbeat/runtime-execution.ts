@@ -890,7 +890,6 @@ export async function executeHeartbeatRuntime(db: Db, input: HeartbeatRuntimeExe
         adapterContext,
         executionTarget,
         legacyRemoteExecution: remoteExecution,
-        authToken,
         getFreshSessionHandoff,
         onWarning: async (message) => {
           logger.warn({ companyId: agent.companyId, agentId: agent.id, runId: run.id }, `run prompt sections: ${message}`);

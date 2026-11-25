@@ -12,7 +12,7 @@ import {
   isPaperclipRecoveryWakePayload,
   normalizePaperclipWakePayload,
 } from "@paperclipai/adapter-utils/server-utils";
-import { claudeIdentityLine, claudeToolsNote, claudeToolsNoteEndsRun } from "./standing-texts.js";
+import { claudeIdentityLine } from "./standing-texts.js";
 import {
   renderClaudeRunMessageSections,
   runTaskForWake,
@@ -24,22 +24,25 @@ import {
  * Today's `claude --print` first message, as one pure function (step 5, Task 1). The CLI engine
  * sends what this returns; the run prompt builder (`server/src/services/run-prompt/`) labels the
  * same text and is checked against it. Its wake is the claude_local one (`wake/render.ts`, step 5
- * phase 2), except on an external chat turn. The standing texts (who the agent is, the
- * instructions location, the tools note) come first, so the wake ends the message (step 5 phase
- * 2, the light sections). The legacy bootstrap template and the session rotation note aren't read.
+ * phase 2), except on an external chat turn. The standing texts come first, so the wake ends the
+ * message (step 5 phase 2, the light sections). On a sealed run who the agent is and how it works
+ * with Paperclip are in the system prompt (step 5 phase 2, the system prompt), so the first
+ * message starts with the instructions line; only an agent's own prompt template comes before it.
+ * The legacy bootstrap template and the session rotation note aren't read.
  */
 export interface ClaudeCliPromptInput {
   /** The adapter context, after `hydrateFreshSessionHandoff` for this attempt. */
   context: Record<string, unknown>;
   resumed: boolean;
   instructionsPathDirective: string;
-  /** The agent's own prompt template (`resolveClaudePromptTemplate`); null sends the identity line. */
+  /**
+   * The agent's own prompt template (`resolveClaudePromptTemplate`). Null: an unsealed run sends
+   * the identity line; a sealed run sends nothing, since its system prompt says who the agent is.
+   */
   promptTemplate: string | null;
   /** `renderTemplate`'s data; `agent` carries `id`, `name` and `title` for the identity line. */
   templateData: Record<string, unknown> & { agent: { id: string; name?: unknown; title?: unknown } };
   sealed: boolean;
-  /** For the tools note: it needs `PAPERCLIP_API_URL` and `PAPERCLIP_API_KEY`. */
-  env: Record<string, string>;
 }
 
 /** The texts the first message joins, before `joinPromptSections` trims them (order: `composeClaudeCliPrompt`). */
@@ -55,9 +58,10 @@ export interface ClaudeCliPromptSectionTexts {
   wakeSections: ClaudeRunMessageSection[];
   /** "" when the task's facts replace it (`runTaskReplacesBrief`). */
   taskBrief: string;
-  /** The Paperclip tools note (`claudeToolsNote`). */
-  mcpNote: string;
-  /** The identity line, or the agent's own rendered template; "" when not sent. */
+  /**
+   * The agent's own rendered template, or (unsealed runs only) the identity line; "" when not
+   * sent. The tools note (`mcp_note`) is no longer sent: the system prompt has its rules.
+   */
   heartbeatTemplate: string;
 }
 
@@ -66,7 +70,7 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
   promptMetrics: Record<string, number>;
   sections: ClaudeCliPromptSectionTexts;
 } {
-  const { context, resumed, instructionsPathDirective, promptTemplate, templateData, sealed, env } = input;
+  const { context, resumed, instructionsPathDirective, promptTemplate, templateData, sealed } = input;
   const { taskContextNote, wakePrompt: sharedWakePrompt } = selectPaperclipPromptSections(context, {
     resumedSession: resumed,
     includeCommunicationGuidance: false,
@@ -82,18 +86,14 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
   // With the task's facts, the wake carries the task and its rules: no separate brief.
   const taskBrief = runTaskReplacesBrief(context) ? "" : taskContextNote;
   const shouldUseResumeDeltaPrompt = resumed && wakePrompt.length > 0;
-  // Who the agent is: its own template when it sets one, else the identity line. Not on a
-  // resumed session with a wake, nor on a recovery wake.
+  // The agent's own template when it sets one; else, on an unsealed run, the identity line (a
+  // sealed run has it in its system prompt). Not on a resumed session with a wake, nor on a
+  // recovery wake.
   const renderedPrompt = shouldUseResumeDeltaPrompt || isPaperclipRecoveryWakePayload(context.paperclipWake)
     ? ""
     : promptTemplate !== null && promptTemplate.trim().length > 0
       ? renderTemplate(promptTemplate, templateData)
-      : claudeIdentityLine(templateData.agent);
-  // Fresh sealed sessions are pointed at the `paperclip_*` tools; resumed sessions and external
-  // chat turns aren't. Chat tasks and recovery wakes get no end-of-run line.
-  const paperclipMcpNote = sealed && !resumed && !isPaperclipExternalChatTurn(context.paperclipWake)
-    ? claudeToolsNote({ env, endOfRunLine: claudeToolsNoteEndsRun(context) })
-    : "";
+      : sealed ? "" : claudeIdentityLine(templateData.agent);
   const sections: ClaudeCliPromptSectionTexts = {
     instructionsDirective: instructionsPathDirective,
     communicationGuidance: selectInitialCommunicationGuidance(
@@ -103,13 +103,11 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
     wake: wakePrompt,
     wakeSections,
     taskBrief,
-    mcpNote: paperclipMcpNote,
     heartbeatTemplate: renderedPrompt,
   };
   const prompt = joinPromptSections([
     sections.heartbeatTemplate,
     sections.instructionsDirective,
-    sections.mcpNote,
     sections.communicationGuidance,
     sections.wake,
     sections.taskBrief,
@@ -182,7 +180,8 @@ export function claudeWakeOptions(input: {
 
 /**
  * The agent's own prompt template (`adapterConfig.promptTemplate`), or null when it sets none or a
- * blank one: the run then sends the identity line (`claudeIdentityLine`), in task runs and chat.
+ * blank one: an unsealed run then sends the identity line (`claudeIdentityLine`), in task runs and
+ * chat; a sealed run has it in its system prompt.
  */
 export function resolveClaudePromptTemplate(config: Record<string, unknown>): string | null {
   const template = config.promptTemplate;

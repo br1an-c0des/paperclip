@@ -59,7 +59,8 @@ export async function previewClaudeRun(ctx: AdapterRunPreviewContext): Promise<A
     credential: credential ?? NO_CREDENTIAL,
     repoView: ctx.repoView,
   });
-  const skills = await planClaudeRunSkillsAndInstructions({ config, moduleDir: __moduleDir });
+  // A preview is of a sealed launch, so its system prompt is the sealed one.
+  const skills = await planClaudeRunSkillsAndInstructions({ config, moduleDir: __moduleDir, agent, sealed: true, context });
   const sealedRun = plannedSealedClaudeRun(plan, agent.id);
   const manifest = buildSealedRunManifest({
     sealedRun,
@@ -67,8 +68,8 @@ export async function previewClaudeRun(ctx: AdapterRunPreviewContext): Promise<A
     runtimeMcpServers,
     context,
     instructionsFilePath: skills.instructionsFilePath,
-    // A fresh session gets the instructions file when the entry file was read.
-    instructionsSent: Boolean(skills.instructionsPathDirective && skills.combinedInstructionsContents),
+    // A sealed run always sends its system prompt file.
+    instructionsSent: Boolean(skills.combinedInstructionsContents),
     launchEnv: buildSealedLaunchEnv(env, sealedRun),
     extraArgs,
     session: { mode: "fresh", reason: "no_saved_session" },

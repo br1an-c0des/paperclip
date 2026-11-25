@@ -14,10 +14,21 @@ const section = (id: RunPromptSection["id"], label: string, text: string, extra:
   text, chars: text.length, ...extra,
 });
 
+/**
+ * A sealed run's system prompt (step 5 phase 2, the system prompt): who the agent is, Working in
+ * Paperclip, the agent's instructions and its skills, sent with every run.
+ */
+const systemPrompt: RunPromptSection[] = [
+  section("identity", "Who you are", "You are M7 test Builder, Builder.", { placement: "system" }),
+  section("working_in_paperclip", "Working in Paperclip", "## Working in Paperclip\n\nM7 test rules.", { placement: "system" }),
+  section("agent_instructions", "Agent instructions", "M7 test: you are the Builder.", { placement: "system" }),
+  section("skill_library", "Skills", "## Skills\n\nM7 test skills.", { placement: "system" }),
+];
+
 function prompt(title: string): RunPromptPreview {
   const issue = `- Issue: "MSE-99"\n- Title: "${title}"`;
   const firstMessage = [
-    section("heartbeat_template", "Who you are", "You are M7 test Builder, Builder."),
+    section("instructions_directive", "Instructions file location", "Your instructions file is /m7-test/AGENTS.md; relative paths in it resolve from /m7-test/."),
     section("task_brief", "Task brief", issue, {
       parts: [{
         id: "task_brief.issue", label: "Issue", source: "task: identifier and title", text: issue, chars: issue.length,
@@ -28,7 +39,7 @@ function prompt(title: string): RunPromptPreview {
   return {
     kind: "assignment",
     issueId: null,
-    systemPrompt: [section("agent_instructions", "Agent instructions", "M7 test: you are the Builder.", { placement: "system", delivery: "fresh_only" })],
+    systemPrompt,
     firstMessage,
     firstMessageChars: firstMessage.map((entry) => entry.text).join("\n\n").length,
   };

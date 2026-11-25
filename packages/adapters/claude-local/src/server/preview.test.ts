@@ -191,7 +191,9 @@ describe("previewClaudeRun", () => {
     await runManifest(input);
     expect(preview.supported).toBe(true);
     if (!preview.supported) return;
-    expect(preview.systemPrompt.map((section) => section.id)).toEqual(["agent_instructions", "skill_library"]);
+    expect(preview.systemPrompt.map((section) => section.id))
+      .toEqual(["identity", "working_in_paperclip", "agent_instructions", "skill_library"]);
+    expect(preview.systemPrompt[0]!.text).toBe("You are M7 test preview.");
     expect(preview.systemPrompt.map((section) => section.text).join("\n\n"))
       .toBe(await fs.readFile(path.join(path.dirname(commandPath), "system-prompt.txt"), "utf8"));
     expect(preview.instructionsPathDirective).toContain(instructionsPath);

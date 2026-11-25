@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { agents, companies, createDb, heartbeatRuns, issues } from "@paperclipai/db";
+import { FAST_RESPONSE_AGENT_GUIDANCE } from "@paperclipai/shared";
 import { joinPaperclipPromptParts } from "@paperclipai/adapter-utils/server-utils";
 import { REDACTED_EVENT_VALUE } from "../../redaction.js";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "../../__tests__/helpers/embedded-postgres.js";
@@ -35,7 +36,10 @@ describePostgres("task brief parts on the run context", () => {
     await temporary?.cleanup();
   });
 
-  async function prepare(input: { title: string; description: string; secret?: string; context?: Record<string, unknown> }) {
+  async function prepare(input: {
+    title: string; description: string; secret?: string; context?: Record<string, unknown>;
+    experimental?: { enableFastResponses?: boolean };
+  }) {
     const companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID(), runId = randomUUID();
     await db.insert(companies).values({ id: companyId, name: "Parts fixture", issuePrefix: `P${companyId.slice(0, 6)}` });
     await db.insert(agents).values({ id: agentId, companyId, name: "Parts reader", adapterType: "claude_local", status: "idle" });
@@ -56,7 +60,7 @@ describePostgres("task brief parts on the run context", () => {
         context,
         taskSession: null,
       },
-      policy: { trustPreset: { kind: "standard" } as never, experimentalInstanceSettings: {} },
+      policy: { trustPreset: { kind: "standard" } as never, experimentalInstanceSettings: input.experimental ?? {} },
       services: { issuesSvc: { getAncestors: async () => [] }, getPinnedSkillTestContext: async () => null },
     });
     return { context, runId };
@@ -100,6 +104,17 @@ describePostgres("task brief parts on the run context", () => {
     // The compact variant has no description, so nothing spans its parts and they stay.
     expect(joinPaperclipPromptParts(readTaskMarkdownParts(context, PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_COMPACT_PARTS_KEY)!))
       .toBe(context.paperclipTaskMarkdownAssignmentCompact);
+  });
+
+  // Step 5 phase 2, the system prompt: the note follows the instance's experimental flag.
+  it("fast-response guidance only when enableFastResponses is on", async () => {
+    const off = await prepare({ title: "Off", description: "No flag.", context: { paperclipTaskCommunicationGuidance: "FORGED" } });
+    expect(String(off.context.paperclipTaskCommunicationGuidance ?? "")).not.toContain(FAST_RESPONSE_AGENT_GUIDANCE);
+    expect(String(off.context.paperclipTaskCommunicationGuidance ?? "")).not.toContain("FORGED");
+    const offExplicit = await prepare({ title: "Off", description: "Flag off.", experimental: { enableFastResponses: false } });
+    expect(String(offExplicit.context.paperclipTaskCommunicationGuidance ?? "")).not.toContain(FAST_RESPONSE_AGENT_GUIDANCE);
+    const on = await prepare({ title: "On", description: "Flag on.", experimental: { enableFastResponses: true } });
+    expect(on.context.paperclipTaskCommunicationGuidance).toBe(FAST_RESPONSE_AGENT_GUIDANCE);
   });
 
   it("replaces parts left from an earlier preparation of the same context", async () => {

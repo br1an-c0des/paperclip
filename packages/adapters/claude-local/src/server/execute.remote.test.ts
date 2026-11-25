@@ -602,6 +602,50 @@ describe("claude remote execution", () => {
     expect(call?.[2]).toContain("12345678-1234-4abc-9def-123456789012");
   });
 
+  // Unsealed runs (the dormant remote paths) keep the system prompt file for fresh sessions
+  // (step 5 phase 2, the system prompt: only sealed runs send it every run).
+  it("resumed unsealed run passes no system prompt file", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "paperclip-claude-remote-resume-no-file-"));
+    cleanupDirs.push(rootDir);
+    const workspaceDir = path.join(rootDir, "workspace");
+    const managedRemoteWorkspace = "/remote/workspace/.paperclip-runtime/runs/run-ssh-resume-file/workspace";
+    await mkdir(workspaceDir, { recursive: true });
+    const instructionsFilePath = path.join(rootDir, "AGENTS.md");
+    await writeFile(instructionsFilePath, "# Remote agent\n", "utf8");
+    const records: Array<Record<string, unknown>> = [];
+
+    await execute({
+      runId: "run-ssh-resume-file",
+      agent: { id: "agent-1", companyId: "company-1", name: "Claude Coder", adapterType: "claude_local", adapterConfig: {} },
+      runtime: {
+        sessionId: "12345678-1234-4abc-9def-123456789012",
+        sessionParams: {
+          sessionId: "12345678-1234-4abc-9def-123456789012",
+          cwd: managedRemoteWorkspace,
+          remoteExecution: { transport: "ssh", host: "127.0.0.1", port: 2222, username: "fixture", remoteCwd: managedRemoteWorkspace },
+        },
+        sessionDisplayId: "12345678-1234-4abc-9def-123456789012",
+        taskKey: null,
+      },
+      config: { model: "claude-opus-5", engine: "cli", command: "claude", instructionsFilePath },
+      context: { paperclipWorkspace: { cwd: workspaceDir, source: "project_primary" } },
+      executionTransport: {
+        remoteExecution: {
+          host: "127.0.0.1", port: 2222, username: "fixture", remoteWorkspacePath: "/remote/workspace",
+          remoteCwd: "/remote/workspace", privateKey: "PRIVATE KEY", knownHosts: "[127.0.0.1]:2222 ssh-ed25519 AAAA",
+          strictHostKeyChecking: true,
+        },
+      },
+      onLog: async () => {},
+      onMeta: async (meta) => { records.push(meta.promptRecord as unknown as Record<string, unknown>); },
+    });
+
+    const call = runChildProcess.mock.calls.find(call => !call[2].includes("--version")) as unknown as [string, string, string[]] | undefined;
+    expect(call?.[2]).toContain("--resume");
+    expect(call?.[2]).not.toContain("--append-system-prompt-file");
+    expect(records[0]?.systemPrompt).toEqual([]);
+  });
+
   it("forwards the duplex_channel_lost transport code on the unparsed Claude result path", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "paperclip-claude-remote-duplex-"));
     cleanupDirs.push(rootDir);

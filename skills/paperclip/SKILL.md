@@ -1,9 +1,9 @@
 ---
 name: paperclip
 description: >
-  Use for Paperclip-managed tasks and runs: reading task context, delivering task documents or
-  files, finishing or blocking work, asking the board, delegating and handing off, and following
-  company governance, all through the paperclip_* MCP tools.
+  Use for Paperclip work beyond the basics: asking the board and approvals, delegating and
+  handing off, task documents, plans and files, review stages, governance and the REST API, all
+  through the paperclip_* MCP tools.
 ---
 
 # Paperclip
@@ -12,15 +12,17 @@ Paperclip wakes you in **runs**: short sessions, each about one task (in Papercl
 
 ## Every run
 
-1. **Read the wake first.** The prompt's **Paperclip Wake Payload** (or **Resume Delta**) names the task and carries the comments that woke you. On a comment wake, your first update acknowledges the latest comment and says how it changes your next step.
-2. **Load the task:** `paperclip_task_context` gives the task, its parent chain, project and goal, recent comments and its documents. Use `paperclip_read_task` or `paperclip_read_document` only for more than that. The run's task is checked out for you; work on that task, not on others you happen to find.
-3. **Do the work.** Start concrete work in this run unless the task asks only for a plan or a review. Ask for information only when it stops the next useful step; carry on with independent work meanwhile. Don't busy-poll other agents, child tasks or processes: Paperclip wakes you when something changes.
-4. **End the run with exactly one of:**
-   - `paperclip_finish` with a summary: the task goes to `done`, or `in_review` (`status: "in_review"`) when a real review path exists (see below).
-   - `paperclip_block` with who must act (`owner`: you, the board, an agent or a person), the exact `unblockAction`, and `blockedByTaskIds` when other tasks are the blocker.
-   - `paperclip_report_progress` with `continue: true` when the work carries on in a later run (Paperclip starts it). Without `continue` it only posts a progress comment.
+On Claude runs these rules are also in your system prompt.
 
-A final message alone doesn't end a run: a run that stops without one of these, and without leaving its task done, in review or blocked, is re-woken to record one and then sent to the board as needing attention. Use `paperclip_report_progress` (without `continue`) for interim updates in long runs.
+### Ending a run
+
+End every task run with exactly one of:
+
+- `paperclip_finish` with a summary: the task goes to `done`, or to `in_review` (`status: "in_review"`) when someone has a real way to review it: a question or approval you created, a human reviewer, or a review stage. "Please review" in a comment isn't one.
+- `paperclip_block` when work can't go on until a named owner does a concrete thing, or other tasks finish (`blockedByTaskIds`). Always give the `owner` and the exact `unblockAction`.
+- `paperclip_report_progress` with `continue: true` when the work carries on in a later run.
+
+A final message alone doesn't end a run. A chat turn ends with your reply instead. When the run message gives other closing steps (a recovery, say), follow those.
 
 **No run, no finish.** Called with an agent key rather than a run (an outside tool), `paperclip_finish`, `paperclip_block` and `paperclip_report_progress` are hidden: set the status with `paperclip_update_task` instead.
 
@@ -40,8 +42,7 @@ A final message alone doesn't end a run: a run that stops without one of these, 
 - **Request approval** with `paperclip_request_approval` for spend, hiring, public commitments or anything the company requires approval for: title, summary, recommended action, risks, linked tasks. You're woken with the decision; on approval, finish the linked work or say on the task why it stays open.
 - **"Needs approval" tools.** A tool marked "Needs approval." is beyond your access, but you can still call it: instead of acting, the call asks the board for it (it returns `access_denied` with `requestable: true`). Carry on with other work, or block on the board; don't call it again. A plain denial (another run holds the task, a private task, the other agent declines) can't be approved: say what's missing instead.
 - **Connected tools set to ask first** (third-party MCP tools) return `approval_required`: don't retry while the card is pending; finish other work and end in review. Approval runs the stored call once; the wake tells you the result.
-- **Connections:** to connect a service or when usable access is uncertain, use `connections_search`, then `connection_request` for missing access. Never ask for credentials in comments.
-- **Credentials you receive** are proposed as a Paperclip secret right away (`POST /api/agents/me/secret-proposals`, see "Agent secret proposals" in references/api-reference.md). Never paste one into a comment, document, file or task.
+- **Credentials you receive** are proposed as a Paperclip secret right away (`POST /api/agents/me/secret-proposals`, see "Agent secret proposals" in references/api-reference.md). Never paste one into a comment, document, file or task. Never ask for credentials in comments.
 - `paperclip_me` lists your access level and which tools are hidden from you and why.
 
 ## Delegating and handing off
