@@ -25,6 +25,7 @@ import {
   eq,
   inArray,
   isNull,
+  or,
   sql,
 } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
@@ -40,7 +41,10 @@ import {
 } from "@paperclipai/shared";
 import {
   agents,
+  agentWakeupRequests,
+  approvals,
   assets,
+  authUsers,
   chatConversations,
   chatDeliveries,
   chatEndpoints,
@@ -121,7 +125,9 @@ import {
 import {
   extractSkillMentionIds,
   isUuidLike,
+  isValidIanaTimeZone,
 } from "@paperclipai/shared";
+import { workspacePreferenceService } from "../workspace-preferences.js";
 import { evaluateCodexCredentialReadiness } from "@paperclipai/adapter-codex-local/server";
 import type { TrustPresetResolution } from "../trust-preset-resolver.js";
 
@@ -2377,6 +2383,11 @@ export async function buildPaperclipWakePayload(input: {
     projectId?: string | null;
     originKind?: string | null;
     executionPolicy?: unknown;
+    // The people fields the wake names. Left out, they're read from the task's row.
+    assigneeAgentId?: string | null;
+    assigneeUserId?: string | null;
+    originId?: string | null;
+    responsibleUserId?: string | null;
   } | null;
   exposeLowTrustRaw?: boolean;
   // Experimental: agents write user-interaction content in ASD-STE100
@@ -2408,6 +2419,7 @@ export async function buildPaperclipWakePayload(input: {
             priority: issues.priority,
             workMode: issues.workMode,
             originKind: issues.originKind,
+            ...WAKE_ISSUE_PEOPLE_COLUMNS,
           })
           .from(issues)
           .where(
@@ -2415,13 +2427,25 @@ export async function buildPaperclipWakePayload(input: {
           )
           .then((rows) => rows[0] ?? null)
       : null);
+  const approvalId = readNonEmptyString(input.contextSnapshot.approvalId);
+  const approval = approvalId
+    ? await readWakeApproval(input.db, input.companyId, approvalId)
+    : null;
+  // An approval with no linked task still gets a wake (step 5); other wakes need a subject.
   if (
     commentIds.length === 0 &&
     Object.keys(executionStage).length === 0 &&
     !issueSummary &&
-    !agentMessageText
+    !agentMessageText &&
+    !approval
   )
     return null;
+  const [issueContext, actor] = await Promise.all([
+    issueSummary
+      ? readWakeIssueContext(input.db, input.companyId, issueSummary)
+      : Promise.resolve(null),
+    readWakeActor(input.db, input.companyId, input.runId ?? null),
+  ]);
 
   const commentRows = input.wakeCommentRows
     ? input.wakeCommentRows.filter(row => row.companyId === input.companyId && (!issueId || row.issueId === issueId) && commentIds.includes(row.id))
@@ -2820,8 +2844,25 @@ export async function buildPaperclipWakePayload(input: {
           status: issueSummary.status,
           priority: issueSummary.priority,
           workMode: issueSummary.workMode,
+          assigneeAgentId: issueContext?.assigneeAgentId ?? null,
+          assigneeUserId: issueContext?.assigneeUserId ?? null,
+          routineName: issueContext?.routineName ?? null,
         }
       : null,
+    approval,
+    actor,
+    names: await readWakeNames(input.db, input.companyId, [
+      ...comments.map((comment) => comment.author as WakePersonRef),
+      ...wakeContinuationPeople(input.contextSnapshot.executionContinuation),
+      actor,
+      approval?.decidedByUserId ? { type: "user", id: approval.decidedByUserId } : null,
+      issueContext?.assigneeAgentId ? { type: "agent", id: issueContext.assigneeAgentId } : null,
+      issueContext?.assigneeUserId ? { type: "user", id: issueContext.assigneeUserId } : null,
+      wakeStagePrincipal(executionStage.currentParticipant),
+      wakeStagePrincipal(executionStage.returnAssignee),
+      originalAssigneeId ? { type: "agent", id: originalAssigneeId } : null,
+    ]),
+    timeZone: issueContext?.timeZone ?? null,
     agentMessage: agentMessageText
       ? {
           text: agentMessageText,
@@ -2974,6 +3015,210 @@ export async function buildPaperclipWakePayload(input: {
 
 function readNonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+/** Who caused a wake: the wakeup request's requester. */
+export type PaperclipWakeActorRef = { type: "user" | "agent" | "system"; id: string | null };
+
+/** The approval an approval wake is about. */
+export type PaperclipWakeApproval = {
+  id: string;
+  type: string;
+  /** One line: the payload's title, summary or name. */
+  summary: string | null;
+  status: string;
+  decisionNote: string | null;
+  decidedByUserId: string | null;
+};
+
+const WAKE_ISSUE_PEOPLE_COLUMNS = {
+  assigneeAgentId: issues.assigneeAgentId,
+  assigneeUserId: issues.assigneeUserId,
+  originId: issues.originId,
+  responsibleUserId: issues.responsibleUserId,
+};
+
+async function readWakeApproval(
+  db: Db,
+  companyId: string,
+  approvalId: string,
+): Promise<PaperclipWakeApproval | null> {
+  if (!isUuidLike(approvalId)) return null;
+  const row = await db
+    .select({
+      id: approvals.id,
+      type: approvals.type,
+      status: approvals.status,
+      payload: approvals.payload,
+      decisionNote: approvals.decisionNote,
+      decidedByUserId: approvals.decidedByUserId,
+    })
+    .from(approvals)
+    .where(and(eq(approvals.id, approvalId), eq(approvals.companyId, companyId)))
+    .then((rows) => rows[0] ?? null);
+  if (!row) return null;
+  const payload = parseObject(row.payload);
+  const summary = [payload.title, payload.summary, payload.name]
+    .map(readNonEmptyString)
+    .find((value): value is string => value !== null);
+  return {
+    id: row.id,
+    type: row.type,
+    summary: summary?.trim().split(/\r?\n/, 1)[0]?.trim() || null,
+    status: row.status,
+    decisionNote: readNonEmptyString(row.decisionNote),
+    decidedByUserId: row.decidedByUserId ?? null,
+  };
+}
+
+/**
+ * The latest wakeup request delivered to the run: its own, or one merged into it later. A merged
+ * wake keeps the latest reason (`mergeCoalescedContextSnapshot`), so the latest requester goes
+ * with it.
+ */
+async function readWakeActor(
+  db: Db,
+  companyId: string,
+  runId: string | null,
+): Promise<PaperclipWakeActorRef | null> {
+  if (!runId || !isUuidLike(runId)) return null;
+  const row = await db
+    .select({
+      type: agentWakeupRequests.requestedByActorType,
+      id: agentWakeupRequests.requestedByActorId,
+    })
+    .from(agentWakeupRequests)
+    .where(
+      and(
+        eq(agentWakeupRequests.companyId, companyId),
+        or(
+          eq(agentWakeupRequests.runId, runId),
+          sql`${agentWakeupRequests.id} = (select ${heartbeatRuns.wakeupRequestId} from ${heartbeatRuns}
+            where ${heartbeatRuns.id} = ${runId} and ${heartbeatRuns.companyId} = ${companyId})`,
+        ),
+      ),
+    )
+    .orderBy(desc(agentWakeupRequests.requestedAt), desc(agentWakeupRequests.createdAt))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+  const type = row?.type;
+  return type === "user" || type === "agent" || type === "system"
+    ? { type, id: readNonEmptyString(row?.id) }
+    : null;
+}
+
+/**
+ * The task's assignee, routine and responsible person's time zone. A caller's summary may carry
+ * the people fields (a draft task has no row); whatever it leaves out comes from the task's row.
+ */
+async function readWakeIssueContext(
+  db: Db,
+  companyId: string,
+  summary: {
+    id: string;
+    originKind?: string | null;
+    assigneeAgentId?: string | null;
+    assigneeUserId?: string | null;
+    originId?: string | null;
+    responsibleUserId?: string | null;
+  },
+) {
+  const supplied = {
+    originKind: summary.originKind,
+    assigneeAgentId: summary.assigneeAgentId,
+    assigneeUserId: summary.assigneeUserId,
+    originId: summary.originId,
+    responsibleUserId: summary.responsibleUserId,
+  };
+  const row = Object.values(supplied).some((value) => value === undefined)
+    ? await db
+        .select({ originKind: issues.originKind, ...WAKE_ISSUE_PEOPLE_COLUMNS })
+        .from(issues)
+        .where(and(eq(issues.id, summary.id), eq(issues.companyId, companyId)))
+        .then((rows) => rows[0] ?? null)
+    : null;
+  const pick = (key: keyof typeof supplied): string | null =>
+    supplied[key] !== undefined ? (supplied[key] ?? null) : (row?.[key] ?? null);
+  const originKind = pick("originKind");
+  const originId = pick("originId");
+  const responsibleUserId = pick("responsibleUserId");
+  const [routineName, timeZone] = await Promise.all([
+    originKind === "routine_execution" && originId && isUuidLike(originId)
+      ? db
+          .select({ title: routines.title })
+          .from(routines)
+          .where(and(eq(routines.id, originId), eq(routines.companyId, companyId)))
+          .then((rows) => rows[0]?.title ?? null)
+      : Promise.resolve(null),
+    responsibleUserId
+      ? workspacePreferenceService(db)
+          .get(responsibleUserId)
+          .then(({ timeZone: zone }) => (zone && isValidIanaTimeZone(zone) ? zone : null))
+      : Promise.resolve(null),
+  ]);
+  return {
+    assigneeAgentId: pick("assigneeAgentId"),
+    assigneeUserId: pick("assigneeUserId"),
+    routineName,
+    timeZone,
+  };
+}
+
+type WakePersonRef = { type: unknown; id: unknown } | null | undefined;
+
+/** The authors of the continuation record's messages, and who answered its interactions. */
+function wakeContinuationPeople(value: unknown): WakePersonRef[] {
+  const continuation = parseObject(value);
+  const messages = Array.isArray(continuation.messages) ? continuation.messages : [];
+  const responses = Array.isArray(continuation.humanResponses) ? continuation.humanResponses : [];
+  return [
+    ...messages.map((message) => {
+      const row = parseObject(message);
+      return { type: row.authorType, id: row.authorId };
+    }),
+    ...responses.map((response) => ({ type: "user", id: parseObject(response).resolvedByUserId })),
+  ];
+}
+
+function wakeStagePrincipal(value: unknown): WakePersonRef {
+  const principal = parseObject(value);
+  if (principal.type === "agent") return { type: "agent", id: principal.agentId };
+  if (principal.type === "user") return { type: "user", id: principal.userId };
+  return null;
+}
+
+/** Display names keyed `user:<id>` / `agent:<id>`, one read each; an unknown id is left out. */
+async function readWakeNames(
+  db: Db,
+  companyId: string,
+  people: WakePersonRef[],
+): Promise<Record<string, string>> {
+  const agentIds = new Set<string>();
+  const userIds = new Set<string>();
+  for (const person of people) {
+    const id = readNonEmptyString(person?.id);
+    if (!id) continue;
+    if (person?.type === "agent" && isUuidLike(id)) agentIds.add(id);
+    else if (person?.type === "user") userIds.add(id);
+  }
+  const [agentRows, userRows] = await Promise.all([
+    agentIds.size === 0
+      ? Promise.resolve([])
+      : db
+          .select({ id: agents.id, name: agents.name })
+          .from(agents)
+          .where(and(eq(agents.companyId, companyId), inArray(agents.id, [...agentIds]))),
+    userIds.size === 0
+      ? Promise.resolve([])
+      : db
+          .select({ id: authUsers.id, name: authUsers.name })
+          .from(authUsers)
+          .where(inArray(authUsers.id, [...userIds])),
+  ]);
+  const names: Record<string, string> = {};
+  for (const row of agentRows) if (readNonEmptyString(row.name)) names[`agent:${row.id}`] = row.name;
+  for (const row of userRows) if (readNonEmptyString(row.name)) names[`user:${row.id}`] = row.name;
+  return names;
 }
 
 /** Issue context and responsible-user resolution bound to one service database. */
