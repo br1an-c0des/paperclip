@@ -136,6 +136,29 @@ export const fixtures = {
     },
     checkedOutByHarness: true,
   },
+  /**
+   * Run da19589b: answered questions on a resumed session. The comment that woke the run which
+   * asked them is an origin of the record, so the resume delta carries it again though that run
+   * received it; and the server's summary starts with its own heading.
+   */
+  answered_after_comment: {
+    ...base,
+    reason: "issue_commented",
+    actor: { type: "user", id: BRIAN },
+    issue,
+    interactionKind: "ask_user_questions",
+    interactionStatus: "answered",
+    comments: [{ id: "q-2", body: "Which idea should I take?", createdAt: "2026-11-24T10:30:00.000Z", author: ada }],
+    questionResponse: {
+      interactionId: "interaction-2",
+      summaryMarkdown: "Resolved questions and answers:\n- Idea — Which idea should I take?: Idea 2",
+    },
+    executionContinuation: continuation({
+      originCommentIds: ["da8a07ae"],
+      messages: [...history, message("da8a07ae", "Thanks. Go with idea 2.", brian, "2026-11-24T10:00:00.000Z")],
+      resumeDelta: { baseRunId: "run-3cca4343", messages: [message("da8a07ae", "Thanks. Go with idea 2.", brian, "2026-11-24T10:00:00.000Z")] },
+    }),
+  },
   options_picked: {
     ...base,
     reason: "issue_commented",

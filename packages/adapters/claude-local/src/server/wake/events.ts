@@ -50,6 +50,12 @@ export interface ClaudeWakeComments {
   edited: ClaudeWakeComment[];
   /** A fresh session's earlier messages (the continuation record's), oldest first, news left out. */
   history: ClaudeWakeComment[];
+  /**
+   * A resumed session's comments that an earlier run already received: never news. The batch's
+   * comments marked `readByEarlierTurn`, and the record's origin comments that came in with the
+   * resume delta though they aren't in this wake's batch (see `selectClaudeWakeComments`).
+   */
+  earlier: ClaudeWakeComment[];
 }
 
 type Continuation = NonNullable<PaperclipWakePayload["executionContinuation"]>;
@@ -68,8 +74,15 @@ function byCreatedAt(left: ClaudeWakeComment, right: ClaudeWakeComment): number 
 }
 
 /**
- * Splits the wake's comments: what's new (the news), what was edited, and the history a fresh
- * session needs. The woken agent's own comments are never news.
+ * Splits the wake's comments: what's new (the news), what was edited, the history a fresh session
+ * needs, and, on a resumed session, what an earlier run already received. The woken agent's own
+ * comments are never news.
+ *
+ * Why "earlier" (run da19589b): the record's resume delta keeps every origin comment even when
+ * the base run delivered it (execution-continuation.ts, `originCommentIds.includes(message.id) ||
+ * !delivered`), and the origins include the source run's and the interaction's. So an answered
+ * question brings back the comment that woke the run which asked it. An origin in the delta that
+ * isn't in this wake's batch is that case; it's shown as seen, not as news.
  */
 export function selectClaudeWakeComments(
   payload: PaperclipWakePayload,
@@ -77,7 +90,7 @@ export function selectClaudeWakeComments(
 ): ClaudeWakeComments {
   const own = (comment: { authorType: string | null; authorId: string | null }) =>
     comment.authorType === "agent" && comment.authorId === options.agentId;
-  const news: ClaudeWakeComment[] = payload.comments
+  const batch: ClaudeWakeComment[] = payload.comments
     .filter((comment) => !own(comment))
     .map((comment) => ({
       id: comment.id,
@@ -88,6 +101,9 @@ export function selectClaudeWakeComments(
       authorId: comment.authorId,
       seen: comment.readByEarlierTurn,
     }));
+  // On a resumed session, a comment an earlier run read is history the session holds.
+  const news = options.resumedSession ? batch.filter((comment) => !comment.seen) : batch;
+  const earlier = options.resumedSession ? batch.filter((comment) => comment.seen) : [];
   const batchIds = new Set(payload.comments.map((comment) => comment.id).filter(Boolean));
   const continuation = wakeContinuation(payload);
   const edited: ClaudeWakeComment[] = [];
@@ -105,7 +121,8 @@ export function selectClaudeWakeComments(
     // Every new or edited message since the last run, not only this wake's batch.
     for (const message of continuation?.resumeDelta?.messages ?? []) {
       if (message.deleted || batchIds.has(message.id) || own({ authorType: message.authorType, authorId: message.authorId })) continue;
-      if (message.updatedAt && message.createdAt && message.updatedAt !== message.createdAt) edited.push(fromMessage(message));
+      if (continuation?.originCommentIds.includes(message.id)) earlier.push({ ...fromMessage(message), seen: true });
+      else if (message.updatedAt && message.createdAt && message.updatedAt !== message.createdAt) edited.push(fromMessage(message));
       else news.push(fromMessage(message));
     }
   } else {
@@ -114,7 +131,7 @@ export function selectClaudeWakeComments(
       history.push(fromMessage(message));
     }
   }
-  return { news: news.sort(byCreatedAt), edited, history: history.sort(byCreatedAt) };
+  return { news: news.sort(byCreatedAt), edited, history: history.sort(byCreatedAt), earlier: earlier.sort(byCreatedAt) };
 }
 
 /** Events that quote the latest comment themselves; any other new comments follow them. */

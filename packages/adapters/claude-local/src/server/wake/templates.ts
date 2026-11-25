@@ -38,6 +38,8 @@ export const COMMENTS = {
   seen: "(you've seen this)",
   cutShort: "(This comment was cut short; `paperclip_read_task` has all of it.)",
   others: "Other new comments on {{taskRef}}:",
+  /** A resumed session's comments that an earlier run already received; no rule goes with them. */
+  earlier: "Earlier comments on {{taskRef}}:",
   omitted: "{{count}} more comments on {{taskRef}} aren't shown here; `paperclip_read_task` reads up to 100.",
   omittedOne: "1 more comment on {{taskRef}} isn't shown here; `paperclip_read_task` reads up to 100.",
 } as const;

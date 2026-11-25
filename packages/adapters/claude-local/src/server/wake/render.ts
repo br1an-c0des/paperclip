@@ -124,6 +124,7 @@ const EVENT_SOURCES: Record<ClaudeWakeEventKind, string> = {
 const PART_META: Readonly<Record<string, PaperclipPromptPartMeta>> = {
   "wake.what_happened": { label: "What happened", source: "claude_local wake: heading" },
   "wake.comments": { label: "Other new comments", source: "wake payload: comments" },
+  "wake.earlier_comments": { label: "Earlier comments", source: "wake payload: comments read by an earlier run, record origin comments" },
   "wake.omitted_comments": { label: "Omitted comments", source: "wake payload: comment window" },
   "wake.session_note": { label: "Session note", source: "claude_local wake: resumed or fresh session" },
   "wake.where_things_stand": { label: "Where things stand", source: "wake payload: continuationSummary, executionContinuation.messages" },
@@ -334,7 +335,7 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       return {
         text: lines(
           t(wake.issue ? EVENTS.questions_answered.onTask : EVENTS.questions_answered.plain, { ...data, who }),
-          quoteClaudeWakeText(response.summaryMarkdown),
+          quoteClaudeWakeText(answersText(response.summaryMarkdown)),
           response.truncated && EVENTS.questions_answered.cutShort,
         ),
         rules: EVENTS.questions_answered.rules,
@@ -570,6 +571,16 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
   }
 }
 
+/**
+ * The server's answer summary without its own heading ("Resolved questions and answers:",
+ * question-response-delivery.ts), which the wake's sentence already says.
+ */
+function answersText(summary: string): string {
+  const [first, ...rest] = summary.replace(/\r\n?/g, "\n").split("\n");
+  const remainder = rest.join("\n").trim();
+  return /^\s*resolved questions and answers[:.]?\s*$/i.test(first ?? "") && remainder ? remainder : summary;
+}
+
 function causeText(recovery: PaperclipWakePayload["recovery"]): string | null {
   if (!recovery?.cause) return null;
   const words = recoveryCauseWords(recovery.cause);
@@ -786,6 +797,10 @@ export function renderClaudeWakeParts(payload: unknown, options: ClaudeWakeRende
     blocks.push({ id: "wake.comments", text: lines(t(COMMENTS.others, { taskRef: ctx.taskRef }), ...others.map((comment) => commentItem(ctx, comment))) });
     const rule = others.length === 1 ? EVENTS.comment.rulesOne[0] : EVENTS.comment.rulesMany[0];
     if (!rules.includes(rule)) rules.push(rule);
+  }
+  if (ctx.comments.earlier.length > 0) {
+    blocks.push({ id: "wake.earlier_comments", text: lines(t(COMMENTS.earlier, { taskRef: ctx.taskRef }),
+      ...ctx.comments.earlier.map((comment) => commentItem(ctx, comment))) });
   }
   const omitted = Math.max(wake.missingCount, wake.cutCount);
   if (omitted > 0) {
