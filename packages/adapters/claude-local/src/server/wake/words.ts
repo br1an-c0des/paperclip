@@ -119,6 +119,54 @@ export function approvalDecisionWords(status: string): string {
   return APPROVAL_DECISIONS[status] ?? `marked as ${fallback(status)}`;
 }
 
+/** How a run ended, before its summary's quote: "Your last run on TES-45 (…) ended with:". */
+const RUN_ENDINGS: Record<string, string> = {
+  succeeded: "ended with",
+  failed: "failed, and ended with",
+  cancelled: "was cancelled, and ended with",
+  timed_out: "timed out, and ended with",
+};
+
+export function runEndingWords(status: string): string {
+  return RUN_ENDINGS[status] ?? `ended (${fallback(status)}) with`;
+}
+
+/** A request kind as a noun, after "your": "your question", "your plan review". */
+export function requestNounWords(kind: string, options: { aboutPlan: boolean; questionCount: number }): string {
+  switch (kind) {
+    case "ask_user_questions":
+      return options.questionCount === 1 ? "question" : "questions";
+    case "request_confirmation":
+    case "request_checkbox_confirmation":
+      if (options.aboutPlan) return "plan review";
+      return kind === "request_checkbox_confirmation" ? "checklist request" : "confirmation request";
+    case "connection_intent":
+      return "connection request";
+    case "approval":
+      return "approval request";
+    default:
+      return `request (${fallback(kind)})`;
+  }
+}
+
+/** A decided request's outcome as a past participle: "answered by Brian", "sent back by Brian". */
+const REQUEST_DECISIONS: Record<string, string> = {
+  answered: "answered",
+  accepted: "accepted",
+  rejected: "rejected",
+  approved: "approved",
+  revision_requested: "sent back for changes",
+  connected: "connected",
+  declined: "declined",
+  skipped: "skipped",
+  withdrawn: "withdrawn",
+};
+
+export function requestDecisionWords(outcome: string, options: { aboutPlan: boolean }): string {
+  if (options.aboutPlan && outcome === "rejected") return "sent back";
+  return REQUEST_DECISIONS[outcome] ?? `marked as ${fallback(outcome)}`;
+}
+
 /** Who a stalled recovery action waits on. */
 export function ownerTypeWords(ownerType: string | null): string {
   if (ownerType === "agent") return "an agent";

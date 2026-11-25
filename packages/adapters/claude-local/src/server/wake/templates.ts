@@ -30,6 +30,8 @@ export const COMMON_RULES = [
 export const SESSION_NOTES = {
   resumed: "Your session continues from your last run.",
   freshWithHandoff: "This is a new session; the handoff above has the task's history.",
+  /** A fresh session whose payload carries `history` (step 5 phase 2, the handoff): no handoff block is sent. */
+  freshWithHistory: "This is a new session; the task's history is under \"Where things stand\".",
 } as const;
 
 export const COMMENTS = {
@@ -50,6 +52,41 @@ export const WHERE_THINGS_STAND = {
   history: "The task's comments so far, oldest first:",
   historyCut: "({{count}} comments in between are left out here; `paperclip_read_task` reads up to 100.)",
   historyCutOne: "(1 comment in between is left out here; `paperclip_read_task` reads up to 100.)",
+} as const;
+
+/**
+ * "Where things stand" from the payload's `history` (step 5 phase 2, fork/step-5-handoff.md "What
+ * a fresh session gets"): the last run's summary, the task's requests, its documents, then the
+ * comments (WHERE_THINGS_STAND.history).
+ */
+export const HISTORY = {
+  /** `{{ended}}` is runEndingWords: "ended with", "failed, and ended with". */
+  lastRunOwn: "Your last run on {{taskRef}} ({{time}}) {{ended}}:",
+  lastRunOwnNoTime: "Your last run on {{taskRef}} {{ended}}:",
+  /** `{{whose}}` is "The agent Coder's". */
+  lastRunOther: "{{whose}} last run on {{taskRef}} ({{time}}) {{ended}}:",
+  lastRunOtherNoTime: "{{whose}} last run on {{taskRef}} {{ended}}:",
+  lastRunCut: "(The summary was cut short.)",
+  answered: "Answered requests:",
+  /** One answered request, before its quote: "Your question, answered by Brian on Nov 24, 17:45". */
+  request: "{{whose}} {{noun}}{{title}}, {{decision}}{{by}}{{on}}",
+  by: " by {{who}}",
+  on: " on {{time}}",
+  withNote: ", with the note",
+  withReason: ", with the reason",
+  noAnswer: "(no answer)",
+  unlistedOption: "(an option no longer listed)",
+  requestCut: "(Cut short; `paperclip_read_task` with `requests: true` reads the rest.)",
+  answeredMore: "{{count}} more answered requests: `paperclip_read_task` with `requests: true` reads them.",
+  answeredMoreOne: "1 more answered request: `paperclip_read_task` with `requests: true` reads it.",
+  /** An open request, one line each. */
+  open: "Still waiting: {{request}}, asked {{time}}.",
+  openNoTime: "Still waiting: {{request}}.",
+  documents: "Documents on this task: {{documents}}.",
+  documentInBrief: "{{document}} (in the brief below)",
+  documentsRead: "Read them with `paperclip_read_document`.",
+  documentsReadRest: "Read the rest with `paperclip_read_document`.",
+  workflow: "Read the workflow document with `paperclip_read_document` before choosing the next step.",
 } as const;
 
 export const TASK_LINE = {

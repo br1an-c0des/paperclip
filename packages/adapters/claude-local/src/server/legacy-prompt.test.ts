@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
   DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE,
+  hydrateFreshSessionHandoff,
 } from "@paperclipai/adapter-utils/server-utils";
 import { createPromptContextFixture } from "@paperclipai/adapter-utils/test-fixtures/prompt-context";
 import { composeClaudeCliPrompt, resolveClaudePromptTemplate, type ClaudeCliPromptInput } from "./legacy-prompt.js";
@@ -342,6 +343,55 @@ describe("composeClaudeCliPrompt: the claude_local wake (step 5 phase 2)", () =>
       },
     };
     expect(composeClaudeCliPrompt(input({ context })).sections.wake).toContain("## External chat response contract");
+  });
+});
+
+describe("composeClaudeCliPrompt: the history replaces the handoff (step 5 phase 2, the handoff)", () => {
+  const handoff = "## Fresh session handoff\n\nEarlier work: the ledger exists.";
+  const history = {
+    lastRun: { runId: "prior-run", agentId: "agent-1", ownRun: true, status: "succeeded", finishedAt: "2026-09-21T12:00:00.000Z",
+      body: "Drafted the ledger.", bodyTruncated: false },
+    answered: [], answeredOmitted: 0, open: [], documents: [{ key: "notes", title: null, inBrief: false }],
+  };
+  const withHistory = (extra: Record<string, unknown> = {}) => {
+    const fixture = createPromptContextFixture();
+    return { ...fixture, ...extra, paperclipWake: { ...fixture.paperclipWake, history } };
+  };
+
+  it("a fresh session with history sends no handoff", () => {
+    const result = composeClaudeCliPrompt(input({ context: withHistory({ paperclipFreshSessionHandoffMarkdown: handoff }) }));
+    expect(result.prompt).not.toContain("Fresh session handoff");
+    expect(result.prompt).not.toContain("Earlier work: the ledger exists.");
+    expect(result.sections.communicationGuidance).toBe("Explain the next step before starting work.");
+    expect(result.sections.wake).toContain("## Where things stand\n\nYour last run on PAP-1 (Sep 21, 12:00 UTC) ended with:\n\n> Drafted the ledger.");
+    expect(result.sections.wake).toContain("This is a new session; the task's history is under \"Where things stand\".");
+    expect(result.sections.wake).not.toContain("the handoff above");
+    // A resumed session gets neither.
+    const resumed = composeClaudeCliPrompt(input({ resumed: true, context: withHistory({ paperclipFreshSessionHandoffMarkdown: handoff }) }));
+    expect(resumed.sections.communicationGuidance).toBe("");
+    expect(resumed.prompt).not.toContain("## Where things stand");
+  });
+
+  it("a chat task's fresh session keeps the handoff", () => {
+    // Chat tasks get no history (the server leaves it out), so the handoff stays.
+    const context = { ...createPromptContextFixture(), conversationMode: true, paperclipFreshSessionHandoffMarkdown: handoff };
+    const result = composeClaudeCliPrompt(input({ context }));
+    expect(result.sections.communicationGuidance).toBe(`Explain the next step before starting work.\n\n${handoff}`);
+    expect(result.prompt).toContain("Earlier work: the ledger exists.");
+    expect(result.sections.wake).toContain("the handoff above has the task's history");
+  });
+
+  it("a resume that fails and retries fresh has the history and no handoff", async () => {
+    // The resumed attempt's context; the retry hydrates the handoff onto it (execute.ts), then
+    // composes a fresh session from the same payload.
+    const context: Record<string, unknown> = withHistory();
+    expect(composeClaudeCliPrompt(input({ resumed: true, context })).prompt).not.toContain("## Where things stand");
+    await hydrateFreshSessionHandoff({ context, getFreshSessionHandoff: async () => handoff }, { resumedSession: false });
+    expect(context.paperclipFreshSessionHandoffMarkdown).toBe(handoff);
+    const retry = composeClaudeCliPrompt(input({ resumed: false, context }));
+    expect(retry.prompt).toContain("## Where things stand");
+    expect(retry.prompt).not.toContain("Earlier work: the ledger exists.");
+    expect(retry.sections.communicationGuidance).toBe("Explain the next step before starting work.");
   });
 });
 

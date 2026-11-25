@@ -8,6 +8,7 @@ import {
   selectInitialCommunicationGuidance,
   selectPaperclipPromptSections,
   isPaperclipRecoveryWakePayload,
+  normalizePaperclipWakePayload,
   DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
   DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE,
 } from "@paperclipai/adapter-utils/server-utils";
@@ -76,7 +77,10 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
   const sections: ClaudeCliPromptSectionTexts = {
     instructionsDirective: instructionsPathDirective,
     bootstrapTemplate: renderedBootstrapPrompt,
-    communicationGuidance: selectInitialCommunicationGuidance(context, { resumedSession: resumed }),
+    communicationGuidance: selectInitialCommunicationGuidance(
+      wakeHistoryReplacesHandoff(context) ? withoutFreshSessionHandoff(context) : context,
+      { resumedSession: resumed },
+    ),
     wake: wakePrompt,
     sessionRotationNote: sessionHandoffNote,
     taskBrief: taskContextNote,
@@ -111,8 +115,24 @@ export function usesSharedWake(context: Record<string, unknown>): boolean {
 }
 
 /**
+ * Whether the wake's history stands in for the fresh-session handoff (step 5 phase 2, the
+ * handoff): the payload carries `history` (the assignee's own non-chat task; plan decision 2) and
+ * the claude_local wake renders it. The handoff is still hydrated onto the context, for ACP and
+ * the others; the CLI and the run prompt builder leave it out of the first message.
+ */
+export function wakeHistoryReplacesHandoff(context: Record<string, unknown>): boolean {
+  return !usesSharedWake(context) && Boolean(normalizePaperclipWakePayload(context.paperclipWake)?.history);
+}
+
+function withoutFreshSessionHandoff(context: Record<string, unknown>): Record<string, unknown> {
+  const { paperclipFreshSessionHandoffMarkdown: _handoff, ...rest } = context;
+  return rest;
+}
+
+/**
  * The claude_local wake's options for one attempt: `context` is the attempt's, after
- * `hydrateFreshSessionHandoff`, so a fresh session's handoff is on it.
+ * `hydrateFreshSessionHandoff`, so a fresh session's handoff is on it. `handoffPresent` is false
+ * when the history replaces the handoff, since the handoff isn't sent.
  */
 export function claudeWakeOptions(input: {
   context: Record<string, unknown>;
@@ -123,7 +143,8 @@ export function claudeWakeOptions(input: {
     agentId: input.agentId,
     resumedSession: input.resumed,
     conversationMode: input.context.conversationMode === true,
-    handoffPresent: !input.resumed && asString(input.context.paperclipFreshSessionHandoffMarkdown, "").trim().length > 0,
+    handoffPresent: !input.resumed && !wakeHistoryReplacesHandoff(input.context) &&
+      asString(input.context.paperclipFreshSessionHandoffMarkdown, "").trim().length > 0,
   };
 }
 
