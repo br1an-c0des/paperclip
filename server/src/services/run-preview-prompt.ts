@@ -346,12 +346,21 @@ function markPending(
   flags: Record<Exclude<keyof typeof PENDING, "identity">, boolean> & { identity: string[] },
 ): RunPromptSection[] {
   const holdsIdentity = (text: string) => flags.identity.some((value) => text.includes(value));
+  // The claude_local wake's task line holds the status, the checkout and the branch (step 5
+  // phase 2); a part with several pending values gets each reason.
+  const taskLine = [
+    flags.checkout ? PENDING.checkout : null,
+    flags.status ? PENDING.status : null,
+    flags.branch ? PENDING.branch : null,
+  ].filter((why): why is NonNullable<typeof why> => why !== null);
   const partPending: Record<string, string | null> = {
+    "wake.task": taskLine.length > 0 ? taskLine.join(" ") : null,
+    "wake.mcp_app_context": flags.mcpApp ? PENDING.mcpApp : null,
+    // The shared wake's parts, on an external chat turn.
     "wake.checkout_line": flags.checkout ? PENDING.checkout : null,
     "wake.checkout_note": flags.checkout ? PENDING.checkout : null,
     "wake.issue_state": flags.status ? PENDING.status : null,
     "wake.workspace_branch": flags.branch ? PENDING.branch : null,
-    "wake.mcp_app_context": flags.mcpApp ? PENDING.mcpApp : null,
   };
   const sectionPending: Partial<Record<RunPromptSection["id"], string | null>> = {
     instructions_directive: flags.instructions ? PENDING.instructions : null,
@@ -360,7 +369,7 @@ function markPending(
   };
   return sections.map((section) => {
     const parts = section.parts?.map((part): RunPromptPart => {
-      const why = partPending[part.id] ?? (holdsIdentity(part.text) ? PENDING.identity : null);
+      const why = [partPending[part.id], holdsIdentity(part.text) ? PENDING.identity : null].filter(Boolean).join(" ");
       return why ? { ...part, pending: why } : part;
     });
     // A section without parts is marked as a whole.

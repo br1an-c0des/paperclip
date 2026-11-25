@@ -131,7 +131,7 @@ function runInput(context: Record<string, unknown>, overrides: Partial<ClaudeRun
 const kinds: RunKind[] = [
   {
     name: "fresh assignment",
-    shows: ["## Paperclip Wake Payload", "- execution workspace branch:", "Task plan document doc-1", "Paperclip API access note:", "You are agent agent-1 (Ada)."],
+    shows: ["## What happened", "You've been assigned PAP-1 \"Release ledger\".", "branch `pap-1-release-ledger`", "Task plan document doc-1", "Paperclip API access note:", "You are agent agent-1 (Ada)."],
     input: () => runInput(withBrief({
       issueId: issue.id,
       wakeReason: "issue_assigned",
@@ -146,7 +146,7 @@ const kinds: RunKind[] = [
   },
   {
     name: "resumed comment wake",
-    shows: ["## Earlier runs", "## Current request and continuation context"],
+    shows: ["## Earlier runs", "This is a new session; the handoff above has the task's history."],
     input: () => {
       const fixture = createPromptContextFixture();
       const comments = fixture.paperclipWake.comments.map(({ id, body }) => ({ id, body }));
@@ -158,7 +158,7 @@ const kinds: RunKind[] = [
   },
   {
     name: "comment with an open plan review",
-    shows: ["Open plan comments to incorporate:", "## Open document annotations", "Rejected plan review directive:"],
+    shows: ["A person sent your plan back:", "There are open comments on the plan (revision 2):", "There are open comments on the document \"Release notes\":", "Rejected plan review directive:"],
     input: () => runInput(withBrief({
       paperclipTaskCommunicationGuidance: guidance,
       interactionKind: "request_confirmation",
@@ -233,7 +233,7 @@ const kinds: RunKind[] = [
   },
   {
     name: "recovery",
-    shows: ["Recovery contract:", "Run liveness continuation:"],
+    shows: ["Your last run on PAP-1 stopped before finishing: its process was lost (the process exited).", "Your last run on PAP-1 ended without concrete progress (attempt 1 of 2)."],
     input: () => runInput(withBrief({
       paperclipTaskCommunicationGuidance: guidance,
       paperclipWake: {
@@ -278,7 +278,7 @@ const kinds: RunKind[] = [
   },
   {
     name: "approval wake",
-    shows: ["- reason: approval_approved"],
+    shows: ["Your request was approved."],
     input: () => runInput(withBrief({
       paperclipTaskCommunicationGuidance: guidance,
       approvalId: "approval-1",
@@ -288,7 +288,7 @@ const kinds: RunKind[] = [
   },
   {
     name: "answered question",
-    shows: ["## Answered questions", "**Which date?** Monday."],
+    shows: ["A person answered your questions on PAP-1:", "> **Which date?** Monday."],
     // runtime-execution.ts adds questionResponse to the adapter's wake at dispatch.
     input: () => runInput(withBrief({
       paperclipTaskCommunicationGuidance: guidance,
@@ -307,7 +307,7 @@ const kinds: RunKind[] = [
   },
   {
     name: "execution review stage",
-    shows: ["- execution wake role: reviewer", "Review request instructions:"],
+    shows: ["You're the reviewer for PAP-1 \"Release ledger\", which an agent worked on.", "Instructions for the review:", "`paperclip_update_task`"],
     input: () => runInput(withBrief({
       paperclipTaskCommunicationGuidance: guidance,
       paperclipWake: {
@@ -386,6 +386,24 @@ describe("buildClaudeRunPromptPlan", () => {
       "task_brief.ancestors",
       "task_brief.closing",
     ]);
+  });
+
+  it("labels the wake with the claude_local renderer's parts", async () => {
+    const plan = await buildClaudeRunPromptPlan(kinds[0]!.input());
+    const wake = plan.fresh.find((section) => section.id === "wake")!;
+    expect(wake.source).toBe("context: paperclipWake, rendered by renderClaudeWake");
+    expect(wake.parts?.map((part) => part.id)).toEqual([
+      "wake.what_happened", "wake.event.assigned", "wake.task", "wake.to_do", "wake.common_rules",
+    ]);
+    expect(wake.parts?.find((part) => part.id === "wake.task")?.text).toContain("already checked out to you");
+    for (const set of [plan.fresh, plan.resumed]) {
+      const text = joinRunPromptSections(set);
+      expect(text).not.toContain("## Paperclip Wake Payload");
+      expect(text).not.toContain("Paperclip Resume Delta");
+    }
+    // An external chat turn keeps the shared renderer, labelled as such.
+    const chat = await buildClaudeRunPromptPlan(kinds[4]!.input());
+    expect(chat.fresh.find((section) => section.id === "wake")?.source).toContain("renderPaperclipWakePrompt");
   });
 
   it("labels a chat turn's brief with the chat directive and the completion update", async () => {

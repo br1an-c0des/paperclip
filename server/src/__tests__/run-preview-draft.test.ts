@@ -176,7 +176,10 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview of a task being
     expect(issuePart.pending).toMatch(/given when it's created/);
     expect(brief(real.prompt.firstMessage).parts!.find((part) => part.id === "task_brief.issue")!.pending).toBeUndefined();
     const wake = drafted.prompt.firstMessage.find((section) => section.id === "wake")!;
-    expect(wake.parts!.find((part) => part.id === "wake.workspace_branch")?.pending).toBeTruthy();
+    const taskLine = wake.parts!.find((part) => part.id === "wake.task")!;
+    expect(taskLine.text).toContain("branch `");
+    expect(taskLine.pending).toMatch(/names the branch/);
+    expect(taskLine.pending).toMatch(/given when it's created/);
   }, 90_000);
 
   it("takes the title from the description, and the workspace the draft chose", async () => {
@@ -193,7 +196,7 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview of a task being
     // The shared checkout: no worktree of its own, so no branch to name.
     expect(drafted.project?.checkout).toEqual({ kind: "local", path: seeded.repo });
     const wake = drafted.prompt.firstMessage.find((section) => section.id === "wake")!;
-    expect(wake.parts?.some((part) => part.id === "wake.workspace_branch")).toBe(false);
+    expect(wake.parts?.find((part) => part.id === "wake.task")?.text).not.toContain("branch `");
   }, 60_000);
 
   it("inserts nothing: no task, comment, run or wakeup", async () => {

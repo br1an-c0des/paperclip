@@ -2,6 +2,7 @@ import {
   asString,
   joinPromptSections,
   renderTemplate,
+  isPaperclipExternalChatQuestionResponseTurn,
   isPaperclipExternalChatTurn,
   renderPaperclipMcpNote,
   selectInitialCommunicationGuidance,
@@ -10,11 +11,13 @@ import {
   DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
   DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE,
 } from "@paperclipai/adapter-utils/server-utils";
+import { renderClaudeWake, type ClaudeWakeRenderOptions } from "./wake/render.js";
 
 /**
  * Today's `claude --print` first message, as one pure function (step 5, Task 1). The CLI engine
  * sends what this returns; the run prompt builder (`server/src/services/run-prompt/`) labels the
- * same text and is checked against it.
+ * same text and is checked against it. Its wake is the claude_local one (`wake/render.ts`, step 5
+ * phase 2), except on an external chat turn.
  */
 export interface ClaudeCliPromptInput {
   /** The adapter context, after `hydrateFreshSessionHandoff` for this attempt. */
@@ -51,10 +54,15 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
     !resumed && bootstrapPromptTemplate.trim().length > 0
       ? renderTemplate(bootstrapPromptTemplate, templateData).trim()
       : "";
-  const { taskContextNote, wakePrompt } = selectPaperclipPromptSections(context, {
+  const { taskContextNote, wakePrompt: sharedWakePrompt } = selectPaperclipPromptSections(context, {
     resumedSession: resumed,
     includeCommunicationGuidance: false,
   });
+  // The claude_local wake (step 5 phase 2), except for an external chat turn, which keeps the
+  // shared renderer's contract (dormant here).
+  const wakePrompt = usesSharedWake(context)
+    ? sharedWakePrompt
+    : renderClaudeWake(context.paperclipWake, claudeWakeOptions({ context, resumed, agentId: asString(templateData.agentId, "") }));
   const shouldUseResumeDeltaPrompt = resumed && wakePrompt.length > 0;
   const renderedPrompt = shouldUseResumeDeltaPrompt || isPaperclipRecoveryWakePayload(context.paperclipWake)
     ? ""
@@ -94,6 +102,29 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
     heartbeatPromptChars: renderedPrompt.length,
   };
   return { prompt, promptMetrics, sections };
+}
+
+/** An external chat turn keeps the shared wake renderer (its contract), not the claude_local one. */
+export function usesSharedWake(context: Record<string, unknown>): boolean {
+  return isPaperclipExternalChatTurn(context.paperclipWake) ||
+    isPaperclipExternalChatQuestionResponseTurn(context.paperclipWake);
+}
+
+/**
+ * The claude_local wake's options for one attempt: `context` is the attempt's, after
+ * `hydrateFreshSessionHandoff`, so a fresh session's handoff is on it.
+ */
+export function claudeWakeOptions(input: {
+  context: Record<string, unknown>;
+  resumed: boolean;
+  agentId: string;
+}): ClaudeWakeRenderOptions {
+  return {
+    agentId: input.agentId,
+    resumedSession: input.resumed,
+    conversationMode: input.context.conversationMode === true,
+    handoffPresent: !input.resumed && asString(input.context.paperclipFreshSessionHandoffMarkdown, "").trim().length > 0,
+  };
 }
 
 /** The heartbeat template a run renders: the agent's own, or the default for its kind of run. */

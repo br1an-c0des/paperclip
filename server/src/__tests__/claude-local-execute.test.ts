@@ -1443,7 +1443,8 @@ describe("claude execute", () => {
       expect(capture2.mcpConfigContents).not.toContain('"run-jwt-token"');
       if (change === "added") expect(capture2.mcpConfigContents).toContain("fresh-github-token");
       if (change === "removed") expect(capture2.mcpConfigContents).not.toContain("GitHub");
-      expect(capture2.prompt).toContain("## Paperclip Resume Delta");
+      expect(capture2.prompt).toContain("## What happened");
+      expect(capture2.prompt).toContain("Your session continues from your last run.");
       expect(capture2.prompt).not.toContain("Follow the paperclip heartbeat.");
     } finally {
       if (previousHome === undefined) delete process.env.HOME;
