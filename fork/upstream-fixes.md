@@ -1529,7 +1529,7 @@ Found 2026-11-23 by the step 5 research ([step-5-research.md](step-5-research.md
 
 ### 85. Say which approval an approval wake is about
 
-Found 2026-11-23 by the step 5 research.
+Found 2026-11-23 by the step 5 research. **Fixed** for `claude_local` in step 5's wake rework (`feat/step-5-wake`, 2026-11-24, [step-5-wake.md](step-5-wake.md#built)): the wake names the approval, its type, the decision and who made it, and quotes the note; an approval with no linked task gets a wake too. The shared renderer (ACP, dormant adapters) is unchanged.
 
 - **Problem:** `approval_approved` and `approval_cancelled` wakes (`server/src/routes/approvals.ts:235-253, 541-562`)
   put `approvalId` and `approvalStatus` on the run context, but the wake renderer
@@ -1575,7 +1575,7 @@ Found 2026-11-23 by the step 5 research.
 
 ### 89. Stop prompt texts naming Runner tools and curl recipes runs don't use
 
-Found 2026-11-23 by the step 5 research.
+Found 2026-11-23 by the step 5 research. **Partly fixed** in step 5's wake rework (`feat/step-5-wake`, 2026-11-24): `claude_local`'s new wake names no REST paths or Runner tools (a test checks), so the comments recipe, the rejected-plan steps and the Runner reviewer text are gone from its runs (the shared renderer, for ACP and the dormant adapters, still has them). The handoff, plan-truncation, attachment and chat texts remain.
 
 - **Problem:** since step 4a, runs work through the `paperclip_*` MCP tools, but several prompt
   texts still describe other tools:

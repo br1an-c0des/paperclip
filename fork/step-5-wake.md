@@ -1,6 +1,6 @@
 # Step 5, phase 2: the wake
 
-**Approved by the user, 2026-11-24.** The first section reworked in phase 2 of step 5
+**Approved by the user, 2026-11-24; built the same day ([Built](#built)).** The first section reworked in phase 2 of step 5
 ([step-5-prompt-builder.md](step-5-prompt-builder.md), "Later: changing the prompt"). The user
 chose direction B (below) on 2026-11-24, after reviewing the
 [Run Prompt Map](https://claude.ai/artifact/9hd4emcjFNG1uksCskvMsr) and the
@@ -23,6 +23,7 @@ the run's own code).
   - [How it's checked](#how-its-checked)
 - [Left to the builder](#left-to-the-builder)
 - [Calls made in this design](#calls-made-in-this-design)
+- [Built](#built)
 
 ## Intent
 
@@ -133,7 +134,7 @@ Laid out in the Wake Deep Dive with before-and-after text.
 <one sentence per event, in the order they happened>
 <the news, quoted>
 
-## Where things stand          (fresh sessions on a task with history, and recovery wakes)
+## Where things stand          (fresh sessions on a task with history)
 <the continuation summary, then the comments as quoted prose, capped>
 
 ## The task
@@ -215,7 +216,7 @@ written, as a Markdown block quote. Each row also gives the rules it adds to "Wh
 | The record's other contents: the interrupted-run note, the kept workspace and its files, the retry reason, recovery outcomes | Each becomes a sentence (the rows above), so nothing that only the record carried is lost. |
 | The new messages on a resumed session (`resumeDelta`) | Their source for the comments: every new or edited message since the last run is quoted as prose, not only the ones in this wake's batch. A comment an earlier turn already read is marked "(you've seen this)". |
 | The evidence JSON (completed actions, outcomes) | Not rendered. Completed actions come from the Runner's tool receipts and are empty for these runs (to confirm). The "don't redo finished steps" rule moves to the recovery events. |
-| The continuation summary (written after each run) | Kept on **fresh sessions and recovery wakes**, under "Where things stand", until the handoff's review decides where it belongs. Dropped on ordinary resumed wakes, which already know. |
+| The continuation summary (written after each run) | Kept on **fresh sessions** (built: recovery wakes on a resumed session drop it too), under "Where things stand", until the handoff's review decides where it belongs. Dropped on ordinary resumed wakes, which already know. |
 | Status, work mode, priority, checkout line and note, branch | "The task" line. |
 | Planning directive | Dropped from the wake; the task brief has it. |
 | Omitted comments | Kept as one line naming `paperclip_task_context`. |
@@ -321,3 +322,64 @@ Made by me while writing it; check these while reading.
   (`agentMessage`) get their own row, keeping their untrusted-data framing.
 - **An approval with no linked task gets a wake,** which relaxes one early return in the shared
   payload builder, for approvals only.
+
+## Built
+
+Built 2026-11-24 on `feat/step-5-wake` by two agents (payload, renderer), merged into `main` as
+`4241def070`. Plan: [step-5-wake-plan.md](step-5-wake-plan.md).
+
+- **Where it lives:** `packages/adapters/claude-local/src/server/wake/` (`render.ts`, `events.ts`,
+  `templates.ts`, `words.ts`, golden tests in `render.test.ts` over `__fixtures__/payloads.ts`). The
+  templates are a TypeScript module, not Markdown files: the adapter builds with `tsc` and ships
+  only `dist` and `skills` (plan decision 1). The payload's new fields are in
+  `server/src/services/heartbeat/run-preparation.ts` (`readWakeApproval`, `readWakeActor`,
+  `readWakeIssueContext`, `readWakeNames`), tested in `run-preparation.wake-fields.test.ts`.
+- **Changed from the design while building:**
+  - **"Where things stand" is on fresh sessions only,** recovery wakes included. A resumed
+    recovery wake repeated a long summary the session already held (real run 4 below). My call.
+  - **A `continue` event** for a continuation with no recovery object (the agent reported progress
+    with `continue: true`): "Paperclip woke you to continue TES-45 from where your last run left
+    off." Its rule names the three ways to end a run. A restored task with no active recovery also
+    reads as `continue` (the renderer agent's call).
+  - **A repair event stands alone:** a disposition repair or recovery wake shows only that event,
+    not a retry or interruption sentence beside it. "This is a retry" is only for `task_retry`,
+    `retry_failed_run` and `transient_failure_retry`.
+  - **`wake.earlier_comments`:** on a resumed session, comments an earlier run already received are
+    quoted under "(you've seen this)" rather than as news, with no "reply" rule.
+  - **Left-out comments** point at `paperclip_read_task` (reads up to 100), not
+    `paperclip_task_context`.
+  - **External chat turns** (`usesSharedWake`) keep the shared renderer; they're dormant here.
+- **What the data can't say yet:** "Status changed" can't name the old status, "Blocker resolved"
+  can't name the task that finished, and a monitor wake has no note: the wake's context doesn't
+  carry them, and the design said to say less rather than add tracking.
+- **Limits:**
+  - The preview can't know who will cause a future wake, so it shows the wording without "by
+    <name>".
+  - An agent repairing someone else's task can resolve the recovery only with
+    `paperclip_call_api`, which agents don't get by default. Rare.
+- **Real runs** on the desktop dev instance with "M7 test sealed runner" (paused between runs), on
+  `5234d7ea2c`. The record matched what was sent in every run (`matchedPlan` true):
+  1. a comment on a resumed session (`3cca4343`): the agent did what the quoted comment asked;
+  2. questions answered (`da19589b`): it used the answer and didn't ask again;
+  3. an approval approved (`ecd990d4`): the wake named the request and quoted the note, which the
+     agent followed;
+  4. a fresh session on a task with history (`e365cdbd`): "Where things stand" gave the history as
+     readable quotes, and the agent summed up the agreement correctly. The first message was
+     20,234 characters, because the handoff and "Where things stand" both carry the history: for
+     the handoff (M3) review;
+  5. a review stage (`b3354c6f`): it approved with `paperclip_update_task` and a comment, and the
+     stage completed.
+
+  The first test task caused six runs in 40 seconds: it told the agent to end with
+  `paperclip_report_progress` without `continue`, which Paperclip doesn't count as an ending, so
+  disposition repairs followed. Those repair wakes showed the six bugs fixed in `9c6f892881` and
+  `940fd6d744`. After the fixes, on `49d1d5f3a8`, a
+  repair wake was caused on purpose (TES-47, first run `23052e6d` ended without an ending): the
+  repair run (`7a87b2db`, resumed, 3,258 characters) showed only "Your last run on TES-47 ended
+  without finishing, blocking or reporting progress (attempt 1 of 2)." and its rule, and the agent
+  finished the task.
+- **Checks:** the local checks passed on `5234d7ea2c` and again on `49d1d5f3a8`, plus the four
+  extended files covering the wake payload (54 tests).
+- **Bugs:** 85 (approval wakes) is fixed for `claude_local`. 89's wake parts are fixed (the
+  comments recipe, the rejected-plan steps, the Runner reviewer text); its handoff, plan-truncation,
+  attachment and chat parts remain. Found along the way: 93, 94, 95.

@@ -271,6 +271,9 @@ Nothing agents receive changes.
 **Not approved; to be decided** once the current prompts can be seen in the UI (2026-11-23). Kept
 here as the options discussed, so the decision starts from them.
 
+**Started 2026-11-24 as phase 2,** one section at a time: the wake is designed and built
+([step-5-wake.md](step-5-wake.md)); the handoff is next.
+
 - **Ideas discussed:**
   - drop text for features this setup doesn't use (about 10 of the renderer's 33 sections can't
     fire here, research section 3.3; connections are live since 4b, so their text is checked, not
