@@ -113,14 +113,23 @@ export interface Ctx {
   sharedWorkspaceNote: PaperclipSharedWorkspaceNote | null;
 }
 
+/**
+ * The task's facts when they're about the wake's task, else null. The one test for whether the
+ * wake renders them, and so (legacy-prompt.ts, `runTaskReplacesBrief`) whether the brief is left out.
+ */
+export function runTaskForWake(wake: PaperclipWakePayload | null, value: unknown): PaperclipRunTask | null {
+  const facts = normalizePaperclipRunTask(value);
+  const issue = wake?.issue;
+  return facts && issue && (!issue.id || facts.issueId === issue.id) ? facts : null;
+}
+
 export function makeCtx(wake: PaperclipWakePayload, raw: unknown, options: ClaudeWakeRenderOptions): Ctx {
   const issue = wake.issue;
   const taskRef = issue?.identifier ?? (issue?.title ? `"${inline(issue.title)}"` : "the task");
   const task = issue?.identifier && issue.title
     ? t(TASK_LINE.titled, { identifier: issue.identifier, title: inline(issue.title) })
     : taskRef;
-  const facts = normalizePaperclipRunTask(options.runTask);
-  const runTask = facts && issue && (!issue.id || facts.issueId === issue.id) ? facts : null;
+  const runTask = runTaskForWake(wake, options.runTask);
   return {
     wake,
     raw,

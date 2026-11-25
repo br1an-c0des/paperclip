@@ -363,7 +363,86 @@ const kinds: RunKind[] = [
       },
     }, { issue: { ...issue, description } })),
   },
+  // Step 5 phase 2, the task brief: with the task's facts there's no brief on a non-chat task.
+  {
+    name: "fresh assignment with the task's facts",
+    shows: ["Part of PAP-0 \"Launch\" (in progress).", "The description:\n\n> Keep the release ledger current", "The plan (revision 1):\n\n> 1. Draft the ledger.", "- Start the work on PAP-1."],
+    input: () => {
+      const input = kinds[0]!.input();
+      return runInput({ ...input.context, paperclipRunTask: runTaskFacts() });
+    },
+  },
+  {
+    name: "planning task with the task's facts",
+    shows: ["work mode: planning", "`paperclip_request_plan_review`", "As a first step, give the task a short title"],
+    input: () => runInput(withBrief({
+      issueId: issue.id,
+      wakeReason: "issue_assigned",
+      paperclipTaskCommunicationGuidance: guidance,
+      paperclipWake: { reason: "issue_assigned", issue: { ...issue, workMode: "planning", description, assigneeAgentId: agent.id }, comments: [],
+        fallbackFetchNeeded: false, checkedOutByHarness: true },
+      paperclipRunTask: runTaskFacts({ workMode: "planning", titleNeedsGeneration: true }),
+      paperclipSharedWorkspaceNote: { heldByRunId: "run-2", heldByIssue: "PAP-2" },
+    }, { issue: { ...issue, workMode: "planning", titleNeedsGeneration: true, description } })),
+  },
+  {
+    name: "recovery by another agent with the task's facts",
+    shows: ["Get the task moving again; don't do its work yourself."],
+    input: () => runInput(withBrief({
+      paperclipTaskCommunicationGuidance: guidance,
+      paperclipWake: {
+        reason: "source_scoped_recovery_action",
+        issue: { ...issue, workMode: "planning", description, assigneeAgentId: "agent-2" },
+        recovery: { cause: "process_lost", originalAssignee: { id: "agent-2", name: "Coder" }, attemptCount: 1, maxAttempts: 3 },
+        comments: [],
+        fallbackFetchNeeded: false,
+      },
+      paperclipRunTask: runTaskFacts({ workMode: "planning" }),
+    }, { issue: { ...issue, workMode: "planning", description } })),
+  },
+  {
+    name: "fresh session with history and the task's facts",
+    shows: ["## Where things stand", "Documents on this task: plan (under \"The task\" below), notes.", "The plan (revision 1):"],
+    input: () => {
+      const fixture = createPromptContextFixture();
+      const comments = fixture.paperclipWake.comments.map(({ id, body }) => ({ id, body }));
+      const history = { ...wakeHistory, documents: [{ key: "plan", title: null, inBrief: true }, ...wakeHistory.documents] };
+      return runInput(withBrief({
+        ...fixture,
+        paperclipTaskCommunicationGuidance: guidance,
+        paperclipWake: { ...fixture.paperclipWake, history },
+        paperclipRunTask: runTaskFacts({ description: fixture.paperclipWake.issue.description }),
+      }, {
+        issue: { ...issue, description: fixture.paperclipWake.issue.description },
+        wakeComments: comments,
+      }), { loadFreshSessionHandoff: async () => "## Earlier runs\n\nThe ledger was drafted in run prior-run." });
+    },
+  },
 ];
+
+/** `context.paperclipRunTask` for PAP-1, as the server's task context sets it on a non-chat task. */
+function runTaskFacts(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    issueId: issue.id,
+    ancestors: [{ identifier: "PAP-0", title: "Launch", status: "in_progress" }],
+    ancestorsOmitted: 0,
+    description,
+    descriptionChangedSinceLastRun: false,
+    plan: { revisionNumber: 1, body: "1. Draft the ledger.", truncatedFrom: null, changedSinceLastRun: false },
+    workMode: "standard",
+    titleNeedsGeneration: false,
+    rejectedPlan: null,
+    acceptedPlan: null,
+    wakeCommentAttachments: [],
+    attachmentOmissions: [],
+    prefixParts: [],
+    compactedSinceLastRun: false,
+    ...overrides,
+  };
+}
+
+const kind = (name: string) => kinds.find((entry) => entry.name === name)!;
+const WAKE_SECTION_IDS = ["what_happened", "where_things_stand", "the_task", "to_do"];
 
 describe("buildClaudeRunPromptPlan", () => {
   it.each(kinds.map((kind) => [kind.name, kind] as const))("joins to today's prompt: %s", async (_name, kind) => {
@@ -387,9 +466,13 @@ describe("buildClaudeRunPromptPlan", () => {
       }
       expect(new Set(set.map((section) => section.id)).size).toBe(set.length);
     }
-    const wake = plan.fresh.find((section) => section.id === "wake");
-    if (wake) expect(wake.parts?.length ?? 0).toBeGreaterThan(0);
-    expect(plan.fresh.find((section) => section.id === "task_brief")?.parts?.length ?? 0).toBeGreaterThan(0);
+    for (const section of plan.fresh.filter((entry) => entry.id === "wake" || WAKE_SECTION_IDS.includes(entry.id))) {
+      expect(section.parts?.length ?? 0, section.id).toBeGreaterThan(0);
+    }
+    // Without the task's facts the brief is sent, with its parts; with them, there's none.
+    const brief = plan.fresh.find((section) => section.id === "task_brief");
+    if (input.context.paperclipRunTask) expect(brief).toBeUndefined();
+    else expect(brief?.parts?.length ?? 0).toBeGreaterThan(0);
   });
 
   it("labels a fresh assignment's sections in order, with their delivery", async () => {
@@ -397,17 +480,21 @@ describe("buildClaudeRunPromptPlan", () => {
     expect(plan.fresh.map((section) => section.id)).toEqual([
       "instructions_directive",
       "communication_guidance",
-      "wake",
+      "what_happened",
+      "the_task",
+      "to_do",
       "task_brief",
       "mcp_note",
       "heartbeat_template",
     ]);
-    expect(plan.resumed.map((section) => section.id)).toEqual(["instructions_directive", "wake", "task_brief"]);
+    expect(plan.resumed.map((section) => section.id)).toEqual(["instructions_directive", "what_happened", "the_task", "to_do", "task_brief"]);
     const delivery = Object.fromEntries(plan.fresh.map((section) => [section.id, section.delivery]));
     expect(delivery).toEqual({
       instructions_directive: "every_run",
       communication_guidance: "fresh_only",
-      wake: "every_run",
+      what_happened: "every_run",
+      the_task: "every_run",
+      to_do: "every_run",
       task_brief: "every_run",
       mcp_note: "fresh_only",
       heartbeat_template: "fresh_only",
@@ -428,14 +515,19 @@ describe("buildClaudeRunPromptPlan", () => {
     ]);
   });
 
-  it("labels the wake with the claude_local renderer's parts", async () => {
+  it("labels the wake's four headings as sections, with the claude_local renderer's parts", async () => {
     const plan = await buildClaudeRunPromptPlan(kinds[0]!.input());
-    const wake = plan.fresh.find((section) => section.id === "wake")!;
-    expect(wake.source).toBe("context: paperclipWake, rendered by renderClaudeWake");
-    expect(wake.parts?.map((part) => part.id)).toEqual([
-      "wake.what_happened", "wake.event.assigned", "wake.task", "wake.to_do", "wake.common_rules",
-    ]);
-    expect(wake.parts?.find((part) => part.id === "wake.task")?.text).toContain("already checked out to you");
+    expect(plan.fresh.some((section) => section.id === "wake")).toBe(false);
+    const byId = (id: string) => plan.fresh.find((section) => section.id === id)!;
+    expect(byId("what_happened")).toMatchObject({ label: "What happened", reason: "assigned the task" });
+    expect(byId("what_happened").parts?.map((part) => part.id)).toEqual(["wake.what_happened", "wake.event.assigned"]);
+    expect(byId("the_task").label).toBe("The task");
+    expect(byId("the_task").reason).toBe("the task in one line; the task brief follows");
+    expect(byId("the_task").parts?.map((part) => part.id)).toEqual(["wake.task"]);
+    expect(byId("the_task").text).toContain("already checked out to you");
+    expect(byId("to_do").label).toBe("What to do now");
+    expect(byId("to_do").parts?.map((part) => part.id)).toEqual(["wake.to_do", "wake.common_rules"]);
+    for (const id of ["what_happened", "the_task", "to_do"]) expect(byId(id).text.startsWith("## ")).toBe(true);
     for (const set of [plan.fresh, plan.resumed]) {
       const text = joinRunPromptSections(set);
       expect(text).not.toContain("## Paperclip Wake Payload");
@@ -475,14 +567,15 @@ describe("buildClaudeRunPromptPlan", () => {
   });
 
   it("leaves out the handoff where the wake has the history (step 5 phase 2)", async () => {
-    const kind = (name: string) => kinds.find((entry) => entry.name === name)!;
     const plan = await buildClaudeRunPromptPlan(kind("fresh session with history").input());
     const section = plan.fresh.find((entry) => entry.id === "communication_guidance")!;
     expect(section.parts?.map((part) => part.id)).toEqual(["communication_guidance.guidance"]);
     expect(section.reason).not.toContain("handoff follows");
     expect(joinRunPromptSections(plan.fresh)).not.toContain("## Earlier runs");
-    const wake = plan.fresh.find((entry) => entry.id === "wake")!;
-    expect(wake.parts?.map((part) => part.id)).toEqual(expect.arrayContaining(["wake.where_things_stand", "wake.last_run", "wake.documents"]));
+    const where = plan.fresh.find((entry) => entry.id === "where_things_stand")!;
+    expect(where.parts?.map((part) => part.id)).toEqual(["wake.where_things_stand", "wake.last_run", "wake.documents"]);
+    expect(where.delivery).toBe("fresh_only");
+    expect(plan.resumed.some((entry) => entry.id === "where_things_stand")).toBe(false);
     // A chat task's fresh session keeps it.
     const chat = await buildClaudeRunPromptPlan(kind("chat turn with a handoff").input());
     expect(chat.fresh.find((entry) => entry.id === "communication_guidance")?.parts?.map((part) => part.id))
@@ -506,7 +599,48 @@ describe("buildClaudeRunPromptPlan", () => {
     expect(brief.text).toBe("null");
     expect(brief.reason).toContain("bug 84");
     expect(brief.parts?.map((part) => part.id)).toEqual(["task_brief.null"]);
-    expect(plan.fresh.some((section) => section.id === "wake")).toBe(false);
+    expect(plan.fresh.some((section) => section.id === "wake" || WAKE_SECTION_IDS.includes(section.id))).toBe(false);
+  });
+
+  describe("the task's facts: four sections and no brief (step 5 phase 2, the task brief)", () => {
+    it("a fresh and a resumed run on a non-chat task have no task brief", async () => {
+      const plan = await buildClaudeRunPromptPlan(kind("fresh assignment with the task's facts").input());
+      expect(plan.fresh.map((section) => section.id)).toEqual([
+        "instructions_directive", "communication_guidance", "what_happened", "the_task", "to_do", "mcp_note", "heartbeat_template",
+      ]);
+      expect(plan.resumed.map((section) => section.id)).toEqual(["instructions_directive", "what_happened", "the_task", "to_do"]);
+      for (const set of [plan.fresh, plan.resumed]) expect(joinRunPromptSections(set)).not.toContain("Paperclip task context");
+      const task = plan.fresh.find((section) => section.id === "the_task")!;
+      expect(task.parts?.map((part) => part.id)).toEqual(["wake.task", "wake.task.parents", "wake.task.description", "wake.task.plan"]);
+      expect(task.reason).toBe("the task with its parents, description and plan; no separate brief");
+      const resumedTask = plan.resumed.find((section) => section.id === "the_task")!;
+      expect(resumedTask.parts?.map((part) => part.id)).toEqual(["wake.task"]);
+      expect(resumedTask.reason).toContain("what changed since the session's last run");
+    });
+
+    it("a planning task's rules and the shared-workspace rule are parts of \"What to do now\"", async () => {
+      const plan = await buildClaudeRunPromptPlan(kind("planning task with the task's facts").input());
+      const toDo = plan.fresh.find((section) => section.id === "to_do")!;
+      expect(toDo.parts?.map((part) => part.id)).toEqual(["wake.to_do", "wake.to_do.task_rules", "wake.to_do.shared_workspace", "wake.common_rules"]);
+      expect(toDo.text).toContain("A run on PAP-2 is using this workspace too");
+      expect(toDo.reason).toContain("the task's rules that apply");
+    });
+
+    it("a recovery agent gets no task rules", async () => {
+      const plan = await buildClaudeRunPromptPlan(kind("recovery by another agent with the task's facts").input());
+      const text = joinRunPromptSections(plan.fresh);
+      expect(text).not.toMatch(/planning mode|paperclip_request_plan_review/);
+      expect(plan.fresh.some((section) => section.id === "task_brief")).toBe(false);
+    });
+
+    it("a chat run records the four headings and the brief; an external chat turn, one wake", async () => {
+      const chat = await buildClaudeRunPromptPlan(kind("chat turn").input());
+      expect(chat.fresh.map((section) => section.id)).toEqual(expect.arrayContaining(["what_happened", "the_task", "to_do", "task_brief"]));
+      expect(chat.fresh.map((section) => section.id).indexOf("task_brief")).toBeGreaterThan(chat.fresh.map((section) => section.id).indexOf("to_do"));
+      const external = await buildClaudeRunPromptPlan(kind("external chat turn").input());
+      expect(external.fresh.map((section) => section.id)).toContain("wake");
+      expect(external.fresh.some((section) => WAKE_SECTION_IDS.includes(section.id))).toBe(false);
+    });
   });
 
   it("says when the templates are the agent's own settings", async () => {
@@ -606,8 +740,12 @@ describePostgres("buildClaudeRunPromptPlan on a prepared context", () => {
     const plan: RunPromptPlan = await buildClaudeRunPromptPlan(input);
     expect(joinRunPromptSections(plan.fresh)).toBe(await sentPrompt(input, false));
     expect(joinRunPromptSections(plan.resumed)).toBe(await sentPrompt(input, true));
-    const brief = plan.fresh.find((section) => section.id === "task_brief")!;
-    expect(brief.parts?.map((part) => part.id)).toContain("task_brief.description");
+    // With the task's facts (step 5 phase 2, the task brief) the description is under "The task"
+    // and there's no brief; without them, the brief carries it.
+    const holder = context.paperclipRunTask
+      ? { section: "the_task", part: "wake.task.description" }
+      : { section: "task_brief", part: "task_brief.description" };
+    expect(plan.fresh.find((section) => section.id === holder.section)?.parts?.map((part) => part.id)).toContain(holder.part);
     expect(JSON.stringify(plan)).not.toContain(secret);
     expectPartsJoin(plan.fresh);
     expectPartsJoin(plan.resumed);
