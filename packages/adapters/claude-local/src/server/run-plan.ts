@@ -26,7 +26,13 @@ import {
 } from "@paperclipai/adapter-utils/server-utils";
 import { buildSkillLibraryManifestMarkdown } from "@paperclipai/adapter-utils/skill-library-manifest";
 import { resolveClaudeDesiredSkillNames } from "./skills.js";
-import { claudeInstructionsLocation } from "./standing-texts.js";
+import {
+  CLAUDE_INSTRUCTIONS_RELATIVE_NOTE,
+  claudeIdentityLine,
+  claudeInstructionsLocation,
+  claudeSkillsSection,
+  WORKING_IN_PAPERCLIP,
+} from "./standing-texts.js";
 import {
   CLAUDE_CREDENTIAL_MISSING,
   PAPERCLIP_MCP_UNAVAILABLE,
@@ -501,12 +507,15 @@ export interface ClaudeRunSkillsAndInstructions {
   instructionsReadError: string | null;
   /** Set only when the instructions file was read. */
   instructionsPathDirective: string;
-  /** The bundle's instructions file contents: the agent's instructions and the skill library list. */
+  /**
+   * The bundle's instructions file contents (the system prompt). Sealed: who the agent is,
+   * Working in Paperclip, the agent's instructions and its skills, never null. Unsealed: the
+   * agent's instructions and the skill library list, or null.
+   */
   combinedInstructionsContents: string | null;
   /**
-   * `combinedInstructionsContents` as labelled system-prompt sections (step 5): the agent's
-   * instructions, then the skill library list. Their texts joined with a blank line are exactly
-   * `combinedInstructionsContents`; empty when that is null.
+   * `combinedInstructionsContents` as labelled system-prompt sections (step 5). Their texts
+   * joined with a blank line are exactly `combinedInstructionsContents`; empty when that is null.
    */
   systemPromptSections: RunPromptSection[];
 }
@@ -544,10 +553,19 @@ export async function planClaudeInstructionsDirective(
   return { directive, readError };
 }
 
-/** Reads the run's skills and the agent's instructions file; writes nothing. */
+/**
+ * Reads the run's skills and the agent's instructions file; writes nothing. A sealed run's system
+ * prompt is who the agent is, "Working in Paperclip", the agent's instructions (when the file was
+ * read) and its skills (step 5 phase 2, the system prompt); it holds no per-run value, so two
+ * runs of one agent with nothing changed share a bundle key. An unsealed run (the dormant remote
+ * paths) keeps the earlier text byte for byte. `context` is the run's adapter context.
+ */
 export async function planClaudeRunSkillsAndInstructions(input: {
   config: Record<string, unknown>;
   moduleDir: string;
+  agent: { id: string; name?: unknown; title?: unknown };
+  sealed: boolean;
+  context: Record<string, unknown>;
 }): Promise<ClaudeRunSkillsAndInstructions> {
   const { config } = input;
   const claudeSkillEntries = await readPaperclipRuntimeSkillEntries(config, input.moduleDir);
@@ -558,50 +576,18 @@ export async function planClaudeRunSkillsAndInstructions(input: {
   const { instructionsFilePath } = instructions;
   const instructionsPathDirective = instructions.directive;
   const instructionsReadError = instructions.readError;
-  let combinedInstructionsContents: string | null = instructions.content === null
-    ? null
-    : instructions.content + INSTRUCTIONS_LOCATION_NOTE;
-  const systemPromptSections: RunPromptSection[] = [];
-  if (instructions.content !== null) {
-    systemPromptSections.push(systemPromptSection({
-      id: "agent_instructions",
-      label: "Agent instructions",
-      reason: "the agent's instructions file was read",
-      source: `instructions file: ${instructionsFilePath}`,
-      parts: [
-        { id: "agent_instructions.file", label: "Instructions file", source: instructionsFilePath, text: instructions.content },
-        { id: "agent_instructions.location_note", label: "Location note", source: "claude_local run plan", text: INSTRUCTIONS_LOCATION_NOTE },
-      ],
-    }));
-  }
-  // Tell the model what the company library actually holds. Without this, an
-  // installed-but-not-enabled skill is indistinguishable from a nonexistent
-  // one from inside the sandbox, and agents tell users freshly installed
-  // skills "are not installed". Deterministic text appended to the
-  // instructions, so it participates in the prompt-bundle cache key and only
-  // busts the cache when the library really changes.
-  const skillLibraryManifest = buildSkillLibraryManifestMarkdown({
-    entries: claudeSkillEntries,
-    desiredSkillKeys: desiredSkillNames,
-  });
-  if (skillLibraryManifest) {
-    combinedInstructionsContents = combinedInstructionsContents
-      ? `${combinedInstructionsContents}\n\n${skillLibraryManifest}`
-      : skillLibraryManifest;
-    systemPromptSections.push(systemPromptSection({
-      id: "skill_library",
-      label: "Company skill library",
-      reason: "the company has library skills",
-      source: "skill library manifest",
-      parts: [{ id: "skill_library.list", label: "Skill list", source: "company skill library", text: skillLibraryManifest }],
-    }));
-  }
   // Missing-source entries must never reach the bundle: their path does not
   // exist, so the bundle hasher would throw and fail the whole run over one
   // broken skill.
   const desiredSkillEntries = claudeSkillEntries.filter((entry) => desiredSkillNames.has(entry.key));
   const mountableSkillEntries = desiredSkillEntries.filter((entry) => !isPaperclipSkillSourceMissing(entry));
   const missingSkillEntries = desiredSkillEntries.filter((entry) => isPaperclipSkillSourceMissing(entry));
+  const systemPromptSections = input.sealed
+    ? sealedSystemPromptSections({ agent: input.agent, instructions, claudeSkillEntries, desiredSkillNames })
+    : unsealedSystemPromptSections({ instructions, claudeSkillEntries, desiredSkillNames });
+  const combinedInstructionsContents = systemPromptSections.length > 0
+    ? systemPromptSections.map((section) => section.text).join("\n\n")
+    : null;
   return {
     claudeSkillEntries,
     desiredSkillNames,
@@ -615,10 +601,121 @@ export async function planClaudeRunSkillsAndInstructions(input: {
   };
 }
 
+type ClaudeInstructionsFileRead = Awaited<ReturnType<typeof readClaudeInstructionsFile>>;
+
+/** Each sealed section goes with every run; a resumed session reads it only after a compaction. */
+const SEALED_SYSTEM_REASON_SUFFIX = "; a resumed session uses it only after a compaction";
+
+/** A sealed run's system prompt (step 5 phase 2, the system prompt): always at least three sections. */
+function sealedSystemPromptSections(input: {
+  agent: { id: string; name?: unknown; title?: unknown };
+  instructions: ClaudeInstructionsFileRead;
+  claudeSkillEntries: RuntimeSkillEntry[];
+  desiredSkillNames: Set<string>;
+}): RunPromptSection[] {
+  const { agent, instructions } = input;
+  const identity = claudeIdentityLine(agent);
+  const name = typeof agent.name === "string" ? agent.name.trim() : "";
+  const title = typeof agent.title === "string" ? agent.title.trim() : "";
+  const identitySource = `the agent's ${name ? `name (${name})` : "id (it has no name)"}${title ? ` and title (${title})` : ""}`;
+  const sections: RunPromptSection[] = [
+    systemPromptSection({
+      id: "identity",
+      label: "Who you are",
+      delivery: "every_run",
+      reason: `every sealed run${SEALED_SYSTEM_REASON_SUFFIX}`,
+      source: identitySource,
+      parts: [{ id: "identity.line", label: "Agent identity", source: identitySource, text: identity }],
+    }),
+    systemPromptSection({
+      id: "working_in_paperclip",
+      label: "Working in Paperclip",
+      delivery: "every_run",
+      reason: `every sealed run${SEALED_SYSTEM_REASON_SUFFIX}`,
+      source: "claude_local: WORKING_IN_PAPERCLIP",
+      parts: [{ id: "working_in_paperclip.text", label: "Paperclip's rules", source: "claude_local: WORKING_IN_PAPERCLIP", text: WORKING_IN_PAPERCLIP }],
+    }),
+  ];
+  if (instructions.content !== null) {
+    sections.push(systemPromptSection({
+      id: "agent_instructions",
+      label: "Agent instructions",
+      delivery: "every_run",
+      reason: `the agent's instructions file was read${SEALED_SYSTEM_REASON_SUFFIX}`,
+      source: `instructions file: ${instructions.instructionsFilePath}`,
+      parts: [
+        { id: "agent_instructions.file", label: "Instructions file", source: instructions.instructionsFilePath, text: instructions.content },
+        { id: "agent_instructions.location_note", label: "Location note", source: "claude_local run plan", text: CLAUDE_INSTRUCTIONS_RELATIVE_NOTE },
+      ],
+    }));
+  }
+  // Only the agent's own skills, so installing a company skill doesn't change every agent's
+  // bundle key; the rest are a `paperclip_skills` call away (bug 92).
+  const skills = claudeSkillsSection({ entries: input.claudeSkillEntries, desiredSkillKeys: input.desiredSkillNames });
+  sections.push(systemPromptSection({
+    id: "skill_library",
+    label: "Skills",
+    delivery: "every_run",
+    reason: `every sealed run${SEALED_SYSTEM_REASON_SUFFIX}`,
+    source: "the agent's skills",
+    parts: [{ id: "skill_library.list", label: "Skill list", source: "the agent's skills", text: skills }],
+  }));
+  return sections;
+}
+
+/** An unsealed run's system prompt, as it was before step 5 phase 2: sent on fresh sessions only. */
+function unsealedSystemPromptSections(input: {
+  instructions: ClaudeInstructionsFileRead;
+  claudeSkillEntries: RuntimeSkillEntry[];
+  desiredSkillNames: Set<string>;
+}): RunPromptSection[] {
+  const { instructions } = input;
+  const systemPromptSections: RunPromptSection[] = [];
+  if (instructions.content !== null) {
+    systemPromptSections.push(systemPromptSection({
+      id: "agent_instructions",
+      label: "Agent instructions",
+      delivery: "fresh_only",
+      reason: "the agent's instructions file was read",
+      source: `instructions file: ${instructions.instructionsFilePath}`,
+      parts: [
+        { id: "agent_instructions.file", label: "Instructions file", source: instructions.instructionsFilePath, text: instructions.content },
+        { id: "agent_instructions.location_note", label: "Location note", source: "claude_local run plan", text: INSTRUCTIONS_LOCATION_NOTE },
+      ],
+    }));
+  }
+  // Tell the model what the company library actually holds. Without this, an
+  // installed-but-not-enabled skill is indistinguishable from a nonexistent
+  // one from inside the sandbox, and agents tell users freshly installed
+  // skills "are not installed". Deterministic text appended to the
+  // instructions, so it participates in the prompt-bundle cache key and only
+  // busts the cache when the library really changes.
+  const skillLibraryManifest = buildSkillLibraryManifestMarkdown({
+    entries: input.claudeSkillEntries,
+    desiredSkillKeys: input.desiredSkillNames,
+  });
+  if (skillLibraryManifest) {
+    systemPromptSections.push(systemPromptSection({
+      id: "skill_library",
+      label: "Company skill library",
+      delivery: "fresh_only",
+      reason: "the company has library skills",
+      source: "skill library manifest",
+      parts: [{ id: "skill_library.list", label: "Skill list", source: "company skill library", text: skillLibraryManifest }],
+    }));
+  }
+  return systemPromptSections;
+}
+
 /** A system-prompt section from its parts; its text is the parts' concatenation. */
 function systemPromptSection(input: {
   id: RunPromptSection["id"];
   label: string;
+  /**
+   * Sealed runs pass the file with every run (`every_run`); unsealed ones only on fresh sessions
+   * (`fresh_only`), and a resumed session keeps its own.
+   */
+  delivery: "every_run" | "fresh_only";
   reason: string;
   source: string;
   parts: Array<{ id: string; label: string; source: string; text: string }>;
@@ -628,8 +725,7 @@ function systemPromptSection(input: {
     id: input.id,
     label: input.label,
     placement: "system",
-    // Sent with --append-system-prompt-file on fresh sessions; a resumed session keeps its own.
-    delivery: "fresh_only",
+    delivery: input.delivery,
     reason: input.reason,
     source: input.source,
     text,
@@ -642,8 +738,9 @@ function systemPromptSection(input: {
 
 /**
  * The manifest of one attempt of a sealed run, from its sealed values, skills, MCP servers and
- * launch environment. `instructionsSent`: the agent's instructions went out with
- * `--append-system-prompt-file` (a fresh session, and the entry file was read).
+ * launch environment. `instructionsSent`: the system prompt file went out with
+ * `--append-system-prompt-file` (every sealed run; a resumed session uses it only after a
+ * compaction).
  */
 export function buildSealedRunManifest(input: {
   sealedRun: SealedClaudeRun;

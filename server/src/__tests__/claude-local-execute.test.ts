@@ -524,9 +524,8 @@ describe("claude execute", () => {
   /**
    * Regression tests for https://github.com/paperclipai/paperclip/issues/2848
    *
-   * --append-system-prompt-file should only be passed on fresh sessions.
-   * On resumed sessions the instructions are already in the session cache;
-   * re-injecting them wastes tokens and may be rejected by the CLI.
+   * --append-system-prompt-file was passed on fresh sessions only. Sealed runs now pass it on
+   * resumed sessions too (step 5 phase 2, bug 90): Claude ignores it until a compaction.
    */
   it("passes --append-system-prompt-file on a fresh session when instructionsFile is set", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-claude-exec-fresh-"));
@@ -562,11 +561,14 @@ describe("claude execute", () => {
     }
   });
 
-  it("omits --append-system-prompt-file on a resumed session even when instructionsFile is set", async () => {
+  // A sealed run passes the system prompt file on resumed sessions too (bug 90): Claude uses it
+  // only after a compaction, and the record lists it.
+  it("resumed sealed run passes --append-system-prompt-file and records the system prompt", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-claude-exec-resume-"));
     const { workspace, commandPath, capturePath, restore } = await setupExecuteEnv(root);
     const instructionsFile = path.join(root, "instructions.md");
     await fs.writeFile(instructionsFile, "# Agent instructions", "utf-8");
+    const records: Array<{ session: string; systemPrompt: Array<{ id: string; delivery: string }> }> = [];
     try {
       await execute({
         runId: "run-resume",
@@ -583,11 +585,46 @@ describe("claude execute", () => {
         context: {},
         authToken: "tok",
         onLog: async () => {},
-        onMeta: async () => {},
+        onMeta: async (meta) => { records.push(meta.promptRecord as never); },
       });
       const captured = JSON.parse(await fs.readFile(capturePath, "utf-8"));
-      expect(captured.argv).not.toContain("--append-system-prompt-file");
       expect(captured.argv).toContain("--resume");
+      expect(captured.argv).toContain("--append-system-prompt-file");
+      expect(captured.instructionsFilePath).toContain("agent-instructions.md");
+      expect(captured.instructionsContents).toContain("You are Test.");
+      expect(captured.instructionsContents).toContain("## Working in Paperclip");
+      expect(captured.instructionsContents).toContain("# Agent instructions");
+      expect(records).toHaveLength(1);
+      expect(records[0]!.session).toBe("resumed");
+      expect(records[0]!.systemPrompt.map((section) => section.id))
+        .toEqual(["identity", "working_in_paperclip", "agent_instructions", "skill_library"]);
+      expect(records[0]!.systemPrompt.every((section) => section.delivery === "every_run")).toBe(true);
+    } finally {
+      restore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("passes the system prompt file without an instructions file, fresh and resumed", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-claude-exec-no-agents-md-"));
+    const { workspace, commandPath, capturePath, restore } = await setupExecuteEnv(root);
+    try {
+      for (const sessionId of [null, "11111111-1111-4111-8111-111111111111"]) {
+        await execute({
+          runId: "run-no-agents-md",
+          agent: { id: "agent-1", companyId: "co-1", name: "Test", title: "QA", adapterType: "claude_local", adapterConfig: { engine: "cli" } },
+          runtime: { sessionId, sessionParams: null, sessionDisplayId: null, taskKey: null },
+          config: { engine: "cli", command: commandPath, cwd: workspace, env: { PAPERCLIP_TEST_CAPTURE_PATH: capturePath } },
+          context: {},
+          authToken: "tok",
+          onLog: async () => {},
+        });
+        const captured = JSON.parse(await fs.readFile(capturePath, "utf-8"));
+        expect(captured.argv.includes("--resume")).toBe(sessionId !== null);
+        expect(captured.argv).toContain("--append-system-prompt-file");
+        expect(captured.instructionsContents.startsWith("You are Test, QA.\n\n## Working in Paperclip")).toBe(true);
+        expect(captured.instructionsContents).toContain("## Skills");
+      }
     } finally {
       restore();
       await fs.rm(root, { recursive: true, force: true });
@@ -631,9 +668,9 @@ describe("claude execute", () => {
     }
   });
 
-  // A sealed run always has the `paperclip` MCP server, so its note stays; the bundle and
-  // instruction notes are left out.
-  it("commandNotes has no bundle or instructions note on a resumed session even when instructionsFile is set", async () => {
+  // A sealed run always has the `paperclip` MCP server, so its note stays. On a resume the bundle
+  // note is left out, and the system prompt note says Claude uses the file only after a compaction.
+  it("commandNotes on a resumed session say the system prompt file is used only after a compaction", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-claude-exec-notes-resume-"));
     const { workspace, commandPath, restore } = await setupExecuteEnv(root);
     const instructionsFile = path.join(root, "instructions.md");
@@ -658,7 +695,10 @@ describe("claude execute", () => {
         onMeta: async (meta) => { capturedNotes = (meta.commandNotes as string[]) ?? []; },
       });
       expect(capturedNotes).not.toContain("sentinel");
-      expect(capturedNotes.filter((note) => /prompt bundle|instructions/i.test(note))).toEqual([]);
+      expect(capturedNotes.filter((note) => /prompt bundle/i.test(note))).toEqual([]);
+      const fileNotes = capturedNotes.filter((note) => note.includes("--append-system-prompt-file"));
+      expect(fileNotes).toHaveLength(1);
+      expect(fileNotes[0]).toContain("only after a compaction");
     } finally {
       restore();
       await fs.rm(root, { recursive: true, force: true });
@@ -713,7 +753,8 @@ describe("claude execute", () => {
       expect(prompts[0]).not.toContain("FRESH_HANDOFF");
       expect(prompts[1]).toContain("FRESH_HANDOFF: original goal and prior decisions");
       expect(captured[0]?.argv).toContain("--resume");
-      expect(captured[0]?.argv).not.toContain("--append-system-prompt-file");
+      // A sealed resume passes the system prompt file too (bug 90).
+      expect(captured[0]?.argv).toContain("--append-system-prompt-file");
       expect(captured[1]?.argv).not.toContain("--resume");
       expect(captured[1]?.argv).toContain("--append-system-prompt-file");
       expect(captured[1]?.appendedSystemPromptFilePath).toContain("agent-instructions.md");
@@ -725,7 +766,8 @@ describe("claude execute", () => {
         `resolve relative paths in it from ${path.dirname(instructionsFile)}/.`,
       );
       expect(metaEvents).toHaveLength(2);
-      expect(metaEvents[0]?.commandNotes.filter((note) => /prompt bundle|instructions/i.test(note))).toEqual([]);
+      expect(metaEvents[0]?.commandNotes.filter((note) => /prompt bundle/i.test(note))).toEqual([]);
+      expect(metaEvents[0]?.commandNotes.some((note) => note.includes("only after a compaction"))).toBe(true);
       expect(metaEvents[1]?.commandNotes.some((note) => note.includes("--append-system-prompt-file"))).toBe(true);
       expect(result.sessionId).toBe("22222222-2222-4222-8222-222222222222");
       expect(result.clearSession).toBe(false);
@@ -1426,7 +1468,8 @@ describe("claude execute", () => {
       expect(capture1.pluginDir).toBeTruthy();
       expect(capture1.pluginDir).toBe(capture2.pluginDir);
       expect(capture1.instructionsFilePath).toBeTruthy();
-      expect(capture2.instructionsFilePath ?? null).toBeNull();
+      // A sealed resume passes the same bundle's system prompt file (bug 90).
+      expect(capture2.instructionsFilePath).toBe(capture1.instructionsFilePath);
       expect(capture1.pluginDir?.startsWith(expectedRoot)).toBe(true);
       expect(capture1.instructionsFilePath?.startsWith(expectedRoot)).toBe(true);
       expect(capture1.instructionsContents).toContain("You are managed instructions.");
@@ -1503,7 +1546,9 @@ describe("claude execute", () => {
         if (change === "location") {
           expect(capture.argv).toContain("--resume");
           expect(capture.argv).toContain("11111111-1111-4111-8111-111111111111");
-          expect(capture.instructionsFilePath).toBeNull();
+          // The same bundle's file, which holds no per-run path (bug 90).
+          expect(capture.instructionsFilePath).toBeTruthy();
+          expect(capture.instructionsContents).not.toContain(instructionsPath);
           expect(result.sessionParams?.promptBundleKey).toBe(previousBundleKey);
         } else {
           expect(capture.argv).not.toContain("--resume");

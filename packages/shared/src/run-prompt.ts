@@ -16,7 +16,10 @@ export type RunPromptPlacement = "system" | "first_message";
 export type RunPromptDelivery = "every_run" | "fresh_only" | "resumed_only";
 
 export type RunPromptSectionId =
-  // system prompt
+  // system prompt; a sealed claude_local run's opens with "identity" and
+  // "working_in_paperclip" (step 5 phase 2, the system prompt)
+  | "identity"
+  | "working_in_paperclip"
   | "agent_instructions"
   | "skill_library"
   // first message
@@ -80,7 +83,10 @@ export interface RunPromptPlan {
 export interface RunPromptRecord {
   version: 1;
   session: "fresh" | "resumed";
-  /** Fresh: the system prompt's parts as sent. Resumed: [] (Claude keeps the session's own). */
+  /**
+   * The system prompt's parts as sent; sealed runs send it every run, and a resumed session uses
+   * it only after a compaction. Unsealed resumed runs: [].
+   */
   systemPrompt: RunPromptSection[];
   firstMessage: RunPromptSection[];
   firstMessageChars: number;

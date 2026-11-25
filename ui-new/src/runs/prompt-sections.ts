@@ -70,9 +70,14 @@ const DELIVERY: Record<RunPromptDelivery, string> = {
   resumed_only: "Resumed sessions only",
 };
 
+/** Ends each system-prompt tip: sealed runs send the system prompt file with every run (bug 90). */
+const SYSTEM_EVERY_RUN = "Sent with every run; a resumed session keeps its own copy until it's compacted.";
+
 const SECTION_INFO: Record<RunPromptSectionId, string> = {
-  agent_instructions: "The agent's instructions file, added to Claude's own system prompt.",
-  skill_library: "The skills this run can load, listed so Claude knows they're there.",
+  identity: `Who the agent is: its name and job title. ${SYSTEM_EVERY_RUN}`,
+  working_in_paperclip: `Paperclip's rules for every run: how to end it, comments and commits, and when to open the paperclip skill. ${SYSTEM_EVERY_RUN}`,
+  agent_instructions: `The agent's instructions file, added to Claude's own system prompt. ${SYSTEM_EVERY_RUN}`,
+  skill_library: `The skills enabled for this agent, and where to find the rest of the company's library. ${SYSTEM_EVERY_RUN}`,
   instructions_directive: "Tells Claude where the agent's instructions came from, and how to find the files they mention.",
   bootstrap_template: "The agent's bootstrap prompt, sent when a session starts.",
   communication_guidance: "How to talk to people through Paperclip, and on a new session the handoff from the one before.",

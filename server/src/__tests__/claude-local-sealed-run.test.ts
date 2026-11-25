@@ -584,7 +584,8 @@ describe("sealed claude_local CLI runs: arguments, repo, prompt and manifest", (
       repoSkills: { enabled: false, reason: "no_project" },
       mcpServers: [{ name: "paperclip", url: "http://127.0.0.1:3100/api/mcp/paperclip" }],
       extraArgs: ["--debug"],
-      instructions: { entryFile: null, sent: false },
+      // A sealed run always sends its system prompt file, with or without AGENTS.md.
+      instructions: { entryFile: null, sent: true },
       session: { mode: "fresh", reason: "no_saved_session" },
     });
     expect(manifest.skills).toContainEqual({
@@ -613,7 +614,8 @@ describe("sealed claude_local CLI runs: arguments, repo, prompt and manifest", (
     expect(manifestOf(none.metas[0])).not.toHaveProperty("github");
   });
 
-  it("records the instructions as sent on a fresh session only", async () => {
+  // Sealed runs pass the system prompt file with every run (step 5 phase 2, bug 90).
+  it("manifest instructions.sent is true on a resumed sealed run", async () => {
     const instructions = path.join(root, "AGENTS.md");
     await fs.writeFile(instructions, "# M7 test agent\n", "utf8");
     const fresh = metaCollector();
@@ -627,7 +629,8 @@ describe("sealed claude_local CLI runs: arguments, repo, prompt and manifest", (
       runtime: { sessionId: null, sessionParams: first.sessionParams ?? null, sessionDisplayId: null, taskKey: null },
       onMeta: resumed.onMeta,
     }));
-    expect(manifestOf(resumed.metas[0]).instructions).toEqual({ entryFile: instructions, sent: false });
+    expect(manifestOf(resumed.metas[0]).session).toMatchObject({ mode: "resumed" });
+    expect(manifestOf(resumed.metas[0]).instructions).toEqual({ entryFile: instructions, sent: true });
   });
 
   it("starts fresh after the skill set changed, and says why", async () => {

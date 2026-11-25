@@ -454,7 +454,7 @@ async function executeClaudeCli(
     instructionsPathDirective,
     combinedInstructionsContents,
     systemPromptSections,
-  } = await planClaudeRunSkillsAndInstructions({ config, moduleDir: __moduleDir });
+  } = await planClaudeRunSkillsAndInstructions({ config, moduleDir: __moduleDir, agent, sealed: Boolean(sealed), context });
   if (instructionsReadError) {
     await onLog(
       "stderr",
@@ -827,10 +827,12 @@ async function executeClaudeCli(
       }
       if (effectiveEffort) args.push("--effort", effectiveEffort);
       if (maxTurns > 0) args.push("--max-turns", String(maxTurns));
-      // On resumed sessions the instructions are already in the session cache;
-      // re-injecting them via --append-system-prompt-file wastes 5-10K tokens
-      // per heartbeat and the Claude CLI may reject the combination outright.
-      if (attemptInstructionsFilePath && !resumeSessionId) {
+      // A sealed run passes the system prompt file on resumed sessions too (bug 90): Claude
+      // ignores it until the session is compacted, then rebuilds the system prompt from it. The
+      // session resumes only under the same bundle key, so it's the text the session started
+      // with. Unsealed runs (the dormant remote paths) pass it on fresh sessions only; the caller
+      // leaves `attemptInstructionsFilePath` unset there on a resume.
+      if (attemptInstructionsFilePath) {
         args.push("--append-system-prompt-file", attemptInstructionsFilePath);
       }
       if (sealed) {
@@ -900,9 +902,9 @@ async function executeClaudeCli(
           runtimeMcpServers,
           context,
           instructionsFilePath,
-          // The agent's instructions went out with --append-system-prompt-file: a fresh
-          // session, and the entry file was read (the directive is set only then).
-          instructionsSent: Boolean(instructionsPathDirective && input.attemptInstructionsFilePath && !input.resumeSessionId),
+          // The system prompt file went out with --append-system-prompt-file: every sealed run
+          // (a resumed session uses it only after a compaction).
+          instructionsSent: Boolean(input.attemptInstructionsFilePath),
           launchEnv,
           extraArgs,
           session,
@@ -921,7 +923,9 @@ async function executeClaudeCli(
         sealed: Boolean(sealed),
         env,
       });
-      const attemptInstructionsFilePath = resumeSessionId ? undefined : effectiveInstructionsFilePath;
+      // Sealed runs send the system prompt file with every run (bug 90); unsealed ones on fresh
+      // sessions only.
+      const attemptInstructionsFilePath = sealed || !resumeSessionId ? effectiveInstructionsFilePath : undefined;
       // What this attempt sent, as the heartbeat's prompt sections when they join to exactly
       // the prompt above; it records, and never changes, the text.
       const runPromptPlan = readRunPromptPlan(context);
@@ -946,7 +950,11 @@ async function executeClaudeCli(
           "Using full Claude permission bypass for remote execution, including connected tools.",
         );
       }
-      if (attemptInstructionsFilePath && !resumeSessionId) {
+      if (attemptInstructionsFilePath && sealed) {
+        commandNotes.push(resumeSessionId
+          ? `Passed the system prompt file with --append-system-prompt-file ${attemptInstructionsFilePath}; Claude uses it on this resumed session only after a compaction.`
+          : `Passed the system prompt file with --append-system-prompt-file ${attemptInstructionsFilePath} (with the current instructions location in the run prompt).`);
+      } else if (attemptInstructionsFilePath && !resumeSessionId) {
         commandNotes.push(
           `Injected agent instructions via --append-system-prompt-file ${instructionsFilePath} (with current file location in the run prompt)`,
         );

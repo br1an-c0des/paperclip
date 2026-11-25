@@ -140,8 +140,9 @@ describe("claude_local prompt record", () => {
     expect(joinRunPromptSections(record!.firstMessage)).toBe(captured[0]!.prompt);
     expect(record!.firstMessageChars).toBe(captured[0]!.prompt.length);
     expect(metas[0]!.prompt).toBe(captured[0]!.prompt);
-    expect(record!.systemPrompt.map((section) => section.id)[0]).toBe("agent_instructions");
-    expect(record!.systemPrompt[0]!.text.startsWith("# Ada\n\nKeep the ledger.\n")).toBe(true);
+    expect(record!.systemPrompt.map((section) => section.id))
+      .toEqual(["identity", "working_in_paperclip", "agent_instructions", "skill_library"]);
+    expect(record!.systemPrompt[2]!.text.startsWith("# Ada\n\nKeep the ledger.\n")).toBe(true);
     expect(record!.firstMessage.find((section) => section.id === "task_brief")?.parts?.map((part) => part.id))
       .toEqual(["task_brief.header", "task_brief.description"]);
     expect(logs.join("")).not.toContain("prompt sections didn't match");
@@ -151,12 +152,16 @@ describe("claude_local prompt record", () => {
     expect(invokeContext).not.toContain(PAPERCLIP_TASK_MARKDOWN_ASSIGNMENT_PARTS_KEY);
   });
 
-  it("records a resumed run's sections and no system prompt", async () => {
+  // A sealed resume sends the system prompt file too (bug 90), so its record lists it.
+  it("records a resumed run's sections and its system prompt", async () => {
     const { adapterContext, plan } = await adapterContextWithPlan(heartbeatContext(), config());
     const { captured, records } = await run({ context: adapterContext, config: config(), sessionId: OLD_SESSION });
     expect(captured).toHaveLength(1);
     expect(captured[0]!.argv).toContain("--resume");
-    expect(records[0]).toMatchObject({ session: "resumed", matchedPlan: true, systemPrompt: [] });
+    expect(records[0]).toMatchObject({ session: "resumed", matchedPlan: true });
+    expect(records[0]!.systemPrompt.map((section) => section.id))
+      .toEqual(["identity", "working_in_paperclip", "agent_instructions", "skill_library"]);
+    expect(captured[0]!.argv).toContain("--append-system-prompt-file");
     expect(records[0]!.firstMessage).toEqual(plan.resumed);
     expect(joinRunPromptSections(records[0]!.firstMessage)).toBe(captured[0]!.prompt);
   });
@@ -180,7 +185,7 @@ describe("claude_local prompt record", () => {
     expect(joinRunPromptSections(ran.firstMessage)).toBe(captured[1]!.prompt);
     expect(captured[1]!.prompt).toContain("Earlier: the ledger was drafted.");
     expect(ran.systemPrompt.length).toBeGreaterThan(0);
-    expect(records[0]!.systemPrompt).toEqual([]);
+    expect(records[0]!.systemPrompt).toEqual(ran.systemPrompt);
   });
 
   it("sends the same text with a plan, a mismatching plan and no plan, and records the latter two unsplit", async () => {
