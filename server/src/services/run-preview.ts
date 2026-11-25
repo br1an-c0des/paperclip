@@ -464,7 +464,7 @@ export function runPreviewService(db: Db) {
       runtimeToolDelivery: adapter.runtimeToolDelivery ?? "invocation_context",
     });
     const preview = await adapter.previewRun({
-      agent: { id: agent.id, companyId: agent.companyId, name: agent.name, adapterType: agent.adapterType, adapterConfig: agent.adapterConfig },
+      agent: { id: agent.id, companyId: agent.companyId, name: agent.name, title: agent.title, adapterType: agent.adapterType, adapterConfig: agent.adapterConfig },
       config: runtimeConfig,
       context,
       runtimeMcp: createAdapterRuntimeMcpAccess(servers),
@@ -476,7 +476,7 @@ export function runPreviewService(db: Db) {
     if (!preview.supported) return preview;
 
     const prompt = await buildRunPreviewPrompt(db, {
-      agent: { id: agent.id, companyId: agent.companyId, name: agent.name, adapterType: agent.adapterType, adapterConfig: agent.adapterConfig },
+      agent: { id: agent.id, companyId: agent.companyId, name: agent.name, title: agent.title, adapterType: agent.adapterType, adapterConfig: agent.adapterConfig },
       target: promptTarget,
       config: runtimeConfig,
       context,

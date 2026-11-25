@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { planClaudeInstructionsDirective, planClaudeRunSkillsAndInstructions } from "./run-plan.js";
+import { claudeInstructionsLocation } from "./standing-texts.js";
 
 // The run plan's prompt pieces (step 5, Task 4): the directive on its own, and the system prompt
 // as labelled sections that join to the bundle's instructions file.
@@ -28,7 +29,7 @@ describe("planClaudeInstructionsDirective", () => {
     const plan = await planClaudeRunSkillsAndInstructions({ config, moduleDir });
     const { directive, readError } = await planClaudeInstructionsDirective(config);
     expect(directive).toBe(plan.instructionsPathDirective);
-    expect(directive).toContain(`loaded from ${instructionsFilePath}`);
+    expect(directive).toBe(claudeInstructionsLocation(instructionsFilePath));
     expect(readError).toBeNull();
   });
 

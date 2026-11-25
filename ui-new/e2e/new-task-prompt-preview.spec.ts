@@ -17,13 +17,13 @@ const section = (id: RunPromptSection["id"], label: string, text: string, extra:
 function prompt(title: string): RunPromptPreview {
   const issue = `- Issue: "MSE-99"\n- Title: "${title}"`;
   const firstMessage = [
+    section("heartbeat_template", "Who you are", "You are M7 test Builder, Builder."),
     section("task_brief", "Task brief", issue, {
       parts: [{
         id: "task_brief.issue", label: "Issue", source: "task: identifier and title", text: issue, chars: issue.length,
         pending: "The task's id and identifier are given when it's created; the identifier shown is the next one, which another task can take first.",
       }],
     }),
-    section("heartbeat_template", "Heartbeat template", "M7 test: do the work."),
   ];
   return {
     kind: "assignment",

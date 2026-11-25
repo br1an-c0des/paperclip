@@ -353,7 +353,7 @@ async function executeClaudeCli(
   const executionTargetIsRemote = adapterExecutionTargetIsRemote(executionTarget);
   const executionTargetIsSandbox = executionTarget?.kind === "remote" && executionTarget.transport === "sandbox";
 
-  const promptTemplate = resolveClaudePromptTemplate(config, context);
+  const promptTemplate = resolveClaudePromptTemplate(config);
   const effort = asString(config.effort, "");
   const chrome = asBoolean(config.chrome, false);
   const maxTurns = asNumber(config.maxTurnsPerRun, 0);
@@ -792,7 +792,6 @@ async function executeClaudeCli(
         `[paperclip] Claude runtime MCP server set changed; loading current tools when resuming session "${runtimeSessionId}".\n`,
       );
     }
-    const bootstrapPromptTemplate = asString(config.bootstrapPromptTemplate, "");
     const templateData = {
       agentId: agent.id,
       companyId: agent.companyId,
@@ -917,7 +916,6 @@ async function executeClaudeCli(
         context,
         resumed: Boolean(resumeSessionId),
         instructionsPathDirective,
-        bootstrapPromptTemplate,
         promptTemplate,
         templateData,
         sealed: Boolean(sealed),
