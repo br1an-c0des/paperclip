@@ -126,11 +126,11 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 85 | [Say which approval an approval wake is about](#85-say-which-approval-an-approval-wake-is-about) | candidate | | | 2026-11-23 | | |
 | 86 | [Send the chat directive once per chat session, not every turn](#86-send-the-chat-directive-once-per-chat-session-not-every-turn) | candidate | | | 2026-11-23 | | |
 | 87 | [Store a run's whole prompt, not the first 16,384 characters](#87-store-a-runs-whole-prompt-not-the-first-16384-characters) | fixed (step 5, `5c3cea6c21`) | | | 2026-11-23 | | |
-| 88 | [Give `claude_local` runs the instruction working-copy guidance](#88-give-claude_local-runs-the-instruction-working-copy-guidance) | candidate | | | 2026-11-23 | | |
+| 88 | [Give `claude_local` runs the instruction working-copy guidance](#88-give-claude_local-runs-the-instruction-working-copy-guidance) | fixed (step 5, `41427fffda`) | | | 2026-11-23 | | |
 | 89 | [Stop prompt texts naming Runner tools and curl recipes runs don't use](#89-stop-prompt-texts-naming-runner-tools-and-curl-recipes-runs-dont-use) | candidate | | | 2026-11-23 | | |
-| 90 | [Keep the agent's instructions after Claude compacts a session](#90-keep-the-agents-instructions-after-claude-compacts-a-session) | candidate | | | 2026-11-23 | | |
+| 90 | [Keep the agent's instructions after Claude compacts a session](#90-keep-the-agents-instructions-after-claude-compacts-a-session) | fixed (step 5, `41427fffda`) | | | 2026-11-23 | | |
 | 91 | [Show a run's whole prompt size in the Transcript tab's prompt card](#91-show-a-runs-whole-prompt-size-in-the-transcript-tabs-prompt-card) | candidate | | | 2026-11-24 | | |
-| 92 | [List the whole company skill library in a run's system prompt, as intended](#92-list-the-whole-company-skill-library-in-a-runs-system-prompt-as-intended) | candidate | | | 2026-11-24 | | |
+| 92 | [List the whole company skill library in a run's system prompt, as intended](#92-list-the-whole-company-skill-library-in-a-runs-system-prompt-as-intended) | fixed (step 5, `41427fffda`) | | | 2026-11-24 | | |
 | 93 | [A run preview on a finished task fails with a server error](#93-a-run-preview-on-a-finished-task-fails-with-a-server-error) | candidate | | | 2026-11-24 | | |
 | 94 | [An "Other" answer shows its option id in the answer summary](#94-an-other-answer-shows-its-option-id-in-the-answer-summary) | candidate | | | 2026-11-24 | | |
 | 95 | [A comment an earlier run handled is sent again as new](#95-a-comment-an-earlier-run-handled-is-sent-again-as-new) | candidate | | | 2026-11-24 | | |
@@ -1569,7 +1569,7 @@ Found 2026-11-23 by the step 5 research. **Fixed** in step 5 (merged as `5c3cea6
 
 ### 88. Give `claude_local` runs the instruction working-copy guidance
 
-Found 2026-11-23 by the step 5 research.
+Found 2026-11-23 by the step 5 research. **Fixed** for `claude_local` CLI runs in step 5's system prompt batch (merged as `41427fffda`, 2026-11-25, [step-5-system-prompt.md](step-5-system-prompt.md#built)): the server tells the adapter what kind of instructions copy the run has (`context.paperclipInstructionCopy`), and the first message's instructions line becomes one line naming the agent directory and saying changes are kept. The long note (and the 403 path's note) no longer reaches these runs, with or without a task. ACP and the other adapters still get the long note.
 
 - **Problem:** the instruction working-copy guidance ("Your persistent agent directory is …",
   where the agent can edit its own instruction files) is appended only to `paperclipTaskMarkdown`
@@ -1598,7 +1598,7 @@ Found 2026-11-23 by the step 5 research. **Partly fixed** in step 5's wake rewor
 ### 90. Keep the agent's instructions after Claude compacts a session
 
 Found 2026-11-23 while designing step 5, by testing Claude Code 2.1.325 by hand (`claude --print`,
-Haiku, the sealed run's `--strict-mcp-config --setting-sources user`, a throwaway folder).
+Haiku, the sealed run's `--strict-mcp-config --setting-sources user`, a throwaway folder). **Fixed** for sealed `claude_local` CLI runs in step 5's system prompt batch (merged as `41427fffda`, 2026-11-25, [step-5-system-prompt.md](step-5-system-prompt.md#built)): `--append-system-prompt-file` goes with resumed runs too. Checked by hand again on 2026-11-25 (2.1.325): after `/compact`, a resume with the file kept the system prompt and one without it lost it. The image installs the latest CLI, so the check is repeated before the deploy.
 
 - **Problem:** Claude saves a session's system prompt when the session starts and restores that
   copy on every `--resume`; a different `--append-system-prompt-file` passed on resume is ignored.
@@ -1628,6 +1628,8 @@ Found 2026-11-24 by step 5's record agent (Task 6, `step5/record`).
   length for older runs.
 
 ### 92. List the whole company skill library in a run's system prompt, as intended
+
+**Fixed** differently for sealed `claude_local` CLI runs in step 5's system prompt batch (merged as `41427fffda`, 2026-11-25, [step-5-system-prompt.md](step-5-system-prompt.md#built)): the system prompt's "Skills" section lists the agent's own skills and says the company library may hold others, which `paperclip_skills` lists. Listing the whole library would have reset every agent's session whenever a company skill was installed. Unsealed runs keep the old list.
 
 Found 2026-11-24 by step 5's real-run check (run `7eb33da7` on TES-43, desktop dev instance) and
 traced by the preview agent.

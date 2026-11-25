@@ -1,6 +1,6 @@
 # Step 5, phase 2: the system prompt
 
-**Approved by the user, 2026-11-25** (after the builder check). The fifth piece of phase 2 of step 5, after the wake
+**Approved by the user, 2026-11-25** (after the builder check); built the same day ([Built](#built)). The fifth piece of phase 2 of step 5, after the wake
 ([step-5-wake.md](step-5-wake.md)), the handoff ([step-5-handoff.md](step-5-handoff.md)), the task
 brief ([step-5-brief.md](step-5-brief.md)) and the light sections ([step-5-light.md](step-5-light.md)).
 On 2026-11-25 the user chose option B below: a short "Working in Paperclip" section in the system
@@ -27,6 +27,7 @@ prompt, with the `paperclip` skill kept for the rest.
   - [How it's checked](#how-its-checked)
 - [Left to the builder](#left-to-the-builder)
 - [Calls made in this design](#calls-made-in-this-design)
+- [Built](#built)
 
 ## Intent
 
@@ -411,3 +412,48 @@ Made in drafting, not discussed. Correct any of these:
 - **The new system prompt and the flag are for sealed runs only** (after the builder check).
 - **No-task runs and the 403 case get only the one-line form,** never the long notes (after the
   builder check).
+
+## Built
+
+Built on `step5-sp/build` by one agent (Tasks 1–3, then three small follow-ups from review),
+integrated on `feat/step-5-system-prompt` and merged into `main` as `41427fffda` on 2026-11-25.
+
+- **Checks:** the local checks passed on the first run on `d83219e86c`:
+  - typecheck, `test:runner`;
+  - ui-new test, build and e2e;
+  - core: 6,484 tests.
+
+  The extended files for the working copy, the task context and comment-wake batching passed
+  (60 tests). One of them, `heartbeat-comment-wake-batching.test.ts`, was updated: it expected the
+  fast-response note by default.
+- **Bug 90 by hand** (Claude Code 2.1.325, Haiku, a throwaway folder):
+  - fresh with a system prompt file naming a codename, `/compact`, then a resume with the file:
+    it answered with the codename;
+  - the same without the file after `/compact`: "UNKNOWN".
+
+  Repeat it with the image's CLI before the deploy.
+- **Real runs** (desktop dev instance, "M7 test sealed runner", task TES-50), both `matchedPlan`
+  true and both with `--append-system-prompt-file` in the args:
+
+  | Run | Session | System prompt | First message | What the agent did |
+  | --- | --- | --- | --- | --- |
+  | `477cb398` (assigned) | fresh | who you are 54, Working in Paperclip 2,032, agent instructions 128, skills 469 | 1,045 characters: the agent directory line, What happened, The task, What to do now | Posted a comment listing the three endings, worded as in "Working in Paperclip", and called `paperclip_finish`. No ToolSearch beyond the two tools, no `paperclip_task_context`, no skill opened. |
+  | `8cef0222` (reopened by a comment) | resumed | the same four, recorded | 1,085 characters | Posted a comment opening with `[TES-50](/TES/issues/TES-50)`, said it would block with `blockedByTaskIds`, the `owner` and the `unblockAction` and wouldn't poll, then called `paperclip_finish`. |
+
+- **Calls made while building:**
+  - the fast-response flag is read from the experimental settings the heartbeat and the preview
+    already pass in (`experimentalInstanceSettings.enableFastResponses`);
+  - the CLI check for leaving out the long notes is `runTakesInstructionCopyFacts` (adapter type
+    and engine, from the run's config);
+  - `paperclipApiReachable` and `attachClaudeRunPromptPlan`'s `authToken` are removed (they only
+    fed the tools note);
+  - the skills section copies the key sanitizer, rather than exporting it from adapter-utils;
+  - the run manifest (`ui-new/src/runs/run-manifest.ts`) says a resumed sealed run was sent the
+    file and uses it only after a compaction. Older resumed records keep "not sent".
+- **Seen in the runs, for later:**
+  - the agent-directory line is still 372 characters, most of it the per-run path;
+  - `paperclip_finish` posts its summary as a second comment after the agent's own (related to
+    bug 98).
+- **The deploy:** every agent's Claude session starts fresh once (the bundle key changes),
+  chat sessions included.
+
