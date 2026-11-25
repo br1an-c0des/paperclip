@@ -26,6 +26,7 @@ import {
 } from "@paperclipai/adapter-utils/server-utils";
 import { buildSkillLibraryManifestMarkdown } from "@paperclipai/adapter-utils/skill-library-manifest";
 import { resolveClaudeDesiredSkillNames } from "./skills.js";
+import { claudeInstructionsLocation } from "./standing-texts.js";
 import {
   CLAUDE_CREDENTIAL_MISSING,
   PAPERCLIP_MCP_UNAVAILABLE,
@@ -521,16 +522,11 @@ async function readClaudeInstructionsFile(config: Record<string, unknown>): Prom
   readError: string | null;
 }> {
   const instructionsFilePath = asString(config.instructionsFilePath, "").trim();
-  const instructionsFileDir = instructionsFilePath ? `${path.dirname(instructionsFilePath)}/` : "";
   if (!instructionsFilePath) return { instructionsFilePath, content: null, directive: "", readError: null };
   try {
     const content = await fs.readFile(instructionsFilePath, "utf-8");
-    const directive =
-      `Agent instructions for this run were loaded from ${instructionsFilePath}. ` +
-      `Resolve any relative file references from ${instructionsFileDir}. ` +
-      `This base directory is authoritative for sibling instruction files such as ` +
-      `./HEARTBEAT.md, ./SOUL.md, and ./TOOLS.md; do not resolve those from the parent agent directory. ` +
-      `This location replaces any instruction file location from earlier turns.`;
+    // One line (step 5 phase 2, the light sections); it satisfies INSTRUCTIONS_LOCATION_NOTE.
+    const directive = claudeInstructionsLocation(instructionsFilePath);
     return { instructionsFilePath, content, directive, readError: null };
   } catch (err) {
     return { instructionsFilePath, content: null, directive: "", readError: err instanceof Error ? err.message : String(err) };

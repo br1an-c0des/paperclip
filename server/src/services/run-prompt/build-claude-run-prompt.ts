@@ -1,5 +1,6 @@
 import type { RunPromptDelivery, RunPromptPart, RunPromptPlan, RunPromptSection, RunPromptSectionId } from "@paperclipai/shared";
 import {
+  claudeToolsNoteEndsRun,
   claudeWakeOptions,
   composeClaudeCliPrompt,
   planClaudeInstructionsDirective,
@@ -12,7 +13,6 @@ import {
 } from "@paperclipai/adapter-claude-local/server";
 import {
   asString,
-  DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
   hydrateFreshSessionHandoff,
   isAssignmentShapedPaperclipWakeReason,
   isPaperclipRecoveryWakePayload,
@@ -21,7 +21,6 @@ import {
   joinPromptSections,
   normalizePaperclipWakePayload,
   renderPaperclipWakePromptParts,
-  renderTemplate,
   trimPaperclipPromptParts,
   type PaperclipPromptPart,
 } from "@paperclipai/adapter-utils/server-utils";
@@ -34,14 +33,16 @@ import {
 
 /**
  * The first message of a `claude_local` CLI run, as labelled sections (step 5; README.md in this
- * folder). It reproduces today's prompt exactly: each set is `composeClaudeCliPrompt`'s eight
- * texts, the same selectors the run uses, with labels, reasons, sources and display parts added.
+ * folder). It reproduces today's prompt exactly: each set is `composeClaudeCliPrompt`'s texts,
+ * the same selectors the run uses, with labels, reasons, sources and display parts added.
  * The claude_local wake is four sections, one per heading (step 5 phase 2, the task brief); with
- * the task's facts on a non-chat task there is no task brief.
+ * the task's facts on a non-chat task there is no task brief. Who the agent is, the instructions
+ * location and the tools note come first (step 5 phase 2, the light sections).
  * It reads the agent's instructions file and nothing else; it writes nothing.
  */
 export interface ClaudeRunPromptInput {
-  agent: { id: string; companyId: string } & Record<string, unknown>;
+  /** The agent; its `name` and `title` make the identity line. */
+  agent: { id: string; companyId: string; name?: unknown; title?: unknown } & Record<string, unknown>;
   runId: string;
   /** The runtime config the adapter gets. */
   config: Record<string, unknown>;
@@ -49,7 +50,7 @@ export interface ClaudeRunPromptInput {
   context: Record<string, unknown>;
   /** A local target: the run is sealed. */
   sealed: boolean;
-  /** The run has a token and PAPERCLIP_API_URL, so the MCP note applies. */
+  /** The run has a token and PAPERCLIP_API_URL, so the tools note applies. */
   paperclipApiReachable: boolean;
   /**
    * The fresh-session handoff loader the adapter gets (`getFreshSessionHandoff`). Without one, a
@@ -63,9 +64,8 @@ type PromptSet = "fresh" | "resumed";
 export async function buildClaudeRunPromptPlan(input: ClaudeRunPromptInput): Promise<RunPromptPlan> {
   const { agent, runId, config, context, sealed } = input;
   const { directive } = await planClaudeInstructionsDirective(config);
-  const bootstrapPromptTemplate = asString(config.bootstrapPromptTemplate, "");
-  const promptTemplate = resolveClaudePromptTemplate(config, context);
-  // renderPaperclipMcpNote reads only whether these are set, never their values.
+  const promptTemplate = resolveClaudePromptTemplate(config);
+  // The tools note reads only whether these are set, never their values.
   const env: Record<string, string> = input.paperclipApiReachable
     ? { PAPERCLIP_API_URL: "set", PAPERCLIP_API_KEY: "set" }
     : {};
@@ -94,13 +94,12 @@ export async function buildClaudeRunPromptPlan(input: ClaudeRunPromptInput): Pro
       context: setContext,
       resumed,
       instructionsPathDirective: directive,
-      bootstrapPromptTemplate,
       promptTemplate,
       templateData,
       sealed,
       env,
     });
-    const labelled = describeSections({ texts, context: setContext, resumed, config, templateData, promptTemplate, agentId: agent.id });
+    const labelled = describeSections({ texts, context: setContext, resumed, agent, promptTemplate });
     return labelled.filter((section) => section.text.length > 0);
   };
 
@@ -122,27 +121,27 @@ function describeSections(input: {
   texts: SectionTexts;
   context: Record<string, unknown>;
   resumed: boolean;
-  config: Record<string, unknown>;
-  templateData: Record<string, unknown>;
-  promptTemplate: string;
-  agentId: string;
+  agent: ClaudeRunPromptInput["agent"];
+  /** The agent's own template (`resolveClaudePromptTemplate`), or null for the identity line. */
+  promptTemplate: string | null;
 }): RunPromptSection[] {
-  const { texts, context, resumed, config } = input;
+  const { texts, context, resumed, agent } = input;
   const wake = normalizePaperclipWakePayload(context.paperclipWake);
-  const ownTemplate = typeof config.promptTemplate === "string" && config.promptTemplate.length > 0;
   // The wake's history stands in for the handoff (step 5 phase 2), as composeClaudeCliPrompt does.
   const historyReplacesHandoff = wakeHistoryReplacesHandoff(context);
   const handoff = historyReplacesHandoff ? "" : asString(context.paperclipFreshSessionHandoffMarkdown, "");
+  // The order composeClaudeCliPrompt joins them in (step 5 phase 2, the light sections).
   return [
+    whoYouAreSection(texts.heartbeatTemplate, agent, input.promptTemplate, resumed),
     section("instructions_directive", texts.instructionsDirective, {
       label: "Instructions file location",
       reason: "the agent's instructions file was read; sent every run, since resumed sessions keep an older location",
       source: "claude_local run plan: the instructions file's path",
     }),
-    section("bootstrap_template", texts.bootstrapTemplate, {
-      label: "Bootstrap template",
-      reason: "a fresh session, and the agent sets a bootstrap template",
-      source: "agent setting: bootstrapPromptTemplate",
+    section("mcp_note", texts.mcpNote, {
+      label: "Paperclip tools",
+      reason: toolsNoteReason(context),
+      source: "claude_local: claudeToolsNote",
     }),
     section("communication_guidance", texts.communicationGuidance, {
       label: "Communication guidance",
@@ -170,31 +169,47 @@ function describeSections(input: {
           suppressIssueDescription: texts.taskBrief.length > 0,
         }),
       })]
-      : wakeSections({ texts, context, resumed, agentId: input.agentId, wakeReasonText: wakeReason(wake?.reason ?? null, resumed) })),
-    section("session_rotation_note", texts.sessionRotationNote, {
-      label: "Session rotation note",
-      reason: "the session was rotated",
-      source: "context: paperclipSessionHandoffMarkdown",
-    }),
+      : wakeSections({ texts, context, resumed, agentId: agent.id, wakeReasonText: wakeReason(wake?.reason ?? null, resumed) })),
     taskBriefSection(texts.taskBrief, context, resumed),
-    section("mcp_note", texts.mcpNote, {
-      label: "Paperclip MCP note",
-      reason: "a fresh sealed session with Paperclip API access",
-      source: "renderPaperclipMcpNote",
-    }),
-    section("heartbeat_template", texts.heartbeatTemplate, {
-      label: "Heartbeat template",
-      reason: resumed ? "a resumed session without a wake" : "every fresh session except recovery wakes",
-      source: ownTemplate
-        ? "agent setting: promptTemplate"
-        : context.conversationMode === true
-          ? "default: conversation template (DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE)"
-          : "default: heartbeat template (DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE)",
-      parts: input.promptTemplate === DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE
-        ? defaultTemplateParts(input.templateData)
-        : undefined,
-    }),
   ];
+}
+
+/**
+ * Who the agent is (`heartbeat_template`): the identity line, as one part, or the agent's own
+ * prompt template when it sets one.
+ */
+function whoYouAreSection(
+  text: string,
+  agent: ClaudeRunPromptInput["agent"],
+  promptTemplate: string | null,
+  resumed: boolean,
+): RunPromptSection {
+  const reason = resumed ? "a resumed session without a wake" : "every fresh session except recovery wakes";
+  if (promptTemplate !== null) {
+    return section("heartbeat_template", text, {
+      label: "Prompt template (agent setting)",
+      reason,
+      source: "agent setting: promptTemplate",
+    });
+  }
+  const name = typeof agent.name === "string" ? agent.name.trim() : "";
+  const title = typeof agent.title === "string" ? agent.title.trim() : "";
+  const source = `the agent's ${name ? `name (${name})` : "id (it has no name)"}${title ? ` and title (${title})` : ""}`;
+  return section("heartbeat_template", text, {
+    label: "Who you are",
+    reason,
+    source,
+    parts: text.trim() ? [{ id: "heartbeat_template.identity", label: "Agent identity", source, text: text.trim() }] : null,
+  });
+}
+
+/** Why the tools note is sent, and why it has no end-of-run line where it has none. */
+function toolsNoteReason(context: Record<string, unknown>): string {
+  const sent = "a fresh sealed session with Paperclip API access";
+  if (claudeToolsNoteEndsRun(context)) return sent;
+  return context.conversationMode === true
+    ? `${sent}; no end-of-run line, since a chat task ends with its reply`
+    : `${sent}; no end-of-run line, since a recovery wake has its own rules for ending`;
 }
 
 const WAKE_SECTIONS: Record<ClaudeRunMessageSectionId, { label: string; source: string }> = {
@@ -281,20 +296,6 @@ function matchTaskBriefVariant(text: string, context: Record<string, unknown>) {
     return { key: variant.key, parts: parts ? alignParts(parts, text, "task_brief") : null };
   }
   return null;
-}
-
-/**
- * The default heartbeat template's two parts, each rendered as the whole template is (a
- * placeholder never spans the line break between them).
- */
-function defaultTemplateParts(templateData: Record<string, unknown>): PaperclipPromptPart[] {
-  const identity = DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE.split("\n")[0] ?? "";
-  return [
-    { id: "heartbeat_template.identity", label: "Agent identity", source: "default template: agent id and name",
-      text: renderTemplate(identity, templateData) },
-    { id: "heartbeat_template.connection_guidance", label: "Connection guidance", source: "CONNECTION_INTENT_AGENT_GUIDANCE",
-      text: renderTemplate(DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE.slice(identity.length), templateData) },
-  ];
 }
 
 const WAKE_REASONS: Record<string, string> = {

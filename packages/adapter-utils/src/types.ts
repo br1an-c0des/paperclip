@@ -20,6 +20,8 @@ export interface AdapterAgent {
   id: string;
   companyId: string;
   name: string;
+  /** The agent's job title; claude_local's identity line names it ("You are <name>, <title>."). */
+  title?: string | null;
   adapterType: string | null;
   adapterConfig: unknown;
 }

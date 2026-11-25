@@ -7,14 +7,12 @@ import {
   renderTemplate,
   isPaperclipExternalChatQuestionResponseTurn,
   isPaperclipExternalChatTurn,
-  renderPaperclipMcpNote,
   selectInitialCommunicationGuidance,
   selectPaperclipPromptSections,
   isPaperclipRecoveryWakePayload,
   normalizePaperclipWakePayload,
-  DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
-  DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE,
 } from "@paperclipai/adapter-utils/server-utils";
+import { claudeIdentityLine, claudeToolsNote, claudeToolsNoteEndsRun } from "./standing-texts.js";
 import {
   renderClaudeRunMessageSections,
   runTaskForWake,
@@ -26,25 +24,27 @@ import {
  * Today's `claude --print` first message, as one pure function (step 5, Task 1). The CLI engine
  * sends what this returns; the run prompt builder (`server/src/services/run-prompt/`) labels the
  * same text and is checked against it. Its wake is the claude_local one (`wake/render.ts`, step 5
- * phase 2), except on an external chat turn.
+ * phase 2), except on an external chat turn. The standing texts (who the agent is, the
+ * instructions location, the tools note) come first, so the wake ends the message (step 5 phase
+ * 2, the light sections). The legacy bootstrap template and the session rotation note aren't read.
  */
 export interface ClaudeCliPromptInput {
   /** The adapter context, after `hydrateFreshSessionHandoff` for this attempt. */
   context: Record<string, unknown>;
   resumed: boolean;
   instructionsPathDirective: string;
-  bootstrapPromptTemplate: string;
-  promptTemplate: string;
-  templateData: Record<string, unknown>;
+  /** The agent's own prompt template (`resolveClaudePromptTemplate`); null sends the identity line. */
+  promptTemplate: string | null;
+  /** `renderTemplate`'s data; `agent` carries `id`, `name` and `title` for the identity line. */
+  templateData: Record<string, unknown> & { agent: { id: string; name?: unknown; title?: unknown } };
   sealed: boolean;
-  /** For `renderPaperclipMcpNote`. */
+  /** For the tools note: it needs `PAPERCLIP_API_URL` and `PAPERCLIP_API_KEY`. */
   env: Record<string, string>;
 }
 
-/** The eight texts the first message joins, in order, before `joinPromptSections` trims them. */
+/** The texts the first message joins, before `joinPromptSections` trims them (order: `composeClaudeCliPrompt`). */
 export interface ClaudeCliPromptSectionTexts {
   instructionsDirective: string;
-  bootstrapTemplate: string;
   communicationGuidance: string;
   /** The wake's text: `wakeSections` joined, or the shared wake on an external chat turn. */
   wake: string;
@@ -53,10 +53,11 @@ export interface ClaudeCliPromptSectionTexts {
    * do now), empty ones left out; [] on an external chat turn. Display only: the prompt joins `wake`.
    */
   wakeSections: ClaudeRunMessageSection[];
-  sessionRotationNote: string;
   /** "" when the task's facts replace it (`runTaskReplacesBrief`). */
   taskBrief: string;
+  /** The Paperclip tools note (`claudeToolsNote`). */
   mcpNote: string;
+  /** The identity line, or the agent's own rendered template; "" when not sent. */
   heartbeatTemplate: string;
 }
 
@@ -65,11 +66,7 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
   promptMetrics: Record<string, number>;
   sections: ClaudeCliPromptSectionTexts;
 } {
-  const { context, resumed, instructionsPathDirective, bootstrapPromptTemplate, promptTemplate, templateData, sealed, env } = input;
-  const renderedBootstrapPrompt =
-    !resumed && bootstrapPromptTemplate.trim().length > 0
-      ? renderTemplate(bootstrapPromptTemplate, templateData).trim()
-      : "";
+  const { context, resumed, instructionsPathDirective, promptTemplate, templateData, sealed, env } = input;
   const { taskContextNote, wakePrompt: sharedWakePrompt } = selectPaperclipPromptSections(context, {
     resumedSession: resumed,
     includeCommunicationGuidance: false,
@@ -85,44 +82,44 @@ export function composeClaudeCliPrompt(input: ClaudeCliPromptInput): {
   // With the task's facts, the wake carries the task and its rules: no separate brief.
   const taskBrief = runTaskReplacesBrief(context) ? "" : taskContextNote;
   const shouldUseResumeDeltaPrompt = resumed && wakePrompt.length > 0;
+  // Who the agent is: its own template when it sets one, else the identity line. Not on a
+  // resumed session with a wake, nor on a recovery wake.
   const renderedPrompt = shouldUseResumeDeltaPrompt || isPaperclipRecoveryWakePayload(context.paperclipWake)
     ? ""
-    : renderTemplate(promptTemplate, templateData);
-  const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
-  // Fresh sealed sessions are pointed at the `paperclip_*` tools, as ACP's are; resumed
-  // sessions and external chat turns aren't.
+    : promptTemplate !== null && promptTemplate.trim().length > 0
+      ? renderTemplate(promptTemplate, templateData)
+      : claudeIdentityLine(templateData.agent);
+  // Fresh sealed sessions are pointed at the `paperclip_*` tools; resumed sessions and external
+  // chat turns aren't. Chat tasks and recovery wakes get no end-of-run line.
   const paperclipMcpNote = sealed && !resumed && !isPaperclipExternalChatTurn(context.paperclipWake)
-    ? renderPaperclipMcpNote(env, true)
+    ? claudeToolsNote({ env, endOfRunLine: claudeToolsNoteEndsRun(context) })
     : "";
   const sections: ClaudeCliPromptSectionTexts = {
     instructionsDirective: instructionsPathDirective,
-    bootstrapTemplate: renderedBootstrapPrompt,
     communicationGuidance: selectInitialCommunicationGuidance(
       wakeHistoryReplacesHandoff(context) ? withoutFreshSessionHandoff(context) : context,
       { resumedSession: resumed },
     ),
     wake: wakePrompt,
     wakeSections,
-    sessionRotationNote: sessionHandoffNote,
     taskBrief,
     mcpNote: paperclipMcpNote,
     heartbeatTemplate: renderedPrompt,
   };
   const prompt = joinPromptSections([
+    sections.heartbeatTemplate,
     sections.instructionsDirective,
-    sections.bootstrapTemplate,
+    sections.mcpNote,
     sections.communicationGuidance,
     sections.wake,
-    sections.sessionRotationNote,
     sections.taskBrief,
-    sections.mcpNote,
-    sections.heartbeatTemplate,
   ]);
+  // The bootstrap and handoff counters keep their keys for older readers; neither is sent.
   const promptMetrics = {
     promptChars: prompt.length,
-    bootstrapPromptChars: renderedBootstrapPrompt.length,
+    bootstrapPromptChars: 0,
     wakePromptChars: wakePrompt.length,
-    sessionHandoffChars: sessionHandoffNote.length,
+    sessionHandoffChars: 0,
     taskContextChars: taskBrief.length,
     heartbeatPromptChars: renderedPrompt.length,
   };
@@ -183,15 +180,11 @@ export function claudeWakeOptions(input: {
   };
 }
 
-/** The heartbeat template a run renders: the agent's own, or the default for its kind of run. */
-export function resolveClaudePromptTemplate(
-  config: Record<string, unknown>,
-  context: Record<string, unknown>,
-): string {
-  return asString(
-    config.promptTemplate,
-    context.conversationMode === true
-      ? DEFAULT_PAPERCLIP_CONVERSATION_PROMPT_TEMPLATE
-      : DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
-  );
+/**
+ * The agent's own prompt template (`adapterConfig.promptTemplate`), or null when it sets none or a
+ * blank one: the run then sends the identity line (`claudeIdentityLine`), in task runs and chat.
+ */
+export function resolveClaudePromptTemplate(config: Record<string, unknown>): string | null {
+  const template = config.promptTemplate;
+  return typeof template === "string" && template.trim().length > 0 ? template : null;
 }
