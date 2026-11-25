@@ -1,6 +1,6 @@
 # Step 5, phase 2: the light sections
 
-**Approved by the user, 2026-11-25.** The fourth piece of phase 2 of step 5, after the wake
+**Approved by the user, 2026-11-25; built the same day ([Built](#built)).** The fourth piece of phase 2 of step 5, after the wake
 ([step-5-wake.md](step-5-wake.md)), the handoff ([step-5-handoff.md](step-5-handoff.md)) and the
 task brief ([step-5-brief.md](step-5-brief.md)). The user chose "trim in place" (below) on
 2026-11-25 and agreed to cut the heartbeat template down to the identity line.
@@ -23,6 +23,7 @@ task brief ([step-5-brief.md](step-5-brief.md)). The user chose "trim in place" 
   - [How it's checked](#how-its-checked)
 - [Left to the builder](#left-to-the-builder)
 - [Calls made in this design](#calls-made-in-this-design)
+- [Built](#built)
 
 ## Intent
 
@@ -277,3 +278,30 @@ Made in drafting, not discussed. Correct any of these:
 - **The server1 check also reads each agent's engine and any session-rotation override** (after
   the builder check).
 - **Labels:** "Who you are" and "Paperclip tools".
+
+## Built
+
+Built on `step5-light/build` by one agent (both plan tasks, then the e2e mocks' labels), integrated
+on `feat/step-5-light` and merged into `main` as `f40880734d` on 2026-11-25.
+
+- **Checks:** the local checks passed on the first run on `2b34f877ae` (typecheck, `test:runner`,
+  ui-new test, build and e2e, core: 6,460 tests).
+- **Real runs** (desktop dev instance, "M7 test sealed runner", task TES-49; the agent's existing
+  title "Step 4b real-run check" stood in for a job title), both `matchedPlan` true:
+
+  | Run | Session | First message | What the agent did |
+  | --- | --- | --- | --- |
+  | `ca11d622` (assigned) | fresh | 1,881 characters: who you are, instructions location, Paperclip tools, communication guidance, What happened, The task, What to do now | Posted the comment and called `paperclip_finish`; no `paperclip_task_context` call |
+  | `e9e85c77` (reopened by a comment) | resumed | 1,119 characters: instructions location, then the wake's three sections | Posted the second comment and called `paperclip_finish` |
+
+- **Calls made while building:**
+  - a blank name with a title gives `You are agent <id>, <title>.`;
+  - the instructions line prints both absolute paths;
+  - `run-preview.ts` passes the agent's title too (the preview builds its agent there);
+  - the dormant Runner's live-run check (`tests/runner-e2e/stock-harness.ts`) still expects the old
+    default text; left alone.
+- **Seen in the runs, for later:**
+  - the instructions path is a per-run copy (`…/file-sync/runs/<run>/live/AGENTS.md`), so the line
+    is 459 characters with the path twice; printing the folder once would halve it;
+  - a fresh non-chat run still gets the fast-response receipt guidance as its "communication
+    guidance" section (305 characters), for a feature that may be off; for the system prompt batch.
