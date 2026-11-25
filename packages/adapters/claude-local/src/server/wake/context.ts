@@ -1,6 +1,10 @@
 import {
+  normalizePaperclipRunTask,
+  normalizePaperclipSharedWorkspaceNote,
   renderTemplate,
   type PaperclipPromptPartMeta,
+  type PaperclipRunTask,
+  type PaperclipSharedWorkspaceNote,
   type PaperclipWakePayload,
 } from "@paperclipai/adapter-utils/server-utils";
 import {
@@ -9,7 +13,7 @@ import {
   type ClaudeWakeComments,
   type ClaudeWakeRenderOptions,
 } from "./events.js";
-import { COMMENTS, PEOPLE, TASK_LINE } from "./templates.js";
+import { ATTACHMENTS, COMMENTS, PEOPLE, TASK_LINE } from "./templates.js";
 
 /**
  * The wake's shared render context (fork/step-5-brief.md "The renderer's modules"): the text
@@ -103,6 +107,10 @@ export interface Ctx {
   timeZone: string | null;
   taskRef: string;
   task: string;
+  /** The task's facts, when they're about the wake's task; null otherwise (as before them). */
+  runTask: PaperclipRunTask | null;
+  /** Read only with `runTask`: without it, the brief carries the note. */
+  sharedWorkspaceNote: PaperclipSharedWorkspaceNote | null;
 }
 
 export function makeCtx(wake: PaperclipWakePayload, raw: unknown, options: ClaudeWakeRenderOptions): Ctx {
@@ -111,6 +119,8 @@ export function makeCtx(wake: PaperclipWakePayload, raw: unknown, options: Claud
   const task = issue?.identifier && issue.title
     ? t(TASK_LINE.titled, { identifier: issue.identifier, title: inline(issue.title) })
     : taskRef;
+  const facts = normalizePaperclipRunTask(options.runTask);
+  const runTask = facts && issue && (!issue.id || facts.issueId === issue.id) ? facts : null;
   return {
     wake,
     raw,
@@ -120,6 +130,8 @@ export function makeCtx(wake: PaperclipWakePayload, raw: unknown, options: Claud
     timeZone: validTimeZone(wake.timeZone),
     taskRef,
     task,
+    runTask,
+    sharedWorkspaceNote: runTask ? normalizePaperclipSharedWorkspaceNote(options.sharedWorkspaceNote) : null,
   };
 }
 
@@ -167,11 +179,46 @@ export function byline(ctx: Ctx, comment: ClaudeWakeComment): string {
   return `${who}${when ? `, ${when}` : ""}${comment.seen ? ` ${COMMENTS.seen}` : ""}`;
 }
 
-export function quotedComment(comment: ClaudeWakeComment): string {
-  return [quoteClaudeWakeText(comment.body), ...(comment.bodyTruncated ? ["", COMMENTS.cutShort] : [])].join("\n");
+/** The comment quoted; with the task's facts, its attachments listed under it. */
+export function quotedComment(ctx: Ctx, comment: ClaudeWakeComment): string {
+  const quoted = [quoteClaudeWakeText(comment.body), ...(comment.bodyTruncated ? ["", COMMENTS.cutShort] : [])].join("\n");
+  const attachments = comment.id ? renderAttachments(ctx, comment.id) : null;
+  return attachments ? `${quoted}\n\n${attachments}` : quoted;
 }
 
 /** "From Brian, Nov 24, 10:20:" and the quote. */
 export function commentItem(ctx: Ctx, comment: ClaudeWakeComment): string {
-  return `${t(COMMENTS.item, { byline: byline(ctx, comment) })}\n\n${quotedComment(comment)}`;
+  return `${t(COMMENTS.item, { byline: byline(ctx, comment) })}\n\n${quotedComment(ctx, comment)}`;
+}
+
+/** "118 KB", "2.4 MB", "512 bytes". */
+export function sizeWords(bytes: number): string {
+  if (bytes < 1024) return bytes === 1 ? "1 byte" : `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")} MB`;
+}
+
+/** A wake comment's attachments and import notices (the task's facts), or null. */
+function renderAttachments(ctx: Ctx, commentId: string): string | null {
+  const attachments = ctx.runTask?.wakeCommentAttachments.filter((attachment) => attachment.commentId === commentId) ?? [];
+  const omissions = ctx.runTask?.attachmentOmissions.filter((omission) => omission.commentId === commentId) ?? [];
+  if (attachments.length === 0 && omissions.length === 0) return null;
+  const items = [
+    ...attachments.map((attachment) => `- ${t(ATTACHMENTS.item, {
+      filename: code(attachment.filename),
+      details: [inline(attachment.contentType, 100), sizeWords(attachment.byteSize)].filter(Boolean).join(", "),
+      id: inline(attachment.id, 100).replace(/`/g, "'"),
+    })}`),
+    ...omissions.map((omission) => `- ${t(ATTACHMENTS.omitted, { notice: inline(omission.notice, 400) })}`),
+  ];
+  return `${ATTACHMENTS.heading}\n${items.join("\n")}`;
+}
+
+/** Whether a comment the wake quotes has attachments listed under it. */
+export function attachmentsShown(ctx: Ctx): boolean {
+  const attachments = ctx.runTask?.wakeCommentAttachments ?? [];
+  if (attachments.length === 0) return false;
+  const { news, edited, history, earlier } = ctx.comments;
+  const quoted = new Set([...news, ...edited, ...earlier, ...(ctx.options.resumedSession ? [] : history)].map((comment) => comment.id));
+  return attachments.some((attachment) => quoted.has(attachment.commentId));
 }

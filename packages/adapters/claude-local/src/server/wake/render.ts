@@ -44,7 +44,7 @@ export function renderClaudeWakeParts(payload: unknown, options: ClaudeWakeRende
     ...happened.blocks,
     ...where,
     ...renderTheTask(ctx),
-    ...renderToDo(ctx, happened),
+    ...renderToDo(ctx, happened, events),
   ];
   return blocks.map((block, index) => ({
     id: block.id,

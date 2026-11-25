@@ -1280,6 +1280,131 @@ function normalizePaperclipWakeHistory(value: unknown): PaperclipWakeHistory | n
   };
 }
 
+/**
+ * Step 5 phase 2, the task brief (fork/step-5-brief-plan.md, "The contract"): the task's facts
+ * for a `claude_local` run of a non-chat task (`context.paperclipRunTask`), which the claude_local
+ * wake renders under "The task" and "What to do now" in place of the task brief. Set by the
+ * server's task context; absent on chat tasks and older contexts.
+ */
+export type PaperclipRunTask = {
+  issueId: string;
+  /** Up to 6, the parent first. */
+  ancestors: Array<{ identifier: string | null; title: string | null; status: string | null }>;
+  ancestorsOmitted: number;
+  /** Trimmed; null when empty. */
+  description: string | null;
+  descriptionChangedSinceLastRun: boolean;
+  plan: {
+    revisionNumber: number;
+    /** Cut at 12,000 characters. */
+    body: string;
+    /** The full length when cut. */
+    truncatedFrom: number | null;
+    changedSinceLastRun: boolean;
+  } | null;
+  workMode: string | null;
+  titleNeedsGeneration: boolean;
+  rejectedPlan: { reason: string | null } | null;
+  /** Present when the accepted plan is to be implemented. */
+  acceptedPlan: { revisionNumber: number | null } | null;
+  wakeCommentAttachments: Array<{ commentId: string; id: string; filename: string; contentType: string; byteSize: number }>;
+  attachmentOmissions: Array<{ commentId: string; notice: string }>;
+  prefixParts: Array<{ id: "wake.task.case" | "wake.task.live_voice"; text: string }>;
+  compactedSinceLastRun: boolean;
+};
+
+/** Another run holds the shared workspace (`context.paperclipSharedWorkspaceNote`, set by environment selection). */
+export type PaperclipSharedWorkspaceNote = { heldByRunId: string; heldByIssue: string | null };
+
+const RUN_TASK_PREFIX_PART_IDS = new Set(["wake.task.case", "wake.task.live_voice"]);
+
+function optionalText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+/** Absent, null or without an issue id: null (a chat task, or an older context). */
+export function normalizePaperclipRunTask(value: unknown): PaperclipRunTask | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const task = value as Record<string, unknown>;
+  const issueId = asString(task.issueId, "").trim();
+  if (!issueId) return null;
+  const count = (entry: unknown) => Math.max(0, Math.floor(asNumber(entry, 0)));
+  const ancestors = Array.isArray(task.ancestors)
+    ? task.ancestors.map((entry) => {
+        const ancestor = parseObject(entry);
+        return { identifier: optionalText(ancestor.identifier), title: optionalText(ancestor.title), status: optionalText(ancestor.status) };
+      })
+    : [];
+  const planValue = parseObject(task.plan);
+  const planBody = typeof planValue.body === "string" ? planValue.body : "";
+  const revisionNumber = asNumber(planValue.revisionNumber, Number.NaN);
+  const plan = planBody.trim() && Number.isFinite(revisionNumber)
+    ? {
+        revisionNumber,
+        body: planBody,
+        truncatedFrom: typeof planValue.truncatedFrom === "number" && Number.isFinite(planValue.truncatedFrom) ? planValue.truncatedFrom : null,
+        changedSinceLastRun: planValue.changedSinceLastRun === true,
+      }
+    : null;
+  const rejected = typeof task.rejectedPlan === "object" && task.rejectedPlan !== null ? parseObject(task.rejectedPlan) : null;
+  const accepted = typeof task.acceptedPlan === "object" && task.acceptedPlan !== null ? parseObject(task.acceptedPlan) : null;
+  const acceptedRevision = accepted ? asNumber(accepted.revisionNumber, Number.NaN) : Number.NaN;
+  return {
+    issueId,
+    ancestors: ancestors.slice(0, 6),
+    ancestorsOmitted: count(task.ancestorsOmitted) + Math.max(0, ancestors.length - 6),
+    description: optionalText(task.description),
+    descriptionChangedSinceLastRun: task.descriptionChangedSinceLastRun === true,
+    plan,
+    workMode: optionalText(task.workMode),
+    titleNeedsGeneration: task.titleNeedsGeneration === true,
+    rejectedPlan: rejected ? { reason: optionalText(rejected.reason) } : null,
+    acceptedPlan: accepted ? { revisionNumber: Number.isFinite(acceptedRevision) ? acceptedRevision : null } : null,
+    wakeCommentAttachments: Array.isArray(task.wakeCommentAttachments)
+      ? task.wakeCommentAttachments.slice(0, 100).flatMap((entry) => {
+          const attachment = parseObject(entry);
+          const commentId = asString(attachment.commentId, "").trim();
+          const id = asString(attachment.id, "").trim();
+          if (!commentId || !id) return [];
+          return [{
+            commentId,
+            id,
+            filename: asString(attachment.filename, "").trim() || "file",
+            contentType: asString(attachment.contentType, "").trim(),
+            byteSize: count(attachment.byteSize),
+          }];
+        })
+      : [],
+    attachmentOmissions: Array.isArray(task.attachmentOmissions)
+      ? task.attachmentOmissions.slice(0, 100).flatMap((entry) => {
+          const omission = parseObject(entry);
+          const commentId = asString(omission.commentId, "").trim();
+          const notice = asString(omission.notice, "").trim();
+          return commentId && notice ? [{ commentId, notice }] : [];
+        })
+      : [],
+    prefixParts: Array.isArray(task.prefixParts)
+      ? task.prefixParts.flatMap((entry) => {
+          const part = parseObject(entry);
+          const id = asString(part.id, "");
+          const text = asString(part.text, "").trim();
+          return RUN_TASK_PREFIX_PART_IDS.has(id) && text
+            ? [{ id: id as PaperclipRunTask["prefixParts"][number]["id"], text }]
+            : [];
+        })
+      : [],
+    compactedSinceLastRun: task.compactedSinceLastRun === true,
+  };
+}
+
+/** Absent or without a run id: null. */
+export function normalizePaperclipSharedWorkspaceNote(value: unknown): PaperclipSharedWorkspaceNote | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const note = value as Record<string, unknown>;
+  const heldByRunId = asString(note.heldByRunId, "").trim();
+  return heldByRunId ? { heldByRunId, heldByIssue: optionalText(note.heldByIssue) } : null;
+}
+
 function normalizePaperclipWakeComment(
   value: unknown,
 ): PaperclipWakeComment | null {

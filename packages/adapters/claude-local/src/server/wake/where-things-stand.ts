@@ -120,7 +120,7 @@ function renderTaskHistory(ctx: Ctx, history: TaskHistory): WakeBlock[] {
   if (history.open.length > 0) {
     blocks.push({ id: "wake.open_requests", text: history.open.map((request) => renderOpenRequest(ctx, request)).join("\n") });
   }
-  const documents = renderDocuments(history.documents);
+  const documents = renderDocuments(ctx, history.documents);
   if (documents) blocks.push({ id: "wake.documents", text: documents });
   // The comments fill what's left of the cap.
   const used = [HEADINGS.whereThingsStand, ...blocks.map((block) => block.text)].reduce((sum, text) => sum + text.length + 2, 0);
@@ -227,19 +227,25 @@ function sameName(key: string, title: string): boolean {
   return flat(key) === flat(title);
 }
 
-function renderDocuments(documents: TaskHistory["documents"]): string | null {
+function renderDocuments(ctx: Ctx, documents: TaskHistory["documents"]): string | null {
   if (documents.length === 0) return null;
+  // With the task's facts there's no brief: the plan is quoted under "The task" instead.
+  const runTask = ctx.runTask;
+  const quoted = (document: TaskHistory["documents"][number]) => runTask
+    ? document.key === "plan" && runTask.plan !== null
+    : document.inBrief;
   const names = documents.map((document) => {
     const name = document.title && !sameName(document.key, document.title)
       ? `${inline(document.key, 100)} ("${inline(document.title, 100).replace(/"/g, "'")}")`
       : inline(document.key, 100);
-    return document.inBrief ? t(HISTORY.documentInBrief, { document: name }) : name;
+    if (!quoted(document)) return name;
+    return t(runTask ? HISTORY.documentInTask : HISTORY.documentInBrief, { document: name });
   });
-  const rest = documents.filter((document) => !document.inBrief);
+  const rest = documents.filter((document) => !quoted(document));
   const workflow = rest.some((document) => document.key === "workflow");
   const others = rest.filter((document) => document.key !== "workflow");
   const read = others.length === 0
     ? null
-    : documents.some((document) => document.inBrief) ? HISTORY.documentsReadRest : HISTORY.documentsRead;
+    : documents.some(quoted) ? HISTORY.documentsReadRest : HISTORY.documentsRead;
   return lines([t(HISTORY.documents, { documents: list(names, 20) }), read].filter(Boolean).join(" "), workflow && HISTORY.workflow);
 }

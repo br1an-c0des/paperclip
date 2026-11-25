@@ -118,6 +118,15 @@ export interface EventText {
   ruleBlock?: string;
 }
 
+/**
+ * A comment's rule. With the task's facts, the brief's follow-up directive is folded in: later
+ * direction replaces conflicting scope.
+ */
+function commentRules(ctx: Ctx, count: number): readonly string[] {
+  if (ctx.runTask) return count === 1 ? EVENTS.comment.rulesOneNoBrief : EVENTS.comment.rulesManyNoBrief;
+  return count === 1 ? EVENTS.comment.rulesOne : EVENTS.comment.rulesMany;
+}
+
 function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComment | null): EventText {
   const { wake, taskRef, task } = ctx;
   const data = { taskRef, task };
@@ -129,19 +138,20 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       const text = routine
         ? t(EVENTS.assigned.routine, { ...data, routine: inline(routine) })
         : who ? t(EVENTS.assigned.byWho, { ...data, who }) : t(EVENTS.assigned.plain, data);
-      return { text, rules: EVENTS.assigned.rules };
+      // With the task's facts no brief follows: the task is under "The task".
+      return { text, rules: ctx.runTask ? EVENTS.assigned.rulesNoBrief.map((rule) => t(rule, data)) : EVENTS.assigned.rules };
     }
     case "comment": {
       const news = ctx.comments.news;
       if (news.length === 1) {
         return {
-          text: lines(t(EVENTS.comment.one, { ...data, byline: byline(ctx, news[0]!) }), quotedComment(news[0]!)),
-          rules: EVENTS.comment.rulesOne,
+          text: lines(t(EVENTS.comment.one, { ...data, byline: byline(ctx, news[0]!) }), quotedComment(ctx, news[0]!)),
+          rules: commentRules(ctx, 1),
         };
       }
       return {
         text: lines(t(EVENTS.comment.many, { ...data, count: news.length }), ...news.map((comment) => commentItem(ctx, comment))),
-        rules: EVENTS.comment.rulesMany,
+        rules: commentRules(ctx, news.length),
       };
     }
     case "mentioned": {
@@ -152,11 +162,11 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       const sentence = assignee
         ? t(EVENTS.mentioned.withAssignee, { ...data, who, assignee })
         : t(EVENTS.mentioned.plain, { ...data, who });
-      return { text: lines(sentence, owned && quotedComment(owned)), rules: EVENTS.mentioned.rules.map((rule) => t(rule, data)) };
+      return { text: lines(sentence, owned && quotedComment(ctx, owned)), rules: EVENTS.mentioned.rules.map((rule) => t(rule, data)) };
     }
     case "reopened": {
       const who = owned ? person(ctx, owned.authorType, owned.authorId, true) : actor(ctx);
-      return { text: lines(t(EVENTS.reopened.text, { ...data, who }), owned && quotedComment(owned)), rules: EVENTS.reopened.rules };
+      return { text: lines(t(EVENTS.reopened.text, { ...data, who }), owned && quotedComment(ctx, owned)), rules: EVENTS.reopened.rules };
     }
     case "questions_answered": {
       const response = wake.questionResponse!;
@@ -243,7 +253,7 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       const who = owned ? person(ctx, owned.authorType, owned.authorId, true) : actor(ctx, PEOPLE.reviewer);
       return {
         text: owned
-          ? lines(t(EVENTS.changes_requested.withComment, { ...data, who }), quotedComment(owned))
+          ? lines(t(EVENTS.changes_requested.withComment, { ...data, who }), quotedComment(ctx, owned))
           : t(EVENTS.changes_requested.plain, { ...data, who }),
         rules: EVENTS.changes_requested.rules,
       };
@@ -283,7 +293,7 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
           const when = time(ctx, comment.createdAt);
           return lines(
             when ? t(EVENTS.comment_edited.withTime, { who, time: when }) : t(EVENTS.comment_edited.plain, { who }),
-            quotedComment(comment),
+            quotedComment(ctx, comment),
           );
         })),
         rules: EVENTS.comment_edited.rules,
@@ -380,7 +390,7 @@ function renderEvent(kind: ClaudeWakeEventKind, ctx: Ctx, owned: ClaudeWakeComme
       const message = wake.agentMessage && wake.agentMessage.source !== "tool_action_review" ? wake.agentMessage : null;
       const blocks: string[] = [];
       if (news.length === 1) {
-        blocks.push(t(EVENTS.chat_message.one, { byline: byline(ctx, news[0]!) }), quotedComment(news[0]!));
+        blocks.push(t(EVENTS.chat_message.one, { byline: byline(ctx, news[0]!) }), quotedComment(ctx, news[0]!));
       } else if (news.length > 1) {
         blocks.push(t(EVENTS.chat_message.many, { count: news.length }), ...news.map((comment) => commentItem(ctx, comment)));
       }
@@ -570,7 +580,7 @@ export function renderWhatHappened(ctx: Ctx, events: readonly ClaudeWakeEventKin
   const others = commentsQuoted ? [] : news.filter((comment) => comment !== owned);
   if (others.length > 0) {
     blocks.push({ id: "wake.comments", text: lines(t(COMMENTS.others, { taskRef: ctx.taskRef }), ...others.map((comment) => commentItem(ctx, comment))) });
-    const rule = others.length === 1 ? EVENTS.comment.rulesOne[0] : EVENTS.comment.rulesMany[0];
+    const rule = commentRules(ctx, others.length)[0]!;
     if (!rules.includes(rule)) rules.push(rule);
   }
   if (ctx.comments.earlier.length > 0) {
