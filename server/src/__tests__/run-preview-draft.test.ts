@@ -160,23 +160,34 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview of a task being
 
     // The identifier is the one the task got: the draft predicts it.
     expect(created.identifier).toBe(`${seeded.prefix}-2`);
-    const brief = (sections: RunPromptSection[]) => sections.find((section) => section.id === "task_brief")!;
-    expect(brief(drafted.prompt.firstMessage).text).toContain(`- Issue: "${created.identifier}"`);
-    expect(brief(drafted.prompt.firstMessage).text).toContain("Planning mode directive:");
-    expect(brief(drafted.prompt.firstMessage).text).toContain(`Parent: ${seeded.prefix}-1 M7 test parent (in_progress) [high]`);
+    // The task's content: in the brief, or with the task's facts under "The task" and its rules
+    // under "What to do now" (step 5 phase 2, the task brief).
+    const byId = (sections: RunPromptSection[], id: string) => sections.find((section) => section.id === id);
+    const brief = (sections: RunPromptSection[]) => byId(sections, "task_brief");
+    if (brief(drafted.prompt.firstMessage)) {
+      expect(brief(drafted.prompt.firstMessage)!.text).toContain(`- Issue: "${created.identifier}"`);
+      expect(brief(drafted.prompt.firstMessage)!.text).toContain("Planning mode directive:");
+      expect(brief(drafted.prompt.firstMessage)!.text).toContain(`Parent: ${seeded.prefix}-1 M7 test parent (in_progress) [high]`);
+      // The task brief matches, apart from the id.
+      expect(comparable([brief(drafted.prompt.firstMessage)!])).toEqual(comparable([brief(real.prompt.firstMessage)!], created.id));
+      // What exists only once the task does is marked: its identifier (and id).
+      const issuePart = brief(drafted.prompt.firstMessage)!.parts!.find((part) => part.id === "task_brief.issue")!;
+      expect(issuePart.pending).toMatch(/given when it's created/);
+      expect(brief(real.prompt.firstMessage)!.parts!.find((part) => part.id === "task_brief.issue")!.pending).toBeUndefined();
+    } else {
+      expect(byId(drafted.prompt.firstMessage, "the_task")!.text).toContain(`Part of ${seeded.prefix}-1 "M7 test parent" (in progress).`);
+      expect(byId(drafted.prompt.firstMessage, "to_do")!.text).toContain("planning mode");
+    }
 
-    // The task brief and the whole first message match, apart from the id; so does the system prompt.
-    expect(comparable([brief(drafted.prompt.firstMessage)])).toEqual(comparable([brief(real.prompt.firstMessage)], created.id));
+    // The whole first message matches, apart from the id; so does the system prompt.
     expect(comparable(drafted.prompt.firstMessage)).toEqual(comparable(real.prompt.firstMessage, created.id));
     expect(drafted.prompt.systemPrompt).toEqual(real.prompt.systemPrompt);
     expect(drafted.manifest).toEqual(real.manifest);
 
-    // What exists only once the task does is marked: its identifier (and id), and the worktree's branch.
-    const issuePart = brief(drafted.prompt.firstMessage).parts!.find((part) => part.id === "task_brief.issue")!;
-    expect(issuePart.pending).toMatch(/given when it's created/);
-    expect(brief(real.prompt.firstMessage).parts!.find((part) => part.id === "task_brief.issue")!.pending).toBeUndefined();
-    const wake = drafted.prompt.firstMessage.find((section) => section.id === "wake")!;
-    const taskLine = wake.parts!.find((part) => part.id === "wake.task")!;
+    // The worktree's branch, and the identifier, on the task line.
+    const theTask = byId(drafted.prompt.firstMessage, "the_task")!;
+    expect(theTask.text).toContain(created.identifier!);
+    const taskLine = theTask.parts!.find((part) => part.id === "wake.task")!;
     expect(taskLine.text).toContain("branch `");
     expect(taskLine.pending).toMatch(/names the branch/);
     expect(taskLine.pending).toMatch(/given when it's created/);
@@ -190,13 +201,19 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview of a task being
       executionWorkspacePreference: "shared_workspace",
       executionWorkspaceSettings: { mode: "shared_workspace" },
     }));
-    const brief = drafted.prompt.firstMessage.find((section) => section.id === "task_brief")!;
-    expect(brief.text).toContain(`- Title: "Reconcile the April invoices with the bank export."`);
-    expect(brief.text).toContain("Task title directive:");
+    const byId = (id: string) => drafted.prompt.firstMessage.find((section) => section.id === id);
+    // In the brief, or with the task's facts in the wake (step 5 phase 2, the task brief).
+    const brief = byId("task_brief");
+    if (brief) {
+      expect(brief.text).toContain(`- Title: "Reconcile the April invoices with the bank export."`);
+      expect(brief.text).toContain("Task title directive:");
+    } else {
+      expect(byId("the_task")!.text).toContain("\"Reconcile the April invoices with the bank export.\"");
+      expect(byId("to_do")!.text).toContain("`onlyIfProvisional: true`");
+    }
     // The shared checkout: no worktree of its own, so no branch to name.
     expect(drafted.project?.checkout).toEqual({ kind: "local", path: seeded.repo });
-    const wake = drafted.prompt.firstMessage.find((section) => section.id === "wake")!;
-    expect(wake.parts?.find((part) => part.id === "wake.task")?.text).not.toContain("branch `");
+    expect(byId("the_task")!.parts?.find((part) => part.id === "wake.task")?.text).not.toContain("branch `");
   }, 60_000);
 
   it("inserts nothing: no task, comment, run or wakeup", async () => {

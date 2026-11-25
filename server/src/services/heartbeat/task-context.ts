@@ -17,6 +17,7 @@ import type { TrustPresetResolution } from "../trust-preset-resolver.js";
 import { liveVoiceExecutionGuidance } from "../voice/voice-execution-guidance.js";
 import { buildPaperclipWakePayload, ConfigurationIncompleteFailure, readHeartbeatWakeComments, PAPERCLIP_WAKE_PAYLOAD_KEY, type createHeartbeatRunPreparation } from "./run-preparation.js";
 import { buildPaperclipTaskMarkdown, buildPaperclipTaskMarkdownParts, type PaperclipTaskMarkdownInput } from "./task-markdown.js";
+import { buildRunTaskFacts } from "./run-task-facts.js";
 import { deriveCommentId, extractWakeCommentIds } from "../../modules/run-dispatch/index.js";
 import { workspacePreferenceService } from "../workspace-preferences.js";
 
@@ -468,6 +469,21 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
   let taskMarkdownAssignmentCompactParts = typeof context.paperclipTaskMarkdownAssignmentCompact === "string"
     ? taskBriefParts({ ...taskMarkdownInput, taskPlan, includeDescription: false, includeWakeComments: false })
     : null;
+  // The task's facts, for the run message's "The task" and "What to do now" (step 5 phase 2). Only
+  // on a non-chat task outside an external chat turn: its presence is the test for leaving the
+  // brief out, so chat tasks keep the brief.
+  if (issueRef && !(taskMarkdownInput.issue?.conversationAgentId || issueRef.conversationAgentId) && !paperclipWakePayload?.externalChatProvider) {
+    context.paperclipRunTask = await buildRunTaskFacts(db, {
+      companyId: agent.companyId,
+      issueId: issueRef.id,
+      taskMarkdownInput,
+      taskPlan,
+      previousRunId: taskSession?.lastRunId ?? null,
+      prefix: { caseMarkdown: caseExecutionMarkdown(workflowCase), liveVoice: liveVoiceTaskPrefix },
+    });
+  } else {
+    delete context.paperclipRunTask;
+  }
   context.paperclipTaskCommunicationGuidance = [context.paperclipTaskCommunicationGuidance, FAST_RESPONSE_AGENT_GUIDANCE].filter(Boolean).join("\n\n");
   if (issueRef) {
     const redactedWakeContext = await createRunSecretRedactionRegistry(
@@ -481,12 +497,14 @@ export async function prepareHeartbeatTaskContext(db: Db, input: HeartbeatTaskCo
       paperclipTaskMarkdownCompact: context.paperclipTaskMarkdownCompact,
       paperclipTaskMarkdownAssignment: context.paperclipTaskMarkdownAssignment,
       paperclipTaskMarkdownAssignmentCompact: context.paperclipTaskMarkdownAssignmentCompact,
+      paperclipRunTask: context.paperclipRunTask,
       taskMarkdownAssignmentParts,
       taskMarkdownAssignmentCompactParts,
     });
     taskMarkdownAssignmentParts = redactedWakeContext.taskMarkdownAssignmentParts;
     taskMarkdownAssignmentCompactParts = redactedWakeContext.taskMarkdownAssignmentCompactParts;
     context.paperclipIssue = redactedWakeContext.paperclipIssue;
+    if (redactedWakeContext.paperclipRunTask) context.paperclipRunTask = redactedWakeContext.paperclipRunTask;
     if (redactedWakeContext.paperclipCase) context.paperclipCase = redactedWakeContext.paperclipCase;
     context.paperclipTaskCommunicationGuidance = redactedWakeContext.paperclipTaskCommunicationGuidance;
     if (redactedWakeContext.paperclipWakeComment) {

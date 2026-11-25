@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { freshRecord, promptSection, resumedRecord, unmatchedRecord } from "./fixtures/prompt-records";
 import { promptSize } from "./invocation";
-import { promptViewFromLegacyPrompt, promptViewFromRecord } from "./prompt-sections";
+import { promptViewFromLegacyPrompt, promptViewFromRecord, sectionInfo } from "./prompt-sections";
 
 describe("promptViewFromRecord", () => {
   it("gives the system prompt, then the first message, with the sections in their recorded order", () => {
@@ -91,6 +91,27 @@ describe("promptViewFromRecord", () => {
     expect(first!.size).toBe("40.3k characters");
     // The system prompt's size is its sections' sizes added up.
     expect(system!.size).toBe("54 characters");
+  });
+
+  it("shows the wake's four headings as sections, each with its own tip, and still shows an old record's wake and brief", () => {
+    const view = promptViewFromRecord({
+      ...freshRecord,
+      firstMessage: [
+        promptSection("what_happened", "## What happened\n\nA new comment."),
+        promptSection("where_things_stand", "## Where things stand\n\nThe history."),
+        promptSection("the_task", "## The task\n\nTES-45 \"Add a toggle\""),
+        promptSection("to_do", "## What to do now\n\n- Reply."),
+      ],
+    });
+    const sections = view.groups[1]!.sections;
+    expect(sections.map((section) => section.id)).toEqual(["what_happened", "where_things_stand", "the_task", "to_do"]);
+    const tips = sections.map((section) => section.info);
+    expect(new Set(tips).size).toBe(4);
+    for (const tip of tips) expect(tip).not.toBe(sectionInfo("unknown_section"));
+    // An old record: one wake section and the brief, each with its tip.
+    const [, old] = promptViewFromRecord(freshRecord).groups;
+    expect(old!.sections.map((section) => section.id)).toEqual(["communication_guidance", "wake", "task_brief"]);
+    expect(old!.sections.map((section) => section.info).every((tip) => tip !== sectionInfo("unknown_section"))).toBe(true);
   });
 
   it("keeps a section's pending marker for the preview to show", () => {

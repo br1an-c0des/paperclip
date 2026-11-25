@@ -23,6 +23,12 @@ export type RunPromptSectionId =
   | "instructions_directive"
   | "bootstrap_template"
   | "communication_guidance"
+  // The claude_local wake's four headings, each its own section (step 5 phase 2, the task
+  // brief); older records, and external chat turns, have one "wake" section instead.
+  | "what_happened"
+  | "where_things_stand"
+  | "the_task"
+  | "to_do"
   | "wake"
   | "session_rotation_note"
   | "task_brief"

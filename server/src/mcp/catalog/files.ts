@@ -14,12 +14,14 @@ export interface FileUploadInput {
 }
 
 /**
- * Temporary file links (carried over from the public MCP). They're tickets tied to an OAuth grant,
- * so only outside connections get these tools; a run attaches files through the task's API.
+ * Temporary file links (carried over from the public MCP). An upload link is a ticket tied to an
+ * OAuth grant, so only outside connections can upload this way; a run attaches files through the
+ * task's API. A download link is tied to the outside connection's grant, or to the run that asked
+ * for it (`services/run-file-links.ts`). Each catalog supplies the links its callers can use.
  */
 export interface CatalogFiles {
-  upload(caller: McpCaller, input: FileUploadInput): Promise<unknown>;
-  download(caller: McpCaller, attachmentId: string): Promise<unknown>;
+  upload?(caller: McpCaller, input: FileUploadInput): Promise<unknown>;
+  download?(caller: McpCaller, attachmentId: string): Promise<unknown>;
 }
 
 function unavailable(): never {
@@ -42,15 +44,15 @@ export function createFileTools(files: CatalogFiles | undefined): PaperclipTool[
         byteSize: z.number().int().min(1).max(MAX_ATTACHMENT_BYTES),
         sha256: z.string().regex(/^[a-f0-9]{64}$/),
       }).strict(),
-      run: async (caller, args) => (files ?? unavailable()).upload(caller, args),
+      run: async (caller, args) => files?.upload ? files.upload(caller, args) : unavailable(),
     }),
     tool({
       name: "paperclip_file_download",
-      description: "Get a ten-minute URL to download one of a task's attached files (ids from paperclip_deliverables).",
+      description: "Get a ten-minute URL to download a file attached to a task you can read (attachment ids from the wake or paperclip_deliverables), then fetch it with your HTTP tools.",
       action: "tasks:read",
-      needsGrant: true,
+      needsRunOrGrant: true,
       input: z.object({ attachmentId: z.uuid() }).strict(),
-      run: async (caller, args) => (files ?? unavailable()).download(caller, args.attachmentId),
+      run: async (caller, args) => files?.download ? files.download(caller, args.attachmentId) : unavailable(),
     }),
   ];
 }

@@ -362,10 +362,15 @@ function markPending(
     "wake.issue_state": flags.status ? PENDING.status : null,
     "wake.workspace_branch": flags.branch ? PENDING.branch : null,
   };
+  // The claude_local wake's four sections (step 5 phase 2, the task brief): connection
+  // instructions follow "What to do now", and without a brief a case's context is under "The task".
+  const briefSent = sections.some((section) => section.id === "task_brief");
   const sectionPending: Partial<Record<RunPromptSection["id"], string | null>> = {
     instructions_directive: flags.instructions ? PENDING.instructions : null,
     wake: flags.connections ? PENDING.connections : null,
+    to_do: flags.connections ? PENDING.connections : null,
     task_brief: flags.workflowCase ? PENDING.workflowCase : null,
+    the_task: flags.workflowCase && !briefSent ? PENDING.workflowCase : null,
   };
   return sections.map((section) => {
     const parts = section.parts?.map((part): RunPromptPart => {

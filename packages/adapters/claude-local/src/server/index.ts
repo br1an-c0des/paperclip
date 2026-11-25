@@ -4,11 +4,17 @@ export {
   claudeWakeOptions,
   composeClaudeCliPrompt,
   resolveClaudePromptTemplate,
+  runTaskReplacesBrief,
   usesSharedWake,
   wakeHistoryReplacesHandoff,
 } from "./legacy-prompt.js";
-export { detectClaudeWakeEvents, renderClaudeWake, renderClaudeWakeParts } from "./wake/render.js";
-export type { ClaudeWakeEventKind, ClaudeWakeRenderOptions } from "./wake/render.js";
+export { detectClaudeWakeEvents, renderClaudeRunMessageSections, renderClaudeWake, renderClaudeWakeParts } from "./wake/render.js";
+export type {
+  ClaudeRunMessageSection,
+  ClaudeRunMessageSectionId,
+  ClaudeWakeEventKind,
+  ClaudeWakeRenderOptions,
+} from "./wake/render.js";
 export type { ClaudeCliPromptInput, ClaudeCliPromptSectionTexts } from "./legacy-prompt.js";
 export { planClaudeInstructionsDirective, planClaudeRunSkillsAndInstructions } from "./run-plan.js";
 export { buildClaudePromptRecord, PAPERCLIP_RUN_PROMPT_PLAN_KEY, readRunPromptPlan } from "./prompt-record.js";
