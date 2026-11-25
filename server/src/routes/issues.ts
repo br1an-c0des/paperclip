@@ -28,6 +28,7 @@ import { recordNativeHumanSelfHandoff } from "../services/native-runtime/native-
 import { recordChildTaskRead } from "../services/native-runtime/native-child-completion-delivery.js";
 import { recordCompletedHandoffRead } from "../services/chat-completion-delivery.js";
 import { recordDeclinedInteractionRead } from "../services/chat-interaction-outcome-report.js";
+import { readTaskRequestHistory } from "../services/task-request-history.js";
 import { runRetainsIssueIdentity } from "../services/task-repository-acquisition.js";
 import { withConversationReadState } from "../services/agent-chat-read-state.js";
 import { markIssueReadSchema } from "@paperclipai/shared";
@@ -18605,6 +18606,28 @@ export function issueRoutes(
         .catch(error => logger.warn({ err: error, runId: req.actor.runId }, "could not record the declined actions a run read"));
     }
     res.json(interactions);
+  });
+
+  // The task's requests for paperclip_read_task: read-only. Unlike GET /issues/:id/interactions it
+  // records nothing (no recordDeclinedInteractionRead), and it applies the history's exclusions
+  // and trust rule (services/task-request-history.ts).
+  router.get("/issues/:id/request-history", async (req, res) => {
+    const id = req.params.id as string;
+    const issue = await getAccessibleResource(
+      req,
+      res,
+      getIssueById(req, id),
+      "Issue not found",
+    );
+    if (!issue) return;
+    if (!(await assertIssueReadAllowed(req, res, issue))) return;
+    const lowTrust = await actorIsLowTrustReview(req, issue.companyId, issue);
+    res.json(await readTaskRequestHistory(db, {
+      companyId: issue.companyId,
+      issueId: issue.id,
+      viewerAgentId: req.actor.type === "agent" ? (req.actor.agentId ?? null) : null,
+      lowTrust,
+    }));
   });
 
   router.post(

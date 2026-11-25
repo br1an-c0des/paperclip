@@ -73,17 +73,48 @@ export const TASK_TOOLS = [
   }),
   tool({
     name: "paperclip_read_task",
-    description: "Read a task and its latest comments (and, with history: true, its activity).",
+    description: "Read a task and its latest comments (with requests: true, its questions, confirmations and approvals; with history: true, its activity).",
     action: "tasks:read",
-    input: z.object({ taskId, comments: z.number().int().min(0).max(100).default(20), history: z.boolean().default(false) }).strict(),
+    input: z.object({
+      taskId,
+      comments: z.number().int().min(0).max(100).default(20),
+      requests: z.boolean().default(false),
+      history: z.boolean().default(false),
+    }).strict(),
     run: async (_caller, args, api) => {
-      const task = await api("GET", `/issues/${pathId(args.taskId)}`);
+      const id = pathId(args.taskId);
+      const task = await api("GET", `/issues/${id}`);
       const comments = args.comments === 0 ? []
-        : rows(await api("GET", `/issues/${pathId(args.taskId)}/comments?order=desc&limit=${args.comments}`));
+        : rows(await api("GET", `/issues/${id}/comments?order=desc&limit=${args.comments}`));
+      // One read gives the requests and the names of their people and of the comments' authors.
+      // It records nothing, unlike GET /issues/:id/interactions.
+      const requestHistory = args.requests || comments.length > 0
+        ? object(await api("GET", `/issues/${id}/request-history`))
+        : null;
+      const names = object(requestHistory?.names);
+      const nameOf = (type: unknown, personId: unknown): string | null => {
+        const name = (type === "agent" || type === "user") && typeof personId === "string" ? names[`${type}:${personId}`] : null;
+        return typeof name === "string" ? name : null;
+      };
+      const personName = (value: unknown) => nameOf(object(value).type, object(value).id);
       const history = args.history
-        ? rows(await api("GET", `/issues/${pathId(args.taskId)}/activity?limit=30`)).slice(0, 30).map(row => pick(row, ["id", "action", "actorType", "actorId", "createdAt"]))
+        ? rows(await api("GET", `/issues/${id}/activity?limit=30`)).slice(0, 30).map(row => pick(row, ["id", "action", "actorType", "actorId", "createdAt"]))
         : undefined;
-      return { task: pick(task, TASK_FIELDS), comments: comments.map(row => pick(row, COMMENT_FIELDS)), ...(history ? { history } : {}) };
+      return {
+        task: pick(task, TASK_FIELDS),
+        comments: comments.map((row) => {
+          const authorName = nameOf("agent", object(row).authorAgentId) ?? nameOf("user", object(row).authorUserId);
+          return { ...pick(row, COMMENT_FIELDS), ...(authorName ? { authorName } : {}) };
+        }),
+        ...(args.requests ? {
+          requests: rows(requestHistory?.requests).map((request) => {
+            const askedByName = personName(object(request).askedBy);
+            const decidedByName = personName(object(request).decidedBy);
+            return { ...object(request), ...(askedByName ? { askedByName } : {}), ...(decidedByName ? { decidedByName } : {}) };
+          }),
+        } : {}),
+        ...(history ? { history } : {}),
+      };
     },
   }),
   tool({
