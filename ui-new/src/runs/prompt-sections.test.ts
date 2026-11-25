@@ -139,7 +139,7 @@ describe("promptViewFromRecord", () => {
   });
 
   it("describes who the agent is and the Paperclip tools note (step 5 phase 2, the light sections)", () => {
-    expect(sectionInfo("heartbeat_template")).toBe("Who the agent is: its name and job title, or the agent's own prompt template.");
+    expect(sectionInfo("heartbeat_template")).toBe("The agent's own prompt template, a legacy setting. Older runs: who the agent is.");
     expect(sectionInfo("mcp_note")).toBe("How the run works with Paperclip: its paperclip_* tools, and how to end the run.");
   });
 

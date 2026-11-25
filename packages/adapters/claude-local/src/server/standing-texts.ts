@@ -1,5 +1,5 @@
 import path from "node:path";
-import { isPaperclipRecoveryWakePayload, type PaperclipSkillEntry } from "@paperclipai/adapter-utils/server-utils";
+import type { PaperclipSkillEntry } from "@paperclipai/adapter-utils/server-utils";
 
 // --- The sealed system prompt (step 5 phase 2, the system prompt; fork/step-5-system-prompt.md) --
 //
@@ -97,9 +97,10 @@ export function claudeSkillsSection(input: {
 
 /**
  * The first message's standing texts on a claude_local CLI run (step 5 phase 2, the light
- * sections; fork/step-5-light.md): who the agent is, where its instructions file is this run, and
- * how it works with Paperclip. claude_local's own; ACP and the other adapters keep the shared
- * texts (`renderPaperclipMcpNote`, `DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE`).
+ * sections and the system prompt; fork/step-5-light.md, fork/step-5-system-prompt.md): where the
+ * agent's instructions are this run, and who the agent is on an unsealed run (a sealed run has it
+ * in its system prompt). claude_local's own; ACP and the other adapters keep the shared texts
+ * (`renderPaperclipMcpNote`, `DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE`).
  */
 
 function trimmedString(value: unknown): string {
@@ -116,31 +117,54 @@ export function claudeIdentityLine(agent: { id: string; name?: unknown; title?: 
   return title ? `You are ${name}, ${title}.` : `You are ${name}.`;
 }
 
-/** Where the agent's instructions file is this run, and the folder its relative paths resolve from. */
-export function claudeInstructionsLocation(instructionsFilePath: string): string {
-  return `Your instructions file this run is ${instructionsFilePath}; resolve relative paths in it from ${path.dirname(instructionsFilePath)}/.`;
+/**
+ * The agent's instructions copy this run, as the server puts it on the run context
+ * (`context.paperclipInstructionCopy`, `server/src/services/heartbeat/instruction-working-copy.ts`):
+ * an agent directory (AGENT_HOME, kept after the run), a registered copy of the instructions file
+ * (saved after the run), or none that can be saved (`unavailable`). Absent: no registered copy.
+ */
+export type ClaudeInstructionCopy =
+  | { kind: "agent_directory"; root: string; entryFile: string; storageWarning: string | null }
+  | { kind: "instruction_file"; root: string; entryFile: string }
+  | { kind: "unavailable" };
+
+/** The context key the server sets the run's `ClaudeInstructionCopy` on. */
+export const PAPERCLIP_INSTRUCTION_COPY_KEY = "paperclipInstructionCopy";
+
+/** The run's instructions copy from the context value, or null when absent or not understood. */
+export function readClaudeInstructionCopy(value: unknown): ClaudeInstructionCopy | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (record.kind === "unavailable") return { kind: "unavailable" };
+  const root = trimmedString(record.root);
+  const entryFile = trimmedString(record.entryFile);
+  if (!root || !entryFile) return null;
+  if (record.kind === "agent_directory") {
+    return { kind: "agent_directory", root, entryFile, storageWarning: trimmedString(record.storageWarning) || null };
+  }
+  if (record.kind === "instruction_file") return { kind: "instruction_file", root, entryFile };
+  return null;
 }
 
 /**
- * How the run works with Paperclip: the `paperclip_*` tools and, unless `endOfRunLine` is false,
- * how to end the run. Empty without the API URL and key, as `renderPaperclipMcpNote` is.
+ * The first message's one instructions line (bug 88): where the agent's instructions are this
+ * run, with each path printed once. An agent directory names the folder and its entry file, then
+ * any storage warning on its own line; otherwise the file and the folder its relative paths
+ * resolve from, and whether changes to it are saved.
  */
-export function claudeToolsNote(input: { env: Record<string, string>; endOfRunLine: boolean }): string {
-  if (!input.env.PAPERCLIP_API_URL || !input.env.PAPERCLIP_API_KEY) return "";
-  return [
-    "Work with Paperclip through the `paperclip` MCP server's `paperclip_*` tools, not HTTP requests. " +
-      "This message has what's new and the task; `paperclip_read_task` and `paperclip_task_context` read more when you need it.",
-    ...(input.endOfRunLine
-      ? ["End the run with `paperclip_finish`, `paperclip_block` (if you're waiting on someone) or `paperclip_report_progress` with `continue: true`."]
-      : []),
-    "PAPERCLIP_API_KEY is there for scripts that need the REST API.",
-  ].join("\n");
-}
-
-/**
- * Whether the tools note carries the end-of-run line: not on a chat task, which ends with its
- * reply, and not on a recovery wake, whose own rules say how it ends.
- */
-export function claudeToolsNoteEndsRun(context: Record<string, unknown>): boolean {
-  return context.conversationMode !== true && !isPaperclipRecoveryWakePayload(context.paperclipWake);
+export function claudeInstructionsLocation(input: {
+  instructionsFilePath: string;
+  copy: ClaudeInstructionCopy | null;
+}): string {
+  const { instructionsFilePath, copy } = input;
+  if (copy?.kind === "agent_directory") {
+    const line =
+      `Your agent directory this run is ${copy.root} (AGENT_HOME): your instructions are ${copy.entryFile} there, ` +
+      "and changes you make in it are kept after the run. Task files go in the task's working directory.";
+    return copy.storageWarning ? `${line}\n${copy.storageWarning}` : line;
+  }
+  const fileLine = `Your instructions file is ${instructionsFilePath}; relative paths in it resolve from ${path.dirname(instructionsFilePath)}/.`;
+  if (copy?.kind === "instruction_file") return `${fileLine} Changes to it are saved after the run.`;
+  if (copy?.kind === "unavailable") return `${fileLine} Changes to it aren't saved.`;
+  return fileLine;
 }

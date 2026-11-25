@@ -1,26 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { createPromptContextFixture } from "@paperclipai/adapter-utils/test-fixtures/prompt-context";
 import type { PaperclipSkillEntry } from "@paperclipai/adapter-utils/server-utils";
 import {
   CLAUDE_INSTRUCTIONS_RELATIVE_NOTE,
   claudeIdentityLine,
   claudeInstructionsLocation,
   claudeSkillsSection,
-  claudeToolsNote,
-  claudeToolsNoteEndsRun,
+  readClaudeInstructionCopy,
   WORKING_IN_PAPERCLIP,
   WORKING_IN_PAPERCLIP_ENDING,
 } from "./standing-texts.js";
 
-// The first message's standing texts on a claude_local CLI run (step 5 phase 2, the light
-// sections). Exact copy from fork/step-5-light.md.
-
-const TOOLS_LINE =
-  "Work with Paperclip through the `paperclip` MCP server's `paperclip_*` tools, not HTTP requests. " +
-  "This message has what's new and the task; `paperclip_read_task` and `paperclip_task_context` read more when you need it.";
-const END_OF_RUN_LINE =
-  "End the run with `paperclip_finish`, `paperclip_block` (if you're waiting on someone) or `paperclip_report_progress` with `continue: true`.";
-const API_KEY_LINE = "PAPERCLIP_API_KEY is there for scripts that need the REST API.";
+// The standing texts on a claude_local CLI run (step 5 phase 2, the light sections and the
+// system prompt). Exact copy from fork/step-5-light.md and fork/step-5-system-prompt-plan.md.
 
 describe("claudeIdentityLine", () => {
   it("names the agent and its title", () => {
@@ -52,70 +43,67 @@ describe("claudeIdentityLine", () => {
 });
 
 describe("claudeInstructionsLocation", () => {
-  it("is one line naming the file and the folder relative paths resolve from", () => {
-    expect(claudeInstructionsLocation("/x/instructions/AGENTS.md"))
-      .toBe("Your instructions file this run is /x/instructions/AGENTS.md; resolve relative paths in it from /x/instructions/.");
+  const instructionsFilePath = "/x/instructions/AGENTS.md";
+  const count = (text: string, needle: string) => text.split(needle).length - 1;
+
+  it("names the agent directory and its entry file once, with no trailing newline", () => {
+    const text = claudeInstructionsLocation({
+      instructionsFilePath: "/home/run/live/AGENTS.md",
+      copy: { kind: "agent_directory", root: "/home/run/live", entryFile: "AGENTS.md", storageWarning: null },
+    });
+    expect(text).toBe(
+      "Your agent directory this run is /home/run/live (AGENT_HOME): your instructions are AGENTS.md there, " +
+        "and changes you make in it are kept after the run. Task files go in the task's working directory.",
+    );
+    expect(count(text, "/home/run/live")).toBe(1);
+    expect(text.endsWith("\n")).toBe(false);
+  });
+
+  it("puts a storage warning on its own line after the agent directory line", () => {
+    const text = claudeInstructionsLocation({
+      instructionsFilePath: "/home/run/live/AGENTS.md",
+      copy: { kind: "agent_directory", root: "/home/run/live", entryFile: "AGENTS.md", storageWarning: "Agent files are near their limit." },
+    });
+    expect(text.split("\n")).toEqual([
+      expect.stringMatching(/^Your agent directory this run is \/home\/run\/live \(AGENT_HOME\)/),
+      "Agent files are near their limit.",
+    ]);
+  });
+
+  it("names a registered instructions file once, saying its changes are saved", () => {
+    const text = claudeInstructionsLocation({ instructionsFilePath, copy: { kind: "instruction_file", root: "/x/instructions", entryFile: "AGENTS.md" } });
+    expect(text).toBe("Your instructions file is /x/instructions/AGENTS.md; relative paths in it resolve from /x/instructions/. Changes to it are saved after the run.");
+    expect(count(text, instructionsFilePath)).toBe(1);
+  });
+
+  it("says changes aren't saved when no copy can be saved", () => {
+    expect(claudeInstructionsLocation({ instructionsFilePath, copy: { kind: "unavailable" } }))
+      .toBe("Your instructions file is /x/instructions/AGENTS.md; relative paths in it resolve from /x/instructions/. Changes to it aren't saved.");
+  });
+
+  it("is the file and its folder without a copy", () => {
+    const text = claudeInstructionsLocation({ instructionsFilePath, copy: null });
+    expect(text).toBe("Your instructions file is /x/instructions/AGENTS.md; relative paths in it resolve from /x/instructions/.");
+    expect(count(text, instructionsFilePath)).toBe(1);
+    expect(text).not.toContain("\n");
   });
 });
 
-describe("claudeToolsNote", () => {
-  const env = { PAPERCLIP_API_URL: "u", PAPERCLIP_API_KEY: "k" };
-
-  it("has three lines with the end-of-run line", () => {
-    const note = claudeToolsNote({ env, endOfRunLine: true });
-    expect(note.split("\n")).toHaveLength(3);
-    expect(note).toBe([TOOLS_LINE, END_OF_RUN_LINE, API_KEY_LINE].join("\n"));
+describe("readClaudeInstructionCopy", () => {
+  it("reads each kind", () => {
+    expect(readClaudeInstructionCopy({ kind: "agent_directory", root: "/r", entryFile: "AGENTS.md", storageWarning: "  " }))
+      .toEqual({ kind: "agent_directory", root: "/r", entryFile: "AGENTS.md", storageWarning: null });
+    expect(readClaudeInstructionCopy({ kind: "agent_directory", root: "/r", entryFile: "AGENTS.md", storageWarning: "Full." }))
+      .toEqual({ kind: "agent_directory", root: "/r", entryFile: "AGENTS.md", storageWarning: "Full." });
+    expect(readClaudeInstructionCopy({ kind: "instruction_file", root: "/r", entryFile: "AGENTS.md" }))
+      .toEqual({ kind: "instruction_file", root: "/r", entryFile: "AGENTS.md" });
+    expect(readClaudeInstructionCopy({ kind: "unavailable" })).toEqual({ kind: "unavailable" });
   });
 
-  it("leaves the end-of-run line out when asked", () => {
-    const note = claudeToolsNote({ env, endOfRunLine: false });
-    expect(note).not.toContain("paperclip_finish");
-    expect(note).toBe([TOOLS_LINE, API_KEY_LINE].join("\n"));
-  });
-
-  it("is empty without the API URL or key", () => {
-    expect(claudeToolsNote({ env: {}, endOfRunLine: true })).toBe("");
-    expect(claudeToolsNote({ env: { PAPERCLIP_API_URL: "u" }, endOfRunLine: true })).toBe("");
-    expect(claudeToolsNote({ env: { PAPERCLIP_API_KEY: "k" }, endOfRunLine: true })).toBe("");
-  });
-
-  it("has no heading and doesn't say to start with paperclip_task_context", () => {
-    const note = claudeToolsNote({ env, endOfRunLine: true });
-    expect(note).not.toContain("Paperclip API access note:");
-    expect(note).not.toContain("Start with");
-  });
-});
-
-describe("claudeToolsNoteEndsRun", () => {
-  it("is false on a chat task", () => {
-    expect(claudeToolsNoteEndsRun({ conversationMode: true })).toBe(false);
-  });
-
-  it("is false on a recovery wake", () => {
-    const fixture = createPromptContextFixture();
-    // A payload needs an issue (or comments) to normalize.
-    expect(claudeToolsNoteEndsRun({
-      paperclipWake: { reason: "source_scoped_recovery_action", issue: fixture.paperclipWake.issue },
-    })).toBe(false);
-    expect(claudeToolsNoteEndsRun({
-      ...fixture,
-      paperclipWake: {
-        reason: "issue_continuation_needed",
-        issue: fixture.paperclipWake.issue,
-        recovery: {
-          cause: "process_lost", failureSummary: "the process exited", originalAssignee: { id: "agent-1", name: "Ada" },
-          attemptCount: 1, maxAttempts: 3, nextAction: "retry",
-        },
-        comments: [],
-        fallbackFetchNeeded: false,
-      },
-    })).toBe(false);
-  });
-
-  it("is true otherwise", () => {
-    expect(claudeToolsNoteEndsRun({})).toBe(true);
-    expect(claudeToolsNoteEndsRun({ conversationMode: false })).toBe(true);
-    expect(claudeToolsNoteEndsRun(createPromptContextFixture())).toBe(true);
+  it("is null when absent or not understood", () => {
+    for (const value of [undefined, null, "x", [], {}, { kind: "other", root: "/r", entryFile: "a" }, { kind: "agent_directory", root: "", entryFile: "a" }]) {
+      expect(readClaudeInstructionCopy(value)).toBeNull();
+    }
   });
 });
 

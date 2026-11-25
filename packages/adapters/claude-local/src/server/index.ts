@@ -21,11 +21,12 @@ export {
   claudeIdentityLine,
   claudeInstructionsLocation,
   claudeSkillsSection,
-  claudeToolsNote,
-  claudeToolsNoteEndsRun,
+  PAPERCLIP_INSTRUCTION_COPY_KEY,
+  readClaudeInstructionCopy,
   WORKING_IN_PAPERCLIP,
   WORKING_IN_PAPERCLIP_ENDING,
 } from "./standing-texts.js";
+export type { ClaudeInstructionCopy } from "./standing-texts.js";
 export { planClaudeInstructionsDirective, planClaudeRunSkillsAndInstructions } from "./run-plan.js";
 export { buildClaudePromptRecord, PAPERCLIP_RUN_PROMPT_PLAN_KEY, readRunPromptPlan } from "./prompt-record.js";
 export * from "./acp.js";

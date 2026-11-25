@@ -60,17 +60,29 @@ describe("planClaudeInstructionsDirective", () => {
   it("is the directive the run plan computes", async () => {
     const config = { instructionsFilePath };
     const planned = await plan({ config });
-    const { directive, readError } = await planClaudeInstructionsDirective(config);
+    const { directive, readError } = await planClaudeInstructionsDirective(config, {});
     expect(directive).toBe(planned.instructionsPathDirective);
-    expect(directive).toBe(claudeInstructionsLocation(instructionsFilePath));
+    expect(directive).toBe(claudeInstructionsLocation({ instructionsFilePath, copy: null }));
     expect(readError).toBeNull();
   });
 
+  it("names the run's instructions copy from the context", async () => {
+    const config = { instructionsFilePath };
+    const context = { paperclipInstructionCopy: { kind: "agent_directory", root: dir, entryFile: "AGENTS.md", storageWarning: "Near the limit." } };
+    const planned = await plan({ config, context });
+    const { directive } = await planClaudeInstructionsDirective(config, context);
+    expect(directive).toBe(planned.instructionsPathDirective);
+    expect(directive).toBe(`Your agent directory this run is ${dir} (AGENT_HOME): your instructions are AGENTS.md there, ` +
+      "and changes you make in it are kept after the run. Task files go in the task's working directory.\nNear the limit.");
+    // The system prompt doesn't change with the copy.
+    expect(planned.combinedInstructionsContents).toBe((await plan({ config })).combinedInstructionsContents);
+  });
+
   it("is empty, with the error, when the file can't be read", async () => {
-    const result = await planClaudeInstructionsDirective({ instructionsFilePath: path.join(dir, "missing.md") });
+    const result = await planClaudeInstructionsDirective({ instructionsFilePath: path.join(dir, "missing.md") }, {});
     expect(result.directive).toBe("");
     expect(result.readError).toMatch(/ENOENT/);
-    expect(await planClaudeInstructionsDirective({})).toEqual({ directive: "", readError: null });
+    expect(await planClaudeInstructionsDirective({}, {})).toEqual({ directive: "", readError: null });
   });
 });
 

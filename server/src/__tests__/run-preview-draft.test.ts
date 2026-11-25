@@ -182,8 +182,9 @@ describe.skipIf(!recoveryPostgresSupport.supported)("run preview of a task being
 
     // The whole first message matches, apart from the id; so does the system prompt.
     expect(comparable(drafted.prompt.firstMessage)).toEqual(comparable(real.prompt.firstMessage, created.id));
-    // It opens with who the agent is, its title included.
-    expect(drafted.prompt.firstMessage[0]).toMatchObject({ id: "heartbeat_template", text: "You are M7 test draft agent, QA engineer." });
+    // Its system prompt opens with who the agent is, its title included (step 5 phase 2).
+    expect(drafted.prompt.systemPrompt[0]).toMatchObject({ id: "identity", text: "You are M7 test draft agent, QA engineer." });
+    expect(drafted.prompt.firstMessage.some((section) => section.id === "heartbeat_template")).toBe(false);
     expect(drafted.prompt.systemPrompt).toEqual(real.prompt.systemPrompt);
     expect(drafted.manifest).toEqual(real.manifest);
 

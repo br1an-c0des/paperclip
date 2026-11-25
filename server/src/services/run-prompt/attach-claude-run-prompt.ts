@@ -47,8 +47,6 @@ export async function attachClaudeRunPromptPlan(input: {
       context: input.adapterContext,
       // A local target is always sealed (execute.ts).
       sealed: true,
-      // PAPERCLIP_API_URL is always set; the key comes only from the run token.
-      paperclipApiReachable: Boolean(input.authToken),
       loadFreshSessionHandoff: input.getFreshSessionHandoff,
     });
     Object.defineProperty(input.adapterContext, PAPERCLIP_RUN_PROMPT_PLAN_KEY, {

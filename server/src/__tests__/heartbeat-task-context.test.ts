@@ -109,7 +109,9 @@ describePostgres("heartbeat task context delivered to an adapter", () => {
     for (const key of ["paperclipIssue", "paperclipWakeComment", "paperclipTaskMarkdown", "paperclipTaskMarkdownAssignment", "paperclipTaskMarkdownCompact", "paperclipTaskMarkdownAssignmentCompact"]) {
       expect(JSON.stringify(context[key])).not.toContain(secret);
     }
-    expect(context.paperclipTaskCommunicationGuidance).toBe(FAST_RESPONSE_AGENT_GUIDANCE);
+    // The caller's guidance is replaced; fast responses are off by default, so no note either.
+    expect(String(context.paperclipTaskCommunicationGuidance ?? "")).not.toContain("FORGED");
+    expect(String(context.paperclipTaskCommunicationGuidance ?? "")).not.toContain(FAST_RESPONSE_AGENT_GUIDANCE);
     expect(context.paperclipSkillTest).toBeUndefined();
     expect(context.paperclipAgentJwtScope).toEqual({ kind: "standard" });
     expect(context.paperclipContinuationSummary).toBeUndefined();

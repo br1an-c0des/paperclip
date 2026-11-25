@@ -762,8 +762,8 @@ describe("claude execute", () => {
       expect(captured[1]?.appendedSystemPromptFileContents).toContain("# Agent instructions");
       expect(captured[1]?.appendedSystemPromptFileContents).not.toContain(instructionsFile);
       for (const prompt of prompts) expect(prompt).toContain(
-        `Your instructions file this run is ${instructionsFile}; ` +
-        `resolve relative paths in it from ${path.dirname(instructionsFile)}/.`,
+        `Your instructions file is ${instructionsFile}; ` +
+        `relative paths in it resolve from ${path.dirname(instructionsFile)}/.`,
       );
       expect(metaEvents).toHaveLength(2);
       expect(metaEvents[0]?.commandNotes.filter((note) => /prompt bundle/i.test(note))).toEqual([]);
@@ -1474,8 +1474,8 @@ describe("claude execute", () => {
       expect(capture1.instructionsFilePath?.startsWith(expectedRoot)).toBe(true);
       expect(capture1.instructionsContents).toContain("You are managed instructions.");
       expect(capture1.instructionsContents).not.toContain(instructionsPath);
-      expect(capture1.prompt).toContain(`Your instructions file this run is ${instructionsPath};`);
-      expect(capture2.prompt).toContain(`Your instructions file this run is ${instructionsPath};`);
+      expect(capture1.prompt).toContain(`Your instructions file is ${instructionsPath};`);
+      expect(capture2.prompt).toContain(`Your instructions file is ${instructionsPath};`);
       expect(capture1.skillEntries).toContain("paperclip");
       expect(capture2.argv).toContain("--resume");
       expect(getFreshSessionHandoff).not.toHaveBeenCalled();
@@ -1562,7 +1562,7 @@ describe("claude execute", () => {
         }
         if (index > 0) {
           expect(capture.prompt).toContain(instructionsPath);
-          expect(capture.prompt).toContain(`resolve relative paths in it from ${path.dirname(instructionsPath)}/.`);
+          expect(capture.prompt).toContain(`relative paths in it resolve from ${path.dirname(instructionsPath)}/.`);
         }
         if (previousInstructionsPath) expect(capture.prompt).not.toContain(previousInstructionsPath);
         sessionParams = sessionCodec.deserialize(sessionCodec.serialize(result.sessionParams ?? null));

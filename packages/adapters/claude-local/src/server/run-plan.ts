@@ -31,6 +31,8 @@ import {
   claudeIdentityLine,
   claudeInstructionsLocation,
   claudeSkillsSection,
+  PAPERCLIP_INSTRUCTION_COPY_KEY,
+  readClaudeInstructionCopy,
   WORKING_IN_PAPERCLIP,
 } from "./standing-texts.js";
 import {
@@ -523,8 +525,11 @@ export interface ClaudeRunSkillsAndInstructions {
 const INSTRUCTIONS_LOCATION_NOTE =
   "\nUse the agent instruction file location supplied in the current run prompt to resolve relative file references.";
 
-/** Reads the agent's instructions file: its contents and the run prompt's location directive. */
-async function readClaudeInstructionsFile(config: Record<string, unknown>): Promise<{
+/**
+ * Reads the agent's instructions file: its contents and the run prompt's location directive. The
+ * directive names the run's instructions copy from `context.paperclipInstructionCopy` (bug 88).
+ */
+async function readClaudeInstructionsFile(config: Record<string, unknown>, context: Record<string, unknown>): Promise<{
   instructionsFilePath: string;
   content: string | null;
   directive: string;
@@ -534,8 +539,11 @@ async function readClaudeInstructionsFile(config: Record<string, unknown>): Prom
   if (!instructionsFilePath) return { instructionsFilePath, content: null, directive: "", readError: null };
   try {
     const content = await fs.readFile(instructionsFilePath, "utf-8");
-    // One line (step 5 phase 2, the light sections); it satisfies INSTRUCTIONS_LOCATION_NOTE.
-    const directive = claudeInstructionsLocation(instructionsFilePath);
+    // One line (step 5 phase 2); it satisfies the system prompt's location note.
+    const directive = claudeInstructionsLocation({
+      instructionsFilePath,
+      copy: readClaudeInstructionCopy(context[PAPERCLIP_INSTRUCTION_COPY_KEY]),
+    });
     return { instructionsFilePath, content, directive, readError: null };
   } catch (err) {
     return { instructionsFilePath, content: null, directive: "", readError: err instanceof Error ? err.message : String(err) };
@@ -548,8 +556,9 @@ async function readClaudeInstructionsFile(config: Record<string, unknown>): Prom
  */
 export async function planClaudeInstructionsDirective(
   config: Record<string, unknown>,
+  context: Record<string, unknown>,
 ): Promise<{ directive: string; readError: string | null }> {
-  const { directive, readError } = await readClaudeInstructionsFile(config);
+  const { directive, readError } = await readClaudeInstructionsFile(config, context);
   return { directive, readError };
 }
 
@@ -572,7 +581,7 @@ export async function planClaudeRunSkillsAndInstructions(input: {
   const desiredSkillNames = new Set(resolveClaudeDesiredSkillNames(config, claudeSkillEntries));
   // Keep per-run working-copy paths out of the content-addressed system prompt.
   // Resumed sessions retain that prompt, so refresh the location on every turn.
-  const instructions = await readClaudeInstructionsFile(config);
+  const instructions = await readClaudeInstructionsFile(config, input.context);
   const { instructionsFilePath } = instructions;
   const instructionsPathDirective = instructions.directive;
   const instructionsReadError = instructions.readError;

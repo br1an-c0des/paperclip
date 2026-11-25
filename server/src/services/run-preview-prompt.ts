@@ -308,7 +308,6 @@ export async function buildRunPreviewPrompt(db: Db, input: RunPreviewPromptInput
     config: input.config,
     context,
     sealed: true,
-    paperclipApiReachable: input.runTokenAvailable,
     loadFreshSessionHandoff: issue
       ? createNativeSessionHandoffLoader({
         db, companyId: agent.companyId, issueId: issue.id, agentId: agent.id, before: new Date(),

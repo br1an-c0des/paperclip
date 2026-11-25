@@ -89,7 +89,7 @@ const SECTION_INFO: Record<RunPromptSectionId, string> = {
   session_rotation_note: "A note carried over when Paperclip starts a new session in place of a long one.",
   task_brief: "The task the run is for: its title, description, plan and surroundings.",
   mcp_note: "How the run works with Paperclip: its paperclip_* tools, and how to end the run.",
-  heartbeat_template: "Who the agent is: its name and job title, or the agent's own prompt template.",
+  heartbeat_template: "The agent's own prompt template, a legacy setting. Older runs: who the agent is.",
   unsplit: "The prompt as it was sent, in one piece.",
 };
 

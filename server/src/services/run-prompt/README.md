@@ -24,8 +24,8 @@ rest separated by a blank line.
 | 4 | `wake` | `renderPaperclipWakePrompt(context.paperclipWake)`: what woke the run. A resumed session gets the "Resume Delta" header. Parts: the renderer's blocks (`wake.header`, `wake.summary`, `wake.continuation`, `wake.comments`, `wake.plan_review`, …; see `PAPERCLIP_WAKE_PROMPT_PART_META` in `adapter-utils`). | every run |
 | 5 | `session_rotation_note` | `paperclipSessionHandoffMarkdown`. Never set for `claude_local` today (its rotation thresholds are 0). | when rotation fires |
 | 6 | `task_brief` | `selectPaperclipTaskMarkdown`: the Assignment brief, or the Assignment-Compact one on an ordinary resume. A run without a task sends the literal `null` (bug 84, reproduced). Parts: the brief's blocks (`task_brief.header`, `task_brief.issue`, `task_brief.chat_directive` or `task_brief.mode_directive`, `task_brief.description`, `task_brief.plan`, …). | every run |
-| 7 | `mcp_note` | Points a sealed run at the `paperclip_*` MCP tools. Fresh sessions with Paperclip API access, except external chat turns. | fresh only |
-| 8 | `heartbeat_template` | The agent's `promptTemplate`, or the default heartbeat template (`DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE`, the same text for chat turns). Left out on a resumed session that has a wake, and on recovery wakes. The default's parts: `identity`, `connection_guidance`. | fresh, and resumed without a wake |
+| 7 | `mcp_note` | No longer sent (step 5 phase 2, the system prompt): its rules are in the system prompt's "Working in Paperclip". The id stays for older records. | — |
+| 8 | `heartbeat_template` | The agent's own `promptTemplate` (legacy), or, on an unsealed run only, the identity line ("You are <name>, <title>."); a sealed run has the identity line in its system prompt. Left out on a resumed session that has a wake, and on recovery wakes. | fresh, and resumed without a wake |
 
 "Delivery" in the table is the usual case; the plan sets each section's `delivery` from the sets
 it actually appears in: `every_run` when it's in both, otherwise `fresh_only` or `resumed_only`.
@@ -35,12 +35,19 @@ it actually appears in: `every_run` when it's in both, otherwise `fresh_only` or
 The system prompt isn't built here. `planClaudeRunSkillsAndInstructions` (`run-plan.ts` in the
 adapter) returns it as `systemPromptSections`, with `placement: "system"`:
 
-1. `agent_instructions`: the agent's `AGENTS.md` (or its configured instructions file), then a line
-   telling the agent to resolve relative references from the location in the run prompt.
-2. `skill_library`: the company skill library list, each skill marked enabled or not.
+A sealed run's (step 5 phase 2, the system prompt; `fork/step-5-system-prompt.md`):
 
-Their texts joined with a blank line are the bundle's `agent-instructions.md`. A fresh session gets
-it through `--append-system-prompt-file`; a resumed session keeps the one it started with.
+1. `identity`: "You are <name>, <title>."
+2. `working_in_paperclip`: the rules every run needs (`WORKING_IN_PAPERCLIP` in `standing-texts.ts`).
+3. `agent_instructions`: the agent's `AGENTS.md` (or its configured instructions file), then a line
+   saying relative paths resolve from the directory the run message names. Only when it was read.
+4. `skill_library` ("Skills"): the agent's own skills, then a pointer to `paperclip_skills`.
+
+None holds a per-run value, so two runs of one agent with nothing changed share a bundle key. Their
+texts joined with a blank line are the bundle's `agent-instructions.md`, passed with
+`--append-system-prompt-file` on every sealed run; a resumed session uses it only after a
+compaction (bug 90). Unsealed runs (the dormant remote paths) keep the earlier text, the agent's
+instructions and the company skill library list, on fresh sessions only.
 
 ## Parts
 

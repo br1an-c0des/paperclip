@@ -1,9 +1,10 @@
 import type { RunPromptDelivery, RunPromptPart, RunPromptPlan, RunPromptSection, RunPromptSectionId } from "@paperclipai/shared";
 import {
-  claudeToolsNoteEndsRun,
   claudeWakeOptions,
   composeClaudeCliPrompt,
+  PAPERCLIP_INSTRUCTION_COPY_KEY,
   planClaudeInstructionsDirective,
+  readClaudeInstructionCopy,
   renderClaudeWakeParts,
   resolveClaudePromptTemplate,
   runTaskReplacesBrief,
@@ -36,12 +37,14 @@ import {
  * folder). It reproduces today's prompt exactly: each set is `composeClaudeCliPrompt`'s texts,
  * the same selectors the run uses, with labels, reasons, sources and display parts added.
  * The claude_local wake is four sections, one per heading (step 5 phase 2, the task brief); with
- * the task's facts on a non-chat task there is no task brief. Who the agent is, the instructions
- * location and the tools note come first (step 5 phase 2, the light sections).
- * It reads the agent's instructions file and nothing else; it writes nothing.
+ * the task's facts on a non-chat task there is no task brief. The instructions line comes first
+ * (step 5 phase 2, the light sections); on a sealed run who the agent is and how it works with
+ * Paperclip are in the system prompt instead (step 5 phase 2, the system prompt), so only an
+ * agent's own prompt template comes before it. It reads the agent's instructions file and nothing
+ * else; it writes nothing.
  */
 export interface ClaudeRunPromptInput {
-  /** The agent; its `name` and `title` make the identity line. */
+  /** The agent; its `name` and `title` make an unsealed run's identity line. */
   agent: { id: string; companyId: string; name?: unknown; title?: unknown } & Record<string, unknown>;
   runId: string;
   /** The runtime config the adapter gets. */
@@ -50,8 +53,6 @@ export interface ClaudeRunPromptInput {
   context: Record<string, unknown>;
   /** A local target: the run is sealed. */
   sealed: boolean;
-  /** The run has a token and PAPERCLIP_API_URL, so the tools note applies. */
-  paperclipApiReachable: boolean;
   /**
    * The fresh-session handoff loader the adapter gets (`getFreshSessionHandoff`). Without one, a
    * fresh session keeps whatever handoff the context already carries, as the adapter does.
@@ -63,12 +64,8 @@ type PromptSet = "fresh" | "resumed";
 
 export async function buildClaudeRunPromptPlan(input: ClaudeRunPromptInput): Promise<RunPromptPlan> {
   const { agent, runId, config, context, sealed } = input;
-  const { directive } = await planClaudeInstructionsDirective(config);
+  const { directive } = await planClaudeInstructionsDirective(config, context);
   const promptTemplate = resolveClaudePromptTemplate(config);
-  // The tools note reads only whether these are set, never their values.
-  const env: Record<string, string> = input.paperclipApiReachable
-    ? { PAPERCLIP_API_URL: "set", PAPERCLIP_API_KEY: "set" }
-    : {};
 
   // A fresh attempt hydrates the handoff onto its context first (execute.ts, runAttempt).
   const freshContext: Record<string, unknown> = { ...context };
@@ -97,7 +94,6 @@ export async function buildClaudeRunPromptPlan(input: ClaudeRunPromptInput): Pro
       promptTemplate,
       templateData,
       sealed,
-      env,
     });
     const labelled = describeSections({ texts, context: setContext, resumed, agent, promptTemplate });
     return labelled.filter((section) => section.text.length > 0);
@@ -135,13 +131,8 @@ function describeSections(input: {
     whoYouAreSection(texts.heartbeatTemplate, agent, input.promptTemplate, resumed),
     section("instructions_directive", texts.instructionsDirective, {
       label: "Instructions file location",
-      reason: "the agent's instructions file was read; sent every run, since resumed sessions keep an older location",
-      source: "claude_local run plan: the instructions file's path",
-    }),
-    section("mcp_note", texts.mcpNote, {
-      label: "Paperclip tools",
-      reason: toolsNoteReason(context),
-      source: "claude_local: claudeToolsNote",
+      reason: "the agent's instructions file was read; sent every run, since the path changes every run",
+      source: instructionsSource(context),
     }),
     section("communication_guidance", texts.communicationGuidance, {
       label: "Communication guidance",
@@ -175,8 +166,9 @@ function describeSections(input: {
 }
 
 /**
- * Who the agent is (`heartbeat_template`): the identity line, as one part, or the agent's own
- * prompt template when it sets one.
+ * Who the agent is (`heartbeat_template`): the agent's own prompt template when it sets one, or,
+ * on an unsealed run, the identity line, as one part. A sealed run has the identity line in its
+ * system prompt, so the section is empty there and left out.
  */
 function whoYouAreSection(
   text: string,
@@ -203,13 +195,15 @@ function whoYouAreSection(
   });
 }
 
-/** Why the tools note is sent, and why it has no end-of-run line where it has none. */
-function toolsNoteReason(context: Record<string, unknown>): string {
-  const sent = "a fresh sealed session with Paperclip API access";
-  if (claudeToolsNoteEndsRun(context)) return sent;
-  return context.conversationMode === true
-    ? `${sent}; no end-of-run line, since a chat task ends with its reply`
-    : `${sent}; no end-of-run line, since a recovery wake has its own rules for ending`;
+/** Where the instructions line's facts come from: the run's instructions copy, when it has one. */
+function instructionsSource(context: Record<string, unknown>): string {
+  const copy = readClaudeInstructionCopy(context[PAPERCLIP_INSTRUCTION_COPY_KEY]);
+  if (!copy) return "claude_local run plan: the instructions file's path";
+  return copy.kind === "agent_directory"
+    ? "context: paperclipInstructionCopy (the agent directory this run)"
+    : copy.kind === "instruction_file"
+      ? "context: paperclipInstructionCopy (a registered copy of the instructions file)"
+      : "context: paperclipInstructionCopy (no copy that can be saved)";
 }
 
 const WAKE_SECTIONS: Record<ClaudeRunMessageSectionId, { label: string; source: string }> = {

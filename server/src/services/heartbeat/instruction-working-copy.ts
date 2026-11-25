@@ -3,6 +3,11 @@ import path from "node:path";
 import { and, eq, sql } from "drizzle-orm";
 import { heartbeatRuns, type Db } from "@paperclipai/db";
 import { adapterExecutionTargetEnablesSandboxDuplexBridge } from "@paperclipai/adapter-utils/execution-target";
+import {
+  PAPERCLIP_INSTRUCTION_COPY_KEY,
+  resolveClaudeExecutionEngine,
+  type ClaudeInstructionCopy,
+} from "@paperclipai/adapter-claude-local/server";
 import { parseObject } from "../../adapters/utils.js";
 import { logger } from "../../middleware/logger.js";
 import { AgentDirectoryReuseInvalidatedError, isAgentDirectoryCopy } from "../agent-directory-working-copies.js";
@@ -21,6 +26,15 @@ type AppendRunEvent = ReturnType<typeof createHeartbeatLifecycle>["appendRunEven
 
 function readNonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+/**
+ * Whether the run is a `claude_local` CLI run, which says where its instructions are in one line
+ * of its own (`claudeInstructionsLocation`, from `context.paperclipInstructionCopy`; bug 88), so
+ * the long working-copy notes aren't appended to its brief. ACP and the other adapters keep them.
+ */
+export function runTakesInstructionCopyFacts(adapterType: string | null | undefined, runtimeConfig: Record<string, unknown>): boolean {
+  return adapterType === "claude_local" && resolveClaudeExecutionEngine(runtimeConfig).engine === "cli";
 }
 
 /** A failed cleanup is deferred once per run; it cannot replace the run result. */
@@ -194,9 +208,12 @@ export function createHeartbeatInstructionWorkingCopy(input: InstructionWorkingC
         await appendRunEvent(readRun(), { eventType: "instruction_save", stream: "system", level: "warn",
           message: "Persistent instruction editing is unavailable. Use an authenticated user with instruction edit access and a managed instruction bundle.",
           payload: { state: "unavailable", code: "INSTRUCTION_COPY_UNAVAILABLE" } });
-        const guidance = "No editable agent instruction working copy is registered for this turn. Use authenticated agent file tools for persistent edits; do not edit a private copy named in an earlier turn or claim its changes will persist.";
-        for (const key of ["paperclipTaskMarkdown", "paperclipTaskMarkdownCompact"]) {
-          context[key] = [readNonEmptyString(context[key]), guidance].filter(Boolean).join("\n\n");
+        context[PAPERCLIP_INSTRUCTION_COPY_KEY] = { kind: "unavailable" } satisfies ClaudeInstructionCopy;
+        if (!runTakesInstructionCopyFacts(agent.adapterType, runtimeConfig)) {
+          const guidance = "No editable agent instruction working copy is registered for this turn. Use authenticated agent file tools for persistent edits; do not edit a private copy named in an earlier turn or claim its changes will persist.";
+          for (const key of ["paperclipTaskMarkdown", "paperclipTaskMarkdownCompact"]) {
+            context[key] = [readNonEmptyString(context[key]), guidance].filter(Boolean).join("\n\n");
+          }
         }
       }
       if (instructionCopy) {
@@ -218,9 +235,14 @@ export function createHeartbeatInstructionWorkingCopy(input: InstructionWorkingC
             agentHomeForPermissions: workspace.agentHome,
           };
         }
-        const guidance = instructionWorkingCopyGuidance(instructionCopy);
-        for (const key of ["paperclipTaskMarkdown", "paperclipTaskMarkdownCompact"]) {
-          context[key] = [readNonEmptyString(context[key]), guidance].filter(Boolean).join("\n\n");
+        context[PAPERCLIP_INSTRUCTION_COPY_KEY] = (isAgentDirectoryCopy(instructionCopy)
+          ? { kind: "agent_directory", root: instructionCopy.executionRoot, entryFile: instructionCopy.entryFile, storageWarning }
+          : { kind: "instruction_file", root: instructionCopy.executionRoot, entryFile: instructionCopy.entryFile }) satisfies ClaudeInstructionCopy;
+        if (!runTakesInstructionCopyFacts(agent.adapterType, runtimeConfig)) {
+          const guidance = instructionWorkingCopyGuidance(instructionCopy);
+          for (const key of ["paperclipTaskMarkdown", "paperclipTaskMarkdownCompact"]) {
+            context[key] = [readNonEmptyString(context[key]), guidance].filter(Boolean).join("\n\n");
+          }
         }
       }
     }

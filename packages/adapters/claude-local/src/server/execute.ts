@@ -921,7 +921,6 @@ async function executeClaudeCli(
         promptTemplate,
         templateData,
         sealed: Boolean(sealed),
-        env,
       });
       // Sealed runs send the system prompt file with every run (bug 90); unsealed ones on fresh
       // sessions only.
