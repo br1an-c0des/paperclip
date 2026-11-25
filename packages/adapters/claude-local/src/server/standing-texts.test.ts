@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { PaperclipSkillEntry } from "@paperclipai/adapter-utils/server-utils";
 import {
@@ -148,6 +150,15 @@ describe("WORKING_IN_PAPERCLIP", () => {
   it("is the spec's text, with the ending rules as their own export", () => {
     expect(WORKING_IN_PAPERCLIP_ENDING).toBe(ENDING_COPY);
     expect(WORKING_IN_PAPERCLIP).toBe(WORKING_COPY);
+  });
+});
+
+describe("the paperclip skill", () => {
+  // ACP and the other engines read the same skill without this system prompt: its "Every run"
+  // keeps the same ending rules, word for word.
+  it("the paperclip skill carries the system prompt's ending rules verbatim", async () => {
+    const skill = await fs.readFile(fileURLToPath(new URL("../../../../../skills/paperclip/SKILL.md", import.meta.url)), "utf8");
+    expect(skill).toContain(WORKING_IN_PAPERCLIP_ENDING);
   });
 });
 
