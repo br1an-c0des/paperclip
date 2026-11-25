@@ -1428,6 +1428,8 @@ const PUBLIC_OPERATIONS = new Set([
   "POST /mcp/gateways/{gatewayPublicId}",
   "GET /api/tool-gateway/gateways/{gatewayId}/mcp",
   "POST /api/tool-gateway/gateways/{gatewayId}/mcp",
+  // A run's ten-minute download link: the ticket in the URL is the credential.
+  "GET /api/mcp/paperclip/files/download",
 ]);
 
 const BOARD_ONLY_PREFIXES = [
@@ -12022,6 +12024,16 @@ registerCurrentRoute({
   tags: ["mcp"],
   summary: "Not supported: Paperclip's MCP server answers POST only",
   responses: { 405: r.ok() },
+});
+
+registerCurrentRoute({
+  method: "get",
+  path: "/api/mcp/paperclip/files/download",
+  tags: ["mcp"],
+  summary: "Download one task attachment with a run's ten-minute link from paperclip_file_download",
+  description: "The ticket query parameter is the credential. It names one attachment and works only while the run that asked for it is running and its agent can still read the task.",
+  query: z.object({ ticket: z.string() }),
+  responses: { 200: r.ok(), 403: r.forbidden, 404: r.notFound },
 });
 
 registerCurrentRoute({

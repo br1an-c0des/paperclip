@@ -799,7 +799,9 @@ export async function createApp(
       return resolveMcpCaller(db, principal.actor, { grant: principal.grant });
     } } : {}),
   });
-  api.use(paperclipMcpRoutes(db, api, { parentLocals: app.locals, requestPermission: permissionRequestCreator(db) }));
+  api.use(paperclipMcpRoutes(db, api, {
+    parentLocals: app.locals, requestPermission: permissionRequestCreator(db), storage: opts.storageService,
+  }));
   api.use(taskWorkspaceRoutes(db));
   api.use(projectRoutes(db));
   api.use(caseRoutes(db, opts.storageService));

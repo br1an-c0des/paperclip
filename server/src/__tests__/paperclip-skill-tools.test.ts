@@ -14,6 +14,13 @@ describe("the paperclip skill teaches the MCP tools", () => {
     }
   });
 
+  it("asks for a plan's review with the plan review tool, not a plain question", () => {
+    const plans = skill.split("\n").find(line => line.startsWith("- **Plans:**"));
+    expect(plans).toBeDefined();
+    expect(plans).toContain("`paperclip_request_plan_review`");
+    expect(plans).not.toContain("paperclip_ask_board");
+  });
+
   it("doesn't teach curl and stays short", () => {
     expect(skill).not.toMatch(/\bcurl\b/i);
     expect(skill.split("\n").length).toBeLessThan(150);

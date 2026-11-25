@@ -3,6 +3,7 @@ import type { McpCaller, PaperclipTool } from "./types.js";
 
 export const NEEDS_RUN_REASON = "Needs a run: only a run's own token can end its work.";
 export const NEEDS_GRANT_REASON = "Needs an outside connection (OAuth): file links are tied to the connection that asked for them.";
+export const NEEDS_RUN_OR_GRANT_REASON = "Needs a run or an outside connection (OAuth): a file link is tied to the run or connection that asked for it.";
 
 /** How a tool appears to a caller. */
 export type ToolVisibility =
@@ -29,6 +30,9 @@ export function isRequestable(definition: PaperclipTool): boolean {
 export function toolVisibility(caller: McpCaller, definition: PaperclipTool): ToolVisibility {
   if (definition.needsRun && !caller.runId) return { state: "hidden", reason: NEEDS_RUN_REASON, code: "run_required" };
   if (definition.needsGrant && !caller.grantId) return { state: "hidden", reason: NEEDS_GRANT_REASON, code: "grant_required" };
+  if (definition.needsRunOrGrant && !caller.runId && !caller.grantId) {
+    return { state: "hidden", reason: NEEDS_RUN_OR_GRANT_REASON, code: "grant_required" };
+  }
   if (hasAgentAccess(caller.access, definition.action)) return { state: "allowed" };
   if (definition.writes && hasAgentAccess(caller.access, readActionOf(definition))) return { state: "allowed" };
   const missingAction = actionsOf(definition)[0]!;
