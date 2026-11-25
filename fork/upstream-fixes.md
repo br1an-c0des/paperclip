@@ -1673,3 +1673,21 @@ Candidate.
 - **Likely fix:** skip the custom-answer option id when the answer has custom text (or map it to
   nothing), so the line reads `…: Both, the header dropdown…`. A test in
   `question-response-delivery.test.ts`.
+
+### 95. A comment an earlier run handled is sent again as new
+
+Found 2026-11-24 in the wake's real-run check (runs `3cca4343` then `da19589b`, TES-45, desktop
+dev instance). Candidate.
+
+- **Problem:** `buildExecutionContinuation` (`server/src/services/execution-continuation.ts`) puts
+  every origin comment into the record's `resumeDelta`, whether or not the base run already
+  delivered it (`originCommentIds.includes(message.id) || !deliveredMessages.some(...)`). The
+  origins include the source run's wake comments and an interaction's recorded origins. So after
+  an agent asks a question in reply to a comment, the answered-question wake carries that comment
+  again, with no "already read" mark.
+- **Effect today:** the new `claude_local` wake shows such comments under "Earlier comments",
+  marked "(you've seen this)" without a reply rule, so the agent isn't told to act on them twice.
+  Other readers of the record (the Runner, ACP) still see them as new.
+- **Likely fix:** keep only the current wake's own origin comments in the delta unconditionally;
+  include inherited origins only when the base run didn't deliver them. A test in
+  `execution-continuation.test.ts`.
