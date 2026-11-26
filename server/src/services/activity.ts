@@ -558,6 +558,11 @@ export function activityService(db: Db) {
           contextIssueId: sql<string | null>`${heartbeatRuns.contextSnapshot} ->> 'issueId'`,
           // A person's Task Retry links its saved request here instead of retryOfRunId.
           taskRetryRequestId: sql<string | null>`${heartbeatRuns.contextSnapshot} ->> 'taskRetryRequestId'`,
+          // The run compacted its context (bug 96): the task thread reads its compaction dividers.
+          // Served by `heartbeat_run_events_company_run_idx` (company_id, run_id).
+          compacted: sql<boolean>`exists (select 1 from ${heartbeatRunEvents} e
+            where e.company_id = ${heartbeatRuns.companyId} and e.run_id = ${heartbeatRuns.id}
+              and e.event_type = 'context.compacted')`,
         })
         .from(heartbeatRuns)
         .innerJoin(

@@ -13,13 +13,11 @@ import { compactionDetail, contextSignal, createCompactionTracker, type ContextS
  * which since #19378 keeps `context.compacted` events and, for runs that compacted, the context
  * readings around them. A finished run's events don't change, so each run is read once.
  *
- * Reading every run would cost a request per run, and the API has no way to ask which runs
- * compacted. So the runs are read only while the task's context reading counts compactions in the
- * assignee's session, plus any run a Compact now request names (`issue.context_compaction_requested`
- * activity, `details.compactionRunId`). Compactions in an earlier session of a task whose reading no
- * longer counts any are missed. `claude_local` runs record no context readings, so the task has no
- * reading to count their compactions: until it does, their runs are read only when Compact now names
- * them.
+ * Reading every run would cost a request per run. So a run is read when the task's run list marks
+ * it `compacted` (it recorded a `context.compacted` event, bug 96; `claude_local` runs record no
+ * context readings, so this is how theirs are found), and otherwise, as before, while the task's
+ * context reading counts compactions in the assignee's session, plus any run a Compact now request
+ * names (`issue.context_compaction_requested` activity, `details.compactionRunId`).
  */
 
 export type Compaction = ContextSizes & {
@@ -82,9 +80,18 @@ export function compactionRunIds(events: readonly Pick<ActivityEvent, "action" |
 
 const ACTIVE = new Set(["queued", "running", "scheduled_retry"]);
 
-/** Which of the shown runs to read: finished runner and `claude_local` runs, all of them while the session counts compactions. */
-export function runsToRead(runs: readonly Pick<RunForIssue, "runId" | "status" | "adapterType">[], options: { sessionCompacted: boolean; requested: ReadonlySet<string> }) {
-  return runs.filter((run) => !ACTIVE.has(run.status) && COMPACTING_ADAPTERS.has(run.adapterType) && (options.sessionCompacted || options.requested.has(run.runId))).map((run) => run.runId);
+/**
+ * Which of the shown runs to read: finished runs the run list marks `compacted`, and finished runner
+ * and `claude_local` runs, all of them while the session counts compactions.
+ */
+export function runsToRead(
+  runs: readonly Pick<RunForIssue, "runId" | "status" | "adapterType" | "compacted">[],
+  options: { sessionCompacted: boolean; requested: ReadonlySet<string> },
+) {
+  return runs
+    .filter((run) => !ACTIVE.has(run.status) && (run.compacted === true
+      || (COMPACTING_ADAPTERS.has(run.adapterType) && (options.sessionCompacted || options.requested.has(run.runId)))))
+    .map((run) => run.runId);
 }
 
 async function readRun(runId: string, signal: AbortSignal) {
