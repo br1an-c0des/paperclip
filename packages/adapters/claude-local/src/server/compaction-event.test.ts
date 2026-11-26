@@ -53,6 +53,35 @@ describe("claudeCompactionEvent", () => {
   });
 });
 
+describe("the patched claude-agent-acp (ACP engine)", () => {
+  // The installed, patched agent the ACP engine runs. Its `status` case handles `/compact`'s
+  // "Compacting..." and `compact_result` banners; `compact_boundary` only fires when there was
+  // something to compact. Only the boundary may carry the marker, so a `/compact` with nothing to
+  // compact records nothing.
+  const source = readFileSync(
+    new URL("../../node_modules/@agentclientprotocol/claude-agent-acp/dist/acp-agent.js", import.meta.url),
+    "utf8",
+  );
+  const caseBlock = (label: string) => {
+    const start = source.indexOf(`case "${label}": {`);
+    expect(start).toBeGreaterThan(-1);
+    const next = source.indexOf("\n                            case \"", start + 1);
+    return source.slice(start, next);
+  };
+
+  it("marks the compact_boundary's usage_update, and nothing else", () => {
+    expect(source.split("paperclip: {\n").length - 1).toBe(1);
+    const boundary = caseBlock("compact_boundary");
+    expect(boundary).toContain("sessionUpdate: \"usage_update\"");
+    expect(boundary).toContain("trigger: message.compact_metadata?.trigger ?? null");
+    expect(boundary).toContain("preTokens: message.compact_metadata?.pre_tokens ?? null");
+    expect(boundary).toContain("compactionId: message.uuid");
+    const status = caseBlock("status");
+    expect(status).toContain("compact_result");
+    expect(status).not.toContain("compacted");
+  });
+});
+
 describe("createClaudeCompactionLog", () => {
   it("reports each boundary once, across chunk splits, and passes every chunk on", async () => {
     const onLog = vi.fn(async () => {});

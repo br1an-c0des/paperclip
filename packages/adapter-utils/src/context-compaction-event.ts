@@ -42,3 +42,27 @@ export function contextCompactedRunEvent(input: {
     },
   };
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * The run event for an ACP `usage_update`'s `_meta`, or null when it has no compaction marker.
+ * Only Paperclip's patch of `claude-agent-acp` sends the marker, at a `compact_boundary`:
+ * `_meta.paperclip.compacted = { trigger, preTokens, compactionId }`. `_meta` is the agent's own,
+ * so each field is checked and bounded.
+ */
+export function acpCompactionMarkerEvent(
+  meta: unknown,
+  sessionId: string | null,
+  now: () => Date,
+): AdapterRuntimeEvent | null {
+  const paperclip = isRecord(meta) ? meta.paperclip : null;
+  const marker = isRecord(paperclip) ? paperclip.compacted : null;
+  if (!isRecord(marker)) return null;
+  const emittedAt = now().toISOString();
+  const compactionId = typeof marker.compactionId === "string" && marker.compactionId ? marker.compactionId.slice(0, 200) : `${sessionId}:${emittedAt}`;
+  const trigger = typeof marker.trigger === "string" && marker.trigger ? marker.trigger.slice(0, 64) : null;
+  const preTokens = typeof marker.preTokens === "number" && Number.isFinite(marker.preTokens) && marker.preTokens >= 0 ? marker.preTokens : null;
+  return contextCompactedRunEvent({ compactionId, trigger, preTokens, sessionId, emittedAt, sourceKind: "claude_local" });
+}

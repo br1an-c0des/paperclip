@@ -7,6 +7,7 @@ import { applyObservabilityEnvironment } from "../agent-observability.js";
 import { cancellableSandboxStartup } from "./startup-cancellation.js";
 import { emitStartupReuse, environmentStartupReuse, summarizeStartupReuse, type StartupReuseReason } from "../startup-reuse.js";
 import { withAdapterExecutionPhase, type AdapterExecutionPhase } from "../execution-phase.js";
+import { acpCompactionMarkerEvent } from "../context-compaction-event.js";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import os from "node:os";
@@ -5040,6 +5041,8 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
       };
       let eventBreakdown: AcpRuntimeUsageBreakdown | null = null;
       let eventCostUsd: number | null = null;
+      // Compactions this run reported, by id, so a repeated marker is recorded once (bug 96).
+      const reportedCompactions = new Set<string>();
       // Receipt persistence is fallible; retain the provider evidence before
       // calling the sink so the failure result can still return it to the host.
       let observedUsage: Pick<AdapterExecutionResult, "usage" | "usageBasis" | "costUsd" | "usageComplete"> = { usageComplete: false };
@@ -5339,6 +5342,13 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
               observedUsage = { usage: checkpoint.usage ?? undefined, costUsd: checkpoint.costUsd, usageBasis: "per_run", usageComplete: false };
               await ctx.onUsage?.({ ...billingFields, usage: checkpoint.usage ?? undefined, costUsd: checkpoint.costUsd,
                 model: accountingModel, usageBasis: "per_run", complete: false });
+              // Only Paperclip's patched claude-agent-acp marks a compaction; other agents' updates pass by.
+              const compaction = acpCompactionMarkerEvent(event._meta, sessionHandle.backendSessionId ?? null, () => new Date(now()));
+              const compactionId = compaction && (compaction.payload?.prpEvent as { payload: { compactionId: string } }).payload.compactionId;
+              if (compaction && compactionId && !reportedCompactions.has(compactionId)) {
+                reportedCompactions.add(compactionId);
+                await ctx.onEvent?.(compaction).catch(() => {});
+              }
             }
             await emitRuntimeEvent(ctx, event, toolTitles, prepared.coalescePlaceholderToolUpdates);
           }

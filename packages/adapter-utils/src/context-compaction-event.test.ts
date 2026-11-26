@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contextCompactedRunEvent } from "./context-compaction-event.js";
+import { acpCompactionMarkerEvent, contextCompactedRunEvent } from "./context-compaction-event.js";
 
 describe("contextCompactedRunEvent", () => {
   const base = {
@@ -42,5 +42,31 @@ describe("contextCompactedRunEvent", () => {
     expect((envelope.payload as Record<string, unknown>).reason).toBe("provider");
     expect((envelope.payload as Record<string, unknown>).preTokens).toBeNull();
     expect(envelope.normalizedSessionId).toBeNull();
+  });
+});
+
+describe("acpCompactionMarkerEvent", () => {
+  const now = () => new Date("2026-11-25T10:00:00.000Z");
+  const inner = (event: ReturnType<typeof acpCompactionMarkerEvent>) =>
+    (event?.payload?.prpEvent as { payload: Record<string, unknown> }).payload;
+
+  it("reads the patched agent's marker", () => {
+    const event = acpCompactionMarkerEvent({ paperclip: { compacted: { trigger: "auto", preTokens: 150000, compactionId: "c-9" } } }, "s-2", now);
+    expect(event?.eventType).toBe("context.compacted");
+    expect((event?.payload?.prpEvent as Record<string, unknown>).normalizedSessionId).toBe("s-2");
+    expect(inner(event)).toMatchObject({ compactionId: "c-9", reason: "auto", preTokens: 150000, postTokens: null });
+  });
+
+  it("gives null without the marker", () => {
+    expect(acpCompactionMarkerEvent(undefined, "s-2", now)).toBeNull();
+    expect(acpCompactionMarkerEvent({ usage: { input_tokens: 1 } }, "s-2", now)).toBeNull();
+    expect(acpCompactionMarkerEvent({ paperclip: { compacted: "yes" } }, "s-2", now)).toBeNull();
+  });
+
+  it("drops fields of the wrong type and bounds the strings", () => {
+    const event = acpCompactionMarkerEvent({ paperclip: { compacted: { trigger: 7, preTokens: "lots", compactionId: "x".repeat(500) } } }, "s-2", now);
+    expect(inner(event)).toMatchObject({ reason: "provider", preTokens: null });
+    expect((inner(event).compactionId as string).length).toBe(200);
+    expect(inner(acpCompactionMarkerEvent({ paperclip: { compacted: {} } }, "s-2", now)).compactionId).toBe("s-2:2026-11-25T10:00:00.000Z");
   });
 });
