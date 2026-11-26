@@ -1,6 +1,6 @@
 import type { Issue, IssueTreeControlMode } from "@paperclipai/shared";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { Copy, EyeOff, Globe, Link2, Lock, MoreHorizontal, PauseCircle, PlayCircle, Plus, RotateCcw, Users, XCircle } from "lucide-solid";
+import { Copy, EyeOff, Globe, Link2, Lock, MoreHorizontal, PauseCircle, PlayCircle, Plus, RotateCcw, Trash2, Users, XCircle } from "lucide-solid";
 import { createSignal, Show } from "solid-js";
 import { issuesApi } from "@/api/issues";
 import { queryKeys } from "@/api/queryKeys";
@@ -25,7 +25,8 @@ import "./TaskActions.css";
  *   parent or project keeps it private.
  * - More: who can see a private task (the share sheet, ShareSheet.tsx), add a subtask, copy the
  *   link or the task as Markdown, pause or resume the task (or its subtree), cancel or restore its
- *   subtree with a preview of what's affected, and hide the task.
+ *   subtree with a preview of what's affected, hide the task, and delete it for good (asked first,
+ *   and refused while it has subtasks, which the server can't delete with it).
  *
  * Archive from inbox comes with the Inbox (M3).
  */
@@ -68,7 +69,7 @@ export function useBoardAccess() {
 }
 
 /** The header actions for a task by id, once it has loaded; it shares the open task's queries. */
-export function TaskHeaderActions(props: { taskId: string; onHidden?: () => void }) {
+export function TaskHeaderActions(props: { taskId: string; onRemoved?: () => void }) {
   const company = useCompany();
   const task = createQuery(() => ({
     queryKey: queryKeys.issues.detail(props.taskId),
@@ -80,22 +81,24 @@ export function TaskHeaderActions(props: { taskId: string; onHidden?: () => void
   }));
   return (
     <Show when={task.data}>
-      {(found) => <TaskActions task={found()} subtaskCount={subtasks.data?.length ?? 0} onHidden={props.onHidden} />}
+      {(found) => <TaskActions task={found()} subtaskCount={subtasks.data?.length ?? 0} onRemoved={props.onRemoved} />}
     </Show>
   );
 }
 
+/** Refreshes the task, the task lists, and the nav's Recent tasks, which leaves out hidden and deleted tasks. */
 function refreshTask(client: ReturnType<typeof useQueryClient>, companyId: string, taskId: string) {
   void client.invalidateQueries({ queryKey: queryKeys.issues.detail(taskId) });
   void client.invalidateQueries({ queryKey: queryKeys.issues.list(companyId) });
+  void client.invalidateQueries({ queryKey: queryKeys.recentNav(companyId) });
 }
 
 export function TaskActions(props: {
   task: Issue;
   /** Subtasks make pausing and cancelling apply to the subtree. */
   subtaskCount: number;
-  /** After the task is hidden, such as closing the panel. */
-  onHidden?: () => void;
+  /** After the task is hidden or deleted, such as closing the panel. */
+  onRemoved?: () => void;
 }) {
   const company = useCompany();
   const commands = useCommands();
@@ -106,6 +109,7 @@ export function TaskActions(props: {
   const [shareOpen, setShareOpen] = createSignal(false);
   const [treeMode, setTreeMode] = createSignal<Exclude<IssueTreeControlMode, "pause"> | null>(null);
   const [busy, setBusy] = createSignal(false);
+  const [deleteOpen, setDeleteOpen] = createSignal(false);
 
   const isPrivate = () => props.task.visibility === "private";
   const canManage = () => {
@@ -175,7 +179,7 @@ export function TaskActions(props: {
       await issuesApi.update(props.task.id, { hiddenAt: new Date().toISOString() });
       pushToast({ tone: "success", title: `${props.task.identifier ?? "The task"} is hidden`, body: "It no longer shows in task lists." });
       refreshTask(client, company().id, props.task.id);
-      props.onHidden?.();
+      props.onRemoved?.();
     } catch (error) {
       pushToast({ tone: "error", title: "Couldn't hide the task", body: (error as Error).message });
     }
@@ -269,9 +273,19 @@ export function TaskActions(props: {
               Show this task again
             </Menu.Item>
           </Show>
+          <Menu.Item icon={<Trash2 size={15} />} danger onSelect={() => setDeleteOpen(true)}>
+            Delete task…
+          </Menu.Item>
         </Menu.Content>
       </Menu>
 
+      <DeleteTaskDialog
+        open={deleteOpen()}
+        task={props.task}
+        subtaskCount={props.subtaskCount}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={() => props.onRemoved?.()}
+      />
       <ShareSheet task={props.task} open={shareOpen()} canManage={canManage()} onOpenChange={setShareOpen} />
       <MakePublicDialog open={publicOpen()} task={props.task} busy={busy()} onCancel={() => setPublicOpen(false)} onConfirm={() => void setVisibility("open")} />
       <TreeControlDialog
@@ -283,6 +297,74 @@ export function TaskActions(props: {
         onClose={() => setTreeMode(null)}
       />
     </>
+  );
+}
+
+/** Deletes the task for good after asking; a task with subtasks can't be deleted until they're gone. */
+function DeleteTaskDialog(props: { open: boolean; task: Issue; subtaskCount: number; onClose: () => void; onDeleted: () => void }) {
+  const client = useQueryClient();
+  const company = useCompany();
+  const [pending, setPending] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
+  const name = () => props.task.identifier ?? "this task";
+  const close = () => {
+    setError(null);
+    props.onClose();
+  };
+  const remove = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      await issuesApi.remove(props.task.id);
+      props.onClose();
+      pushToast({ tone: "success", title: `${props.task.identifier ?? "The task"} is deleted` });
+      props.onDeleted();
+      client.removeQueries({ queryKey: queryKeys.issues.detail(props.task.id) });
+      void client.invalidateQueries({ queryKey: queryKeys.issues.list(company().id) });
+      void client.invalidateQueries({ queryKey: queryKeys.recentNav(company().id) });
+    } catch (failure) {
+      setError((failure as Error).message);
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <Dialog
+      open={props.open}
+      onOpenChange={(open) => !open && close()}
+      title={`Delete ${name()}?`}
+      width={480}
+      footer={
+        <>
+          <Button variant="quiet" onClick={close}>
+            Keep it
+          </Button>
+          <Button variant="danger" disabled={pending() || props.subtaskCount > 0} onClick={() => void remove()}>
+            {pending() ? "Deleting…" : "Delete task"}
+          </Button>
+        </>
+      }
+    >
+      <Show
+        when={props.subtaskCount === 0}
+        fallback={
+          <p class="ta-dialog-warn" role="alert">
+            It has {props.subtaskCount === 1 ? "a subtask" : `${props.subtaskCount} subtasks`}. Delete or move{" "}
+            {props.subtaskCount === 1 ? "it" : "them"} first, or hide this task instead.
+          </p>
+        }
+      >
+        <p class="ta-dialog-text">
+          “{props.task.title}” goes for good, with its comments, documents and files. <b>This can't be undone.</b>{" "}
+          To keep it out of your lists but still have it, hide it instead.
+        </p>
+      </Show>
+      <Show when={error()}>
+        <p class="ta-dialog-warn" role="alert">
+          {error()}
+        </p>
+      </Show>
+    </Dialog>
   );
 }
 

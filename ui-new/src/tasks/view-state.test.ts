@@ -63,14 +63,14 @@ describe("parseViewState", () => {
   it("keeps the new filters, a sort, the board's options and the picked view", () => {
     const saved = {
       groupBy: "workspace",
-      filters: { ...EMPTY_FILTERS, creators: ["agent:a"], projects: ["p1", 3], workspaces: ["none"], liveOnly: true, hideAgentCreated: "yes" },
+      filters: { ...EMPTY_FILTERS, creators: ["agent:a"], projects: ["p1", 3], workspaces: ["none"], liveOnly: true, hideAgentCreated: "yes", hiddenOnly: true },
       sort: { field: "priority", dir: "asc" },
       board: { subtasks: true, closed: false },
       savedViewId: "v1",
     };
     expect(parseViewState(JSON.stringify(saved))).toMatchObject({
       groupBy: "workspace",
-      filters: { creators: ["agent:a"], projects: ["p1"], workspaces: ["none"], liveOnly: true, hideAgentCreated: false },
+      filters: { creators: ["agent:a"], projects: ["p1"], workspaces: ["none"], liveOnly: true, hideAgentCreated: false, hiddenOnly: true },
       sort: { field: "priority", dir: "asc" },
       board: { subtasks: true, closed: false },
       savedViewId: "v1",
@@ -136,6 +136,7 @@ describe("applyFilters", () => {
     expect(filterCount({ ...EMPTY_FILTERS, statuses: ["todo"], labels: ["bug", "none"] })).toBe(3);
     expect(filterCount({ ...EMPTY_FILTERS, creators: ["user:me"], projects: ["p"], workspaces: ["w"], liveOnly: true, hideAgentCreated: true })).toBe(5);
     expect(filterCount({ ...EMPTY_FILTERS, externalObjects: ["failed", "stale"] })).toBe(2);
+    expect(filterCount({ ...EMPTY_FILTERS, hiddenOnly: true })).toBe(1);
     expect(toggled(["a", "b"], "a")).toEqual(["b"]);
     expect(toggled(["a"], "b")).toEqual(["a", "b"]);
   });
