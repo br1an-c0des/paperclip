@@ -1739,3 +1739,19 @@ Found 2026-11-24 in the task brief's real runs (TES-48, desktop dev instance). *
   its first line) and keep the comment; otherwise keep the summary. Decided on the server, where
   the wake payload's `history` is built, so the comment ids of that run are known; a test with a
   run that commented and one that didn't.
+
+### 99. Agent runs on server1 can't reach Paperclip's MCP server or the GitHub broker
+
+Found 2026-11-25 in Jim's runs on BRA-46 and BRA-47 (server1, the first runs after the step 4a–5
+deploy). **Fixed** the same day: `deploy/docker-compose.yml` sets `PAPERCLIP_API_URL` to
+`http://localhost:3100`.
+
+- **Problem:** every run started with the `paperclip`, `Paperclip connections` and
+  `paperclip-assigned` MCP servers failed (`ECONNREFUSED`), and git printed
+  `GitHub broker_transport_unavailable`, so the agent couldn't push, post through the Paperclip
+  tools or end the task. The deploy didn't set `PAPERCLIP_API_URL`, so the server derived the
+  run-side address from `PAPERCLIP_PUBLIC_URL` (`server/src/index.ts`,
+  `choosePrimaryRuntimeApiUrl`): the Tailscale Serve URL, which resolves inside the container to
+  the host's tailnet IP and refuses connections from the Docker network.
+- **Fix:** runs execute inside the server container, so they use `http://localhost:3100`. Links
+  people open still come from `PAPERCLIP_PUBLIC_URL` (`runtimePublicOrigin` prefers it).

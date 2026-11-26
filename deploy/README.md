@@ -146,7 +146,7 @@ anyone else can reach it. (`public` deployments use `paperclipai auth bootstrap-
 | --- | --- |
 | `PAPERCLIP_DATA_ROOT` | Host directory for all data; `postgres/` and `home/` go under it |
 | `USER_UID` / `USER_GID` | Output of `id -u` / `id -g`, so files agents create are owned by you |
-| `PAPERCLIP_PUBLIC_URL` | The exact URL people open, including `https://` |
+| `PAPERCLIP_PUBLIC_URL` | The exact URL people open, including `https://`. Agent runs don't use it: the compose file sets `PAPERCLIP_API_URL` to `http://localhost:3100`, since a Tailscale Serve URL refuses connections from inside the container. |
 | `PAPERCLIP_DEPLOYMENT_EXPOSURE` | `private` (Tailscale/VPN/LAN) or `public` (internet, behind Caddy) |
 | `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `PAPERCLIP_TOOL_ACTION_SIGNING_SECRET` | Generate each with `openssl rand -hex 32`. Keep them stable: changing `BETTER_AUTH_SECRET` signs everyone out. |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | API keys for agents. Leave `ANTHROPIC_API_KEY` empty to use a Claude subscription instead: sign in from Connections → AI connections after setup. A set key takes precedence over the subscription. |

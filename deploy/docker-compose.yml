@@ -64,6 +64,11 @@ services:
       PAPERCLIP_DEPLOYMENT_EXPOSURE: "${PAPERCLIP_DEPLOYMENT_EXPOSURE:-private}"
       PAPERCLIP_PUBLIC_URL: "${PAPERCLIP_PUBLIC_URL:?PAPERCLIP_PUBLIC_URL must be set}"
       PAPERCLIP_ALLOWED_HOSTNAMES: "${PAPERCLIP_ALLOWED_HOSTNAMES:-}"
+      # The address agent runs reach Paperclip at: its MCP server, the GitHub
+      # credential broker, file links. Runs execute inside this container, where
+      # PAPERCLIP_PUBLIC_URL may not answer (a Tailscale Serve URL refuses
+      # connections from the Docker network), so they use the server directly.
+      PAPERCLIP_API_URL: "http://localhost:3100"
 
       BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set}"
       PAPERCLIP_TOOL_ACTION_SIGNING_SECRET: "${PAPERCLIP_TOOL_ACTION_SIGNING_SECRET:?PAPERCLIP_TOOL_ACTION_SIGNING_SECRET must be set}"
