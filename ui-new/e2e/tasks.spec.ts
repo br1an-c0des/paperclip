@@ -62,3 +62,28 @@ test("opens a run in the run modal", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(modal).toBeHidden();
 });
+
+test("the Hidden tasks only filter lists the tasks someone hid", async ({ page, db }) => {
+  db.issues.find((i) => i.id === "issue-m7-3")!.hiddenAt = "2026-11-20T09:00:00.000Z" as never;
+  await page.goto("/MSE/issues");
+  await expect(page.getByRole("link", { name: "M7 test Fix the signup form" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "M7 test Review the pricing copy" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Hidden tasks only" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("link", { name: "M7 test Review the pricing copy" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "M7 test Fix the signup form" })).toHaveCount(0);
+});
+
+test("deletes a task after asking", async ({ page, api }) => {
+  await page.goto("/MSE/issues/MSE-5");
+  await page.getByRole("button", { name: "More task actions" }).click();
+  await page.getByRole("menuitem", { name: "Delete task…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete MSE-5?" });
+  await expect(dialog.getByText("This can't be undone.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Delete task" }).click();
+  await api.waitForWrite("DELETE", "/issues/issue-m7-5");
+  await expect(page).toHaveURL(/\/MSE\/issues$/);
+  await expect(page.getByRole("link", { name: "M7 test Plan the launch" })).toHaveCount(0);
+});

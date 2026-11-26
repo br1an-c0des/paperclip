@@ -61,6 +61,8 @@ export type TaskFilters = {
    * (`?originKind=routine_execution`, since the 2026-11-01 sync). Agent-created tasks show with it on.
    */
   routineOnly: boolean;
+  /** Only the tasks someone hid (`hiddenAt`), which the server sends only when asked (`?hidden=only`). */
+  hiddenOnly: boolean;
 };
 
 /** The fields the old list sorts by (ui/src/components/IssuesList.tsx); task-sort.ts sorts. */
@@ -104,6 +106,7 @@ export const EMPTY_FILTERS: TaskFilters = {
   hideAgentCreated: false,
   inCase: false,
   routineOnly: false,
+  hiddenOnly: false,
 };
 
 /** The server's order: most recently updated first. */
@@ -156,6 +159,7 @@ export function parseFilters(value: unknown): TaskFilters {
     hideAgentCreated: filters.hideAgentCreated === true,
     inCase: filters.inCase === true,
     routineOnly: filters.routineOnly === true,
+    hiddenOnly: filters.hiddenOnly === true,
   };
 }
 
@@ -252,7 +256,8 @@ export function filterCount(filters: TaskFilters) {
     (filters.liveOnly ? 1 : 0) +
     (filters.hideAgentCreated ? 1 : 0) +
     (filters.inCase ? 1 : 0) +
-    (filters.routineOnly ? 1 : 0)
+    (filters.routineOnly ? 1 : 0) +
+    (filters.hiddenOnly ? 1 : 0)
   );
 }
 

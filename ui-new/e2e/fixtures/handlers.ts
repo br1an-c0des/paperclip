@@ -273,6 +273,8 @@ export function installDefaultHandlers(api: MockApi, options: MockOptions = {}):
   api.get("/companies/:companyId/labels", () => []);
   api.get("/companies/:companyId/routines", () => []);
   api.get("/companies/:companyId/issues", ({ params, query }) => (params.companyId === world.COMPANY_ID ? filterIssues(db.issues, query) : []));
+  // The filter menu's workspace choices.
+  api.get("/companies/:companyId/execution-workspaces", () => []);
   api.get("/companies/:companyId/issues/summaries", ({ query }) => {
     const ids = (query.get("ids") ?? "").split(",");
     return db.issues.filter((i) => ids.includes(i.id));
@@ -293,6 +295,12 @@ export function installDefaultHandlers(api: MockApi, options: MockOptions = {}):
       db.comments.push(added);
       return { ...found, comment: added };
     }
+    return found;
+  });
+  api.delete("/issues/:ref", ({ params }) => {
+    const found = findIssue(params.ref!);
+    if (!found) return reply(404, { error: "Issue not found" });
+    db.issues = db.issues.filter((i) => i.id !== found.id);
     return found;
   });
   api.post("/companies/:companyId/issues", ({ params, body }) => {
@@ -416,7 +424,9 @@ export function installDefaultHandlers(api: MockApi, options: MockOptions = {}):
 /** The task list's filters the journeys use: project, parent, status, assignee, a search. */
 function filterIssues(issues: Issue[], query: URLSearchParams) {
   // Chats aren't tasks to the lists.
-  let found = issues.filter((i) => !i.hiddenAt && !i.conversationAgentId);
+  // Hidden tasks only when asked (`?hidden=only`), and then only them.
+  const hiddenOnly = query.get("hidden") === "only";
+  let found = issues.filter((i) => !!i.hiddenAt === hiddenOnly && !i.conversationAgentId);
   const projectId = query.get("projectId");
   if (projectId) found = found.filter((i) => i.projectId === projectId);
   const parentId = query.get("parentId");

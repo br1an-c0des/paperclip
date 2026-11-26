@@ -9305,6 +9305,16 @@ export function issueRoutes(
       res.status(400).json({ error: "includeAgentCreatedTasks must be true or false when provided" });
       return;
     }
+    const hiddenRaw = req.query.hidden;
+    if (hiddenRaw !== undefined && hiddenRaw !== "only") {
+      res.status(400).json({ error: "hidden must be \"only\" when provided" });
+      return;
+    }
+    // Task search reads only visible tasks, so it can't search hidden ones.
+    if (hiddenRaw === "only" && (attention === "blocked" || (typeof req.query.q === "string" && req.query.q.trim()))) {
+      res.status(400).json({ error: "hidden=only is not supported with q or blocked attention lists" });
+      return;
+    }
     const includeLiveDescendantSummary = parseOptionalBooleanQuery(
       req.query.includeLiveDescendantSummary,
     );
@@ -9483,6 +9493,7 @@ export function issueRoutes(
         req.query.includeBlockedInboxAttention === "true" ||
         req.query.includeBlockedInboxAttention === "1",
       includeAgentCreatedTasks,
+      hiddenOnly: hiddenRaw === "only" ? true : undefined,
       creationVisibilityUserId: includeParticipatedTasks === true && req.actor.type === "board" ? req.actor.userId : undefined,
       includeLiveDescendantSummary: includeLiveDescendantSummary === true,
       hasPlanDocument,

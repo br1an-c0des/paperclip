@@ -70,6 +70,8 @@ export type IssueListFilters = {
    */
   sortField?: "updated" | "created";
   sortDir?: "asc" | "desc";
+  /** Only the tasks someone hid (`?hidden=only`), which lists otherwise leave out. */
+  hidden?: "only";
   limit?: number;
   offset?: number;
 };
@@ -83,6 +85,7 @@ function listParams(filters: IssueListFilters) {
   if (filters.participantAgentId) params.set("participantAgentId", filters.participantAgentId);
   if (filters.includeBlockedBy) params.set("includeBlockedBy", "true");
   if (filters.includeRoutineExecutions) params.set("includeRoutineExecutions", "true");
+  if (filters.hidden) params.set("hidden", filters.hidden);
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.offset) params.set("offset", String(filters.offset));
   return params.toString();
@@ -188,6 +191,8 @@ export const issuesApi = {
    */
   getCore: (ref: string, signal?: AbortSignal) => api.get<Issue>(`/issues/${encodeURIComponent(ref)}?view=core`, { signal }),
   update: (id: string, data: Record<string, unknown>) => api.patch<Issue>(`/issues/${id}`, data),
+  /** Deletes the task for good, with its comments, documents and files. A task with subtasks is refused (409). */
+  remove: (id: string) => api.delete<Issue>(`/issues/${id}`),
   /**
    * Asks for another attempt at an interrupted task (`POST /issues/:id/retry`). The idempotency key
    * makes a resent request land once; `observedRunId` is the run the viewer saw fail, and the server

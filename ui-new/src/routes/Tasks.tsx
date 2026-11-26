@@ -88,7 +88,7 @@ export function TaskPage() {
                 </>
               }
               title={<TitleEditor title={found().title} onChange={change} />}
-              actions={<TaskHeaderActions taskId={found().id} onHidden={() => navigate(`/${company().issuePrefix}/issues`)} />}
+              actions={<TaskHeaderActions taskId={found().id} onRemoved={() => navigate(`/${company().issuePrefix}/issues`)} />}
             />
             <section class="card task-page">
               <TaskSections

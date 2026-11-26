@@ -6,6 +6,11 @@ export function visibleIssueCondition(): SQL {
   return and(isNull(issues.hiddenAt), isNull(issues.harnessKind))!;
 }
 
+/** Tasks someone hid (`hiddenAt`), which lists leave out unless asked (`?hidden=only`). */
+export function hiddenIssueCondition(): SQL {
+  return and(isNotNull(issues.hiddenAt), isNull(issues.harnessKind))!;
+}
+
 export function visibleIssueSql(alias = "issues") {
   return `"${alias}"."hidden_at" IS NULL AND "${alias}"."harness_kind" IS NULL`;
 }

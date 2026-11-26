@@ -246,6 +246,50 @@ describeEmbeddedPostgres("issue list routes assigneeAgentId filter", () => {
     expect(res.body.map((issue: { id: string }) => issue.id)).toEqual([unassignedIssueId]);
   });
 
+  it("lists only hidden tasks for hidden=only and leaves them out otherwise", async () => {
+    const companyId = randomUUID();
+    const visibleIssueId = randomUUID();
+    const hiddenIssueId = randomUUID();
+
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Paperclip",
+      issuePrefix: uniqueIssuePrefix(),
+      requireBoardApprovalForNewAgents: false,
+    });
+    await seedCloudTenantMember(companyId);
+    await db.insert(issues).values([
+      { id: visibleIssueId, companyId, title: "Visible issue", status: "todo", priority: "medium" },
+      {
+        id: hiddenIssueId,
+        companyId,
+        title: "Hidden issue",
+        status: "done",
+        priority: "medium",
+        hiddenAt: new Date("2026-11-01T00:00:00.000Z"),
+      },
+    ]);
+
+    const app = createApp(companyId);
+    const visible = await request(app).get(`/api/companies/${companyId}/issues`).query({ view: "compact", limit: "20" });
+    expect(visible.status, JSON.stringify(visible.body)).toBe(200);
+    expect(visible.body.map((issue: { id: string }) => issue.id)).toEqual([visibleIssueId]);
+
+    const hidden = await request(app)
+      .get(`/api/companies/${companyId}/issues`)
+      .query({ view: "compact", hidden: "only", limit: "20" });
+    expect(hidden.status, JSON.stringify(hidden.body)).toBe(200);
+    expect(hidden.body.map((issue: { id: string }) => issue.id)).toEqual([hiddenIssueId]);
+
+    const searched = await request(app)
+      .get(`/api/companies/${companyId}/issues`)
+      .query({ hidden: "only", q: "Hidden", limit: "20" });
+    expect(searched.status).toBe(400);
+
+    const bad = await request(app).get(`/api/companies/${companyId}/issues`).query({ hidden: "yes" });
+    expect(bad.status).toBe(400);
+  });
+
   it("returns compact issue list rows with recovery chips but without detail-only fields", async () => {
     const companyId = randomUUID();
     const ownerAgentId = randomUUID();

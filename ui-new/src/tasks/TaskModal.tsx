@@ -136,7 +136,7 @@ export function TaskModal(props: {
         <TaskParentCrumb taskId={props.task.id} onOpenTask={props.onOpenTask} />
         <span class="mono tmodal-id">{props.task.identifier}</span>
         <div class="tmodal-actions">
-          <TaskHeaderActions taskId={props.task.id} onHidden={props.onClose} />
+          <TaskHeaderActions taskId={props.task.id} onRemoved={props.onClose} />
           <span class="ta-sep" aria-hidden="true" />
           <Show when={props.canDock}>
             {/* Opens on hover and on keyboard focus; it only explains the button's name. */}

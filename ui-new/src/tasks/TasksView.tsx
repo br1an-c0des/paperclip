@@ -1,7 +1,7 @@
 import type { CompactIssue, IssueDisplayStatus, IssuePriority } from "@paperclipai/shared";
 import { useLocation, useSearchParams } from "@solidjs/router";
 import { createQuery, keepPreviousData, useQueryClient } from "@tanstack/solid-query";
-import { ArrowUpDown, ChevronDown, CircleCheck, Columns3, CornerDownRight, Kanban, List, ListFilter, Plus, Repeat, Rows3, Search, UserRound, X } from "lucide-solid";
+import { ArrowUpDown, ChevronDown, CircleCheck, Columns3, CornerDownRight, EyeOff, Kanban, List, ListFilter, Plus, Repeat, Rows3, Search, UserRound, X } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { isTemporaryApiError } from "@/api/client";
 import { describeError } from "@/lib/offline/errors";
@@ -188,7 +188,8 @@ export function TasksView(props: {
   const retry = useTaskRetry();
   const location = useLocation();
   const [params, setParams] = useSearchParams<{ task?: string; section?: string; show?: string; group?: string }>();
-  const tasks = () => props.tasks.data ?? [];
+  // The list's tasks: the page's, or the hidden ones while the Hidden tasks filter is on (`list`).
+  const tasks = () => list().data ?? [];
   const recurring = () => showsRecurring(params.show);
 
   // What the URL says: the search, and pre-filters that replace the saved view's.
@@ -235,6 +236,19 @@ export function TasksView(props: {
       { defer: true },
     ),
   );
+  // Hidden tasks (`hiddenAt`) are a list of their own, which the server sends only when asked.
+  const hiddenOnly = () => view().filters.hiddenOnly;
+  const hiddenTasks = createQuery(() => ({
+    queryKey: [...queryKeys.issues.view(company().id, { projectId: props.projectId }), "hidden"],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      issuesApi.listAll(
+        company().id,
+        { ...(props.projectId ? { projectId: props.projectId } : {}), includeBlockedBy: true, includeRoutineExecutions: true, hidden: "only" },
+        signal,
+      ),
+    enabled: hiddenOnly(),
+  }));
+  const list = () => (hiddenOnly() ? hiddenTasks : props.tasks);
   const changeView = (next: Partial<TaskViewState>) => {
     const state = { ...view(), ...next };
     setView(state);
@@ -679,19 +693,25 @@ export function TasksView(props: {
       </Show>
       <PendingTasks projectId={props.projectId} />
       <Switch>
-        <Match when={props.tasks.isError && !props.tasks.data}>
+        <Match when={list().isError && !list().data}>
           <section class="card tv-note">
-            <p>The tasks couldn't be loaded: {describeError(props.tasks.error)}</p>
+            <p>The tasks couldn't be loaded: {describeError(list().error)}</p>
           </section>
         </Match>
-        <Match when={!props.tasks.data}>
+        <Match when={!list().data}>
           <section class="card tv-note" aria-busy="true">
             <p class="muted">{loadingText("Loading tasks…")}</p>
           </section>
         </Match>
         <Match when={tasks().length === 0}>
           <section class="card tv-note">
-            <p>{participantName() ? `${participantName()} hasn't taken part in any tasks.` : "No tasks yet."}</p>
+            <p>
+              {hiddenOnly()
+                ? "No hidden tasks."
+                : participantName()
+                  ? `${participantName()} hasn't taken part in any tasks.`
+                  : "No tasks yet."}
+            </p>
           </section>
         </Match>
         <Match when={true}>
@@ -898,6 +918,13 @@ function FilterMenu(props: {
             onChange={() => props.onChange({ routineOnly: !props.filters.routineOnly })}
           >
             Recurring task runs
+          </Menu.CheckboxItem>
+          <Menu.CheckboxItem
+            icon={<EyeOff size={14} aria-hidden="true" />}
+            checked={props.filters.hiddenOnly}
+            onChange={() => props.onChange({ hiddenOnly: !props.filters.hiddenOnly })}
+          >
+            Hidden tasks only
           </Menu.CheckboxItem>
           <Show when={props.cases}>
             <Menu.CheckboxItem icon={<CaseIcon size={14} />} checked={props.filters.inCase} onChange={() => props.onChange({ inCase: !props.filters.inCase })}>

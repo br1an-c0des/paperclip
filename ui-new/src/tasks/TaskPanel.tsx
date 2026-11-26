@@ -68,7 +68,7 @@ export function TaskPanel(props: {
       }
       actions={
         <div class="tp-actions">
-          <TaskHeaderActions taskId={props.task.id} onHidden={props.onClose} />
+          <TaskHeaderActions taskId={props.task.id} onRemoved={props.onClose} />
           <button
             type="button"
             class="btn btn--icon btn--ghost btn--compact"

@@ -262,7 +262,7 @@ import {
   type IssueGraphLivenessInput,
   type IssueLivenessFinding,
 } from "./recovery/issue-graph-liveness.js";
-import { visibleIssueCondition } from "./issue-visibility.js";
+import { hiddenIssueCondition, visibleIssueCondition } from "./issue-visibility.js";
 import { finalizeStatusCardsForStalledGeneration } from "./status-card-finalization.js";
 import { finalizeSummarySlotsForTerminalIssue } from "./summary-slot-finalization.js";
 import {
@@ -1926,6 +1926,8 @@ export interface IssueFilters {
   originKindPrefix?: string;
   originId?: string;
   includeAgentCreatedTasks?: boolean;
+  /** Only the tasks someone hid (`hiddenAt` set), in place of the visible ones. Not for blocked attention. */
+  hiddenOnly?: boolean;
   /** Authenticated inbox discovery can retain existing participation. */
   creationVisibilityUserId?: string;
   includeRoutineExecutions?: boolean;
@@ -8610,9 +8612,10 @@ export function issueService(db: Db) {
         });
       }
 
+      const listVisibility = filters?.hiddenOnly ? hiddenIssueCondition() : visibleIssueCondition();
       const conditions = [
         eq(issues.companyId, companyId),
-        visibleIssueCondition(),
+        listVisibility,
       ];
       if (filters?.issueIds) {
         if (filters.issueIds.length === 0) return [];
@@ -8839,7 +8842,7 @@ export function issueService(db: Db) {
         ? searchedSource.where(and(
           eq(issues.companyId, companyId),
           inArray(issues.id, pageIds),
-          visibleIssueCondition(),
+          listVisibility,
           filters?.readCondition,
         ))
         : paginate(searchedSource.where(and(...conditions)).orderBy(...orderBy).$dynamic());
