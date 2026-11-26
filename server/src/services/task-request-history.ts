@@ -42,6 +42,11 @@ export type PaperclipWakeLastRun = {
   /** Cut to 2,000 characters. */
   body: string;
   bodyTruncated: boolean;
+  /**
+   * The task's comments this run posted (`issue_comments.created_by_run_id`), not deleted, oldest
+   * first, at most 20. When one is quoted in the run message, the summary is left out (bug 98).
+   */
+  commentIds: string[];
 };
 
 export type PaperclipWakeRequestKind =
@@ -96,6 +101,7 @@ const REQUEST_TEXT_MAX_CHARS = 1_000;
 const MAX_QUESTIONS = 20;
 const MAX_OPTIONS = 30;
 const MAX_DOCUMENTS = 30;
+const MAX_LAST_RUN_COMMENTS = 20;
 export const REQUEST_HISTORY_ROUTE_LIMIT = 50;
 
 const INTERACTION_KINDS = ["ask_user_questions", "request_confirmation", "request_checkbox_confirmation", "connection_intent"] as const;
@@ -327,6 +333,12 @@ export async function readTaskLastRun(db: Db, input: {
   if (!row?.finishedAt) return null;
   const quarantined = lowerTrustRun(companyId, row.executionPolicy);
   const truncated = !quarantined && row.body.length > RUN_SUMMARY_MAX_CHARS;
+  const comments = await db.select({ id: issueComments.id }).from(issueComments).where(and(
+    eq(issueComments.companyId, companyId),
+    eq(issueComments.issueId, issueId),
+    eq(issueComments.createdByRunId, row.id),
+    isNull(issueComments.deletedAt),
+  )).orderBy(issueComments.createdAt, issueComments.id).limit(MAX_LAST_RUN_COMMENTS);
   return {
     runId: row.id,
     agentId: row.agentId,
@@ -335,6 +347,7 @@ export async function readTaskLastRun(db: Db, input: {
     finishedAt: row.finishedAt.toISOString(),
     body: quarantined ? LOW_TRUST_QUARANTINED_BODY : row.body.slice(0, RUN_SUMMARY_MAX_CHARS),
     bodyTruncated: truncated,
+    commentIds: comments.map(comment => comment.id),
   };
 }
 

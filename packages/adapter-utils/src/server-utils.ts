@@ -672,6 +672,11 @@ export type PaperclipWakeLastRun = {
   finishedAt: string;
   body: string;
   bodyTruncated: boolean;
+  /**
+   * The task's comments this run posted, oldest first (bug 98): when one is quoted in the run
+   * message, the summary is left out. Empty on older payloads.
+   */
+  commentIds: string[];
 };
 
 export const PAPERCLIP_WAKE_REQUEST_KINDS = [
@@ -1199,6 +1204,9 @@ function normalizePaperclipWakeLastRun(value: unknown): PaperclipWakeLastRun | n
     finishedAt: asString(run.finishedAt, "").trim(),
     body,
     bodyTruncated: asBoolean(run.bodyTruncated, false) || asString(run.body, "").trim().length > HISTORY_TEXT_MAX,
+    commentIds: Array.isArray(run.commentIds)
+      ? [...new Set(run.commentIds.filter((id): id is string => typeof id === "string").map((id) => id.trim()).filter(Boolean))].slice(0, 20)
+      : [],
   };
 }
 

@@ -212,7 +212,7 @@ describe.skipIf(!support.supported)("a task's request history", () => {
       contextSnapshot: { issueId: f.issueId, executionStage: { wakeRole: "reviewer" } } });
     expect(await readTaskLastRun(db, { companyId: f.companyId, issueId: f.issueId, agentId: f.agentId, previousAssigneeAgentId: null }))
       .toEqual({ runId: own.id, agentId: f.agentId, ownRun: true, status: "succeeded", finishedAt: "2026-11-24T17:52:00.000Z",
-        body: "Posted the plan.", bodyTruncated: false });
+        body: "Posted the plan.", bodyTruncated: false, commentIds: [] });
   });
 
   it("falls back to the previous assignee's when the agent has none", async () => {
@@ -254,6 +254,40 @@ describe.skipIf(!support.supported)("a task's request history", () => {
     const lastRun = await readTaskLastRun(db, { companyId: f.companyId, issueId: f.issueId, agentId: f.agentId, previousAssigneeAgentId: null });
     expect(lastRun?.body).toHaveLength(2_000);
     expect(lastRun?.bodyTruncated).toBe(true);
+  });
+
+  it("the last run's comments: the ones it posted on the task, oldest first, not deleted (bug 98)", async () => {
+    const f = await seed();
+    const own = await run(f, { summary: "Posted the plan." });
+    const other = await run(f, { summary: "Earlier.", finishedAt: new Date("2026-11-24T10:00:00Z") });
+    const comment = async (values: Partial<typeof issueComments.$inferInsert>) => {
+      const [row] = await db.insert(issueComments).values({
+        companyId: f.companyId, issueId: f.issueId, authorType: "agent", authorAgentId: f.agentId, body: "A comment", ...values,
+      }).returning();
+      return row!.id;
+    };
+    const second = await comment({ createdByRunId: own.id, createdAt: new Date("2026-11-24T17:51:00Z") });
+    const first = await comment({ createdByRunId: own.id, createdAt: new Date("2026-11-24T17:50:00Z") });
+    // Another run's comment, a comment on another task by this run, and one with no run don't count.
+    await comment({ createdByRunId: other.id });
+    await comment({});
+    const elsewhere = await seed();
+    await db.insert(issueComments).values({ companyId: elsewhere.companyId, issueId: elsewhere.issueId, authorType: "agent",
+      authorAgentId: elsewhere.agentId, body: "Elsewhere", createdByRunId: own.id });
+    const read = () => readTaskLastRun(db, { companyId: f.companyId, issueId: f.issueId, agentId: f.agentId, previousAssigneeAgentId: null });
+    expect((await read())?.commentIds).toEqual([first, second]);
+
+    // A run whose only comment is deleted, and a run with none: no comments.
+    const deleted = await seed();
+    const deletedRun = await run(deleted, { summary: "Posted, then removed." });
+    await db.insert(issueComments).values({ companyId: deleted.companyId, issueId: deleted.issueId, authorType: "agent",
+      authorAgentId: deleted.agentId, body: "Removed", createdByRunId: deletedRun.id, deletedAt: new Date() });
+    expect((await readTaskLastRun(db, { companyId: deleted.companyId, issueId: deleted.issueId, agentId: deleted.agentId,
+      previousAssigneeAgentId: null }))?.commentIds).toEqual([]);
+    const none = await seed();
+    await run(none, { summary: "Said nothing on the task." });
+    expect((await readTaskLastRun(db, { companyId: none.companyId, issueId: none.issueId, agentId: none.agentId,
+      previousAssigneeAgentId: null }))?.commentIds).toEqual([]);
   });
 
   it("a lower-trust run's summary is quarantined", async () => {

@@ -67,6 +67,14 @@ export const HISTORY = {
   lastRunOther: "{{whose}} last run on {{taskRef}} ({{time}}) {{ended}}:",
   lastRunOtherNoTime: "{{whose}} last run on {{taskRef}} {{ended}}:",
   lastRunCut: "(The summary was cut short.)",
+  /**
+   * The last run posted its result as a comment, and the comments below quote it: one line, no
+   * summary (bug 98).
+   */
+  lastRunOwnCommented: "Your last run on {{taskRef}} ({{time}}) {{ended}} its comment, quoted below.",
+  lastRunOwnCommentedNoTime: "Your last run on {{taskRef}} {{ended}} its comment, quoted below.",
+  lastRunOtherCommented: "{{whose}} last run on {{taskRef}} ({{time}}) {{ended}} its comment, quoted below.",
+  lastRunOtherCommentedNoTime: "{{whose}} last run on {{taskRef}} {{ended}} its comment, quoted below.",
   answered: "Answered requests:",
   /** One answered request, before its quote: "Your question, answered by Brian on Nov 24, 17:45". */
   request: "{{whose}} {{noun}}{{title}}, {{decision}}{{by}}{{on}}",
