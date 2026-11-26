@@ -91,7 +91,7 @@ export function parseClaudeRunGitHub(value: unknown): ClaudeRunGitHub | null {
   if (!isRecord(value)) return null;
   if (value.mode === "server_login" || value.mode === "none") return { mode: value.mode };
   if (value.mode !== "connection") return null;
-  const identitySource = value.identitySource === "dedicated" ? "dedicated" : "personal";
+  const identitySource = value.identitySource === "dedicated" || value.identitySource === "shared" ? value.identitySource : "personal";
   const login = typeof value.login === "string" && value.login.trim() ? value.login.trim() : null;
   return { mode: "connection", identitySource, login };
 }

@@ -43,6 +43,8 @@ describe("parseClaudeRunGitHub", () => {
   it("keeps only the known fields", () => {
     expect(parseClaudeRunGitHub({ mode: "connection", identitySource: "personal", login: " octocat ", token: "x" }))
       .toEqual({ mode: "connection", identitySource: "personal", login: "octocat" });
+    expect(parseClaudeRunGitHub({ mode: "connection", identitySource: "shared", login: null }))
+      .toEqual({ mode: "connection", identitySource: "shared", login: null });
     expect(parseClaudeRunGitHub({ mode: "connection" })).toEqual({ mode: "connection", identitySource: "personal", login: null });
     expect(parseClaudeRunGitHub({ mode: "none", extra: 1 })).toEqual({ mode: "none" });
   });

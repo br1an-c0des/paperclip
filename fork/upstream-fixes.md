@@ -1755,3 +1755,25 @@ deploy). **Fixed** the same day: `deploy/docker-compose.yml` sets `PAPERCLIP_API
   the host's tailnet IP and refuses connections from the Docker network.
 - **Fix:** runs execute inside the server container, so they use `http://localhost:3100`. Links
   people open still come from `PAPERCLIP_PUBLIC_URL` (`runtimePublicOrigin` prefers it).
+
+### 100. A GitHub connection's shared token never reaches runs
+
+Found 2026-11-25 in Jim's retried run on BRA-47 (server1), once bug 99 let runs reach the broker.
+**Fixed** the same day on `github-shared-token`: a shared token is the fallback when nobody has
+signed in.
+
+- **Problem:** the GitHub connection on server1 holds one fine-grained token for the whole
+  company (an organization grant with a `credentials.authorization` secret). The connection's
+  health check uses it and passes, but runs never got it: `resolveManagedGitHubIdentitySelection`
+  (`server/src/services/git-credentials.ts`) only considered the agent's own sign-in and the
+  responsible person's (GitHub App OAuth grants). Since a company-wide GitHub connection counts as
+  configured, the older `GITHUB_TOKEN` fallback was skipped too. So git and gh ran with no
+  credential ("No managed GitHub identity is available for this run") and the connector's tools
+  failed with `github_identity_unavailable`. Upstream's code, unchanged since the freeze: GitHub
+  pushes from runs had never worked on server1.
+- **Fix:** with no sign-in of the agent's or the person's, the selection takes the connection's
+  shared token (`identitySource: "shared"`); one such token at most, else it refuses. The broker
+  gives it to git and gh without the `Bearer ` scheme, and the gateway's connector tools send it as
+  the health check does. A token records no GitHub account, so the managed launchers make the agent
+  the committer as well as the author, and the run manifest shows "account not recorded (shared)".
+  Tests: `server/src/__tests__/github-shared-token.test.ts`.

@@ -65,7 +65,7 @@ export function runGitHubManifest(input: {
   useHostGitHub: boolean;
   selection: {
     configured: boolean;
-    identitySource?: "personal" | "dedicated";
+    identitySource?: "personal" | "dedicated" | "shared";
     grant?: { providerTenant?: { github?: { login?: string | null } | null } | null };
   };
 }): ClaudeRunGitHub {

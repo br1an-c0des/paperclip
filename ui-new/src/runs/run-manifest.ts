@@ -147,7 +147,7 @@ export function githubText(github: ClaudeRunManifest["github"] | undefined): str
   if (github.mode === "server_login") return "This server's GitHub login";
   if (github.mode === "none") return "None";
   if (github.mode === "connection") {
-    const source = github.identitySource === "dedicated" ? "dedicated" : "personal";
+    const source = github.identitySource === "dedicated" || github.identitySource === "shared" ? github.identitySource : "personal";
     return `Connection: ${github.login ? github.login : "account not recorded"} (${source})`;
   }
   return null;
