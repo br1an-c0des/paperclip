@@ -63,6 +63,7 @@ export {
   resolveSessionCompactionPolicy,
   hasSessionCompactionThresholds,
 } from "./session-compaction.js";
+export { contextCompactedRunEvent } from "./context-compaction-event.js";
 export {
   REDACTED_HOME_PATH_USER,
   redactHomePathUserSegments,
