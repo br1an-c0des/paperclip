@@ -1,5 +1,5 @@
 import { and, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
-import { activityLog, documentRevisions, heartbeatRuns, type Db } from "@paperclipai/db";
+import { activityLog, documentRevisions, heartbeatRunEvents, heartbeatRuns, type Db } from "@paperclipai/db";
 import { briefPlanState, type PaperclipTaskMarkdownInput } from "./task-markdown.js";
 
 /**
@@ -38,9 +38,11 @@ export type PaperclipRunTask = {
   /** A case's execution context and live-voice guidance, as the brief puts them before itself. */
   prefixParts: Array<{ id: "wake.task.case" | "wake.task.live_voice"; text: string }>;
   /**
-   * Claude compacted the session since its last run. Always false for now: Paperclip records a
-   * compaction (`context.compacted` run events, which the transcript's compaction divider reads)
-   * only for Paperclip Runner runs; `claude_local` runs, CLI or ACP, record none.
+   * Claude compacted the session in its last run: that run (`previousRunId`) recorded a
+   * `context.compacted` run event (bug 96; `claude_local` records one from the CLI's
+   * `compact_boundary` or the patched ACP agent's marker). Then the task's first message, with the
+   * description and plan, is gone from the session, so "The task" sends them again. A compaction
+   * in an older run, or in another task's run, doesn't count: the last run already resent them.
    */
   compactedSinceLastRun: boolean;
 };
@@ -67,9 +69,10 @@ export async function buildRunTaskFacts(db: Db, input: {
   const { companyId, issueId, taskMarkdownInput: markdown, taskPlan } = input;
   const since = await previousRunStart(db, companyId, input.previousRunId);
   const planBody = taskPlan?.body.trim() ?? "";
-  const [descriptionChanged, planChanged] = await Promise.all([
+  const [descriptionChanged, planChanged, compacted] = await Promise.all([
     since ? descriptionEditedSince(db, { companyId, issueId, since, previousRunId: input.previousRunId! }) : false,
     since && taskPlan && planBody ? revisionSavedSince(db, { companyId, revisionId: taskPlan.revisionId, since, previousRunId: input.previousRunId! }) : false,
+    input.previousRunId ? runCompacted(db, companyId, input.previousRunId) : false,
   ]);
   const planState = briefPlanState(markdown);
   const allAncestors = markdown.ancestors ?? [];
@@ -118,7 +121,7 @@ export async function buildRunTaskFacts(db: Db, input: {
       ...(input.prefix.liveVoice.trim() ? [{ id: "wake.task.live_voice" as const, text: input.prefix.liveVoice.trim() }] : []),
       ...(input.prefix.caseMarkdown.trim() ? [{ id: "wake.task.case" as const, text: input.prefix.caseMarkdown.trim() }] : []),
     ],
-    compactedSinceLastRun: false,
+    compactedSinceLastRun: compacted,
   };
 }
 
@@ -149,6 +152,20 @@ async function descriptionEditedSince(db: Db, input: { companyId: string; issueI
       gt(activityLog.createdAt, input.since),
       or(isNull(activityLog.runId), ne(activityLog.runId, input.previousRunId)),
       sql`(${activityLog.details} -> 'changes' -> 'description') is not null`,
+    ))
+    .limit(1);
+  return row.length > 0;
+}
+
+/** The run recorded a `context.compacted` event (`heartbeat_run_events_company_run_idx`). */
+async function runCompacted(db: Db, companyId: string, runId: string) {
+  const row = await db
+    .select({ id: heartbeatRunEvents.id })
+    .from(heartbeatRunEvents)
+    .where(and(
+      eq(heartbeatRunEvents.companyId, companyId),
+      eq(heartbeatRunEvents.runId, runId),
+      eq(heartbeatRunEvents.eventType, "context.compacted"),
     ))
     .limit(1);
   return row.length > 0;
