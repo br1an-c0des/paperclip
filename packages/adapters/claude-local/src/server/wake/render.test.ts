@@ -1360,6 +1360,16 @@ describe("renderClaudeWake: the task's history (step 5 phase 2, the handoff)", (
     expect(briefOnly).toContain("Documents on this task: plan (in the brief below).\n");
   });
 
+  it("a document in the brief has one bracket, title and pointer together (bug 97)", () => {
+    const titled = renderClaudeWake(withHistory({ documents: [
+      { key: "plan", title: "Compact mode plan", inBrief: true }, { key: "notes", title: "Meeting notes", inBrief: false },
+    ] }), fresh);
+    expect(titled).toContain("Documents on this task: plan (\"Compact mode plan\", in the brief below), notes (\"Meeting notes\"). Read the rest with `paperclip_read_document`.");
+    expect(titled).not.toContain(") (");
+    const untitled = renderClaudeWake(withHistory({ documents: [{ key: "plan", title: null, inBrief: true }] }), fresh);
+    expect(untitled).toContain("Documents on this task: plan (in the brief below).\n");
+  });
+
   it("only an open question, no comments", () => {
     const open = { ...answeredQuestion, status: "pending", answers: undefined, decidedBy: null, decidedAt: null };
     const payload = {
@@ -1733,7 +1743,7 @@ Your session continues`);
 
   it("the TES-45 history with the task's facts: the plan is under \"The task\"", () => {
     const text = renderClaudeWake(historyFixtures.tes45, withTask(fresh, tes45RunTask));
-    expect(text).toContain("Documents on this task: plan (under \"The task\" below), notes. Read the rest with `paperclip_read_document`.");
+    expect(text).toContain("Documents on this task: plan (quoted under \"The task\" below), notes. Read the rest with `paperclip_read_document`.");
     expect(heading(text, "The task")).toBe(`## The task
 
 TES-45 "M7 test wake: dark mode notes" · in progress · already checked out to you
@@ -1751,6 +1761,18 @@ ${PLAN_QUOTE}`);
     // No plan in the facts: the plan is one of the documents to read.
     expect(renderClaudeWake(historyFixtures.tes45, withTask(fresh, { ...tes45RunTask, plan: null })))
       .toContain("Documents on this task: plan, notes. Read them with `paperclip_read_document`.");
+  });
+
+  it("the plan under \"The task\" has one bracket, title and pointer together (bug 97)", () => {
+    const documents = (list: Array<Record<string, unknown>>) =>
+      ({ ...historyFixtures.tes45, history: { ...tes45History, documents: list } });
+    const titled = renderClaudeWake(documents([
+      { key: "plan", title: "Compact mode plan", inBrief: false }, { key: "notes", title: "Meeting notes", inBrief: false },
+    ]), withTask(fresh, tes45RunTask));
+    expect(titled).toContain("Documents on this task: plan (\"Compact mode plan\", quoted under \"The task\" below), notes (\"Meeting notes\"). Read the rest with `paperclip_read_document`.");
+    expect(titled).not.toContain(") (");
+    const untitled = renderClaudeWake(documents([{ key: "plan", title: null, inBrief: false }]), withTask(fresh, tes45RunTask));
+    expect(untitled).toContain("Documents on this task: plan (quoted under \"The task\" below).\n");
   });
 
   it("parts join to the text, with the facts", () => {

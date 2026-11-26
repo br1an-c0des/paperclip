@@ -83,9 +83,13 @@ export const HISTORY = {
   open: "Still waiting: {{request}}, asked {{time}}.",
   openNoTime: "Still waiting: {{request}}.",
   documents: "Documents on this task: {{documents}}.",
-  documentInBrief: "{{document}} (in the brief below)",
+  /** A document's key, then one bracket with its title (when it differs) and where it's quoted (bug 97). */
+  documentNamed: "{{key}} ({{details}})",
+  documentTitle: "\"{{title}}\"",
+  /** The pointer for a document the brief quotes, inside the name's bracket. */
+  documentInBrief: "in the brief below",
   /** With the task's facts (step 5 phase 2, the task brief): the plan is quoted under "The task". */
-  documentInTask: "{{document}} (under \"The task\" below)",
+  documentInTask: "quoted under \"The task\" below",
   documentsRead: "Read them with `paperclip_read_document`.",
   documentsReadRest: "Read the rest with `paperclip_read_document`.",
   workflow: "Read the workflow document with `paperclip_read_document` before choosing the next step.",

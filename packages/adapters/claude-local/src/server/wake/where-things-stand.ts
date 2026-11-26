@@ -234,12 +234,17 @@ function renderDocuments(ctx: Ctx, documents: TaskHistory["documents"]): string 
   const quoted = (document: TaskHistory["documents"][number]) => runTask
     ? document.key === "plan" && runTask.plan !== null
     : document.inBrief;
+  // The key, then one bracket with the title (when it differs) and the pointer (bug 97):
+  // plan ("Compact mode plan", quoted under "The task" below).
   const names = documents.map((document) => {
-    const name = document.title && !sameName(document.key, document.title)
-      ? `${inline(document.key, 100)} ("${inline(document.title, 100).replace(/"/g, "'")}")`
-      : inline(document.key, 100);
-    if (!quoted(document)) return name;
-    return t(runTask ? HISTORY.documentInTask : HISTORY.documentInBrief, { document: name });
+    const key = inline(document.key, 100);
+    const details = [
+      document.title && !sameName(document.key, document.title)
+        ? t(HISTORY.documentTitle, { title: inline(document.title, 100).replace(/"/g, "'") })
+        : null,
+      quoted(document) ? (runTask ? HISTORY.documentInTask : HISTORY.documentInBrief) : null,
+    ].filter((detail): detail is string => detail !== null);
+    return details.length > 0 ? t(HISTORY.documentNamed, { key, details: details.join(", ") }) : key;
   });
   const rest = documents.filter((document) => !quoted(document));
   const workflow = rest.some((document) => document.key === "workflow");
