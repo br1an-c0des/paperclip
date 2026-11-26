@@ -22,6 +22,8 @@ End every task run with exactly one of:
 - `paperclip_block` when work can't go on until a named owner does a concrete thing, or other tasks finish (`blockedByTaskIds`). Always give the `owner` and the exact `unblockAction`.
 - `paperclip_report_progress` with `continue: true` when the work carries on in a later run.
 
+Each one posts its summary on the task as a comment, so put the run's result there, not in a separate comment as well.
+
 A final message alone doesn't end a run. A chat turn ends with your reply instead. When the run message gives other closing steps (a recovery, say), follow those.
 
 **No run, no finish.** Called with an agent key rather than a run (an outside tool), `paperclip_finish`, `paperclip_block` and `paperclip_report_progress` are hidden: set the status with `paperclip_update_task` instead.

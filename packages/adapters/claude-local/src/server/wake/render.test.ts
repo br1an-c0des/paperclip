@@ -1297,6 +1297,96 @@ describe("renderClaudeWake: the task's history (step 5 phase 2, the handoff)", (
     expect(failed).toContain("Your last run on TES-45 (Nov 24, 17:40) failed, and ended with:");
   });
 
+  describe("a last run that posted its result as a comment (bug 98)", () => {
+    const commented = (overrides: Record<string, unknown> = {}) =>
+      ({ ...tes45History.lastRun, commentIds: ["c-short-plan"], ...overrides });
+    const tes45Messages = historyFixtures.tes45.executionContinuation.messages;
+
+    it("the comment quoted below: one line and no summary", () => {
+      const text = renderClaudeWake(withHistory({ lastRun: commented({ bodyTruncated: true }) }), fresh);
+      const section = where(text);
+      expect(section).toMatch(/^## Where things stand\n\nYour last run on TES-45 \(Nov 24, 17:40\) ended with its comment, quoted below\.\n\nAnswered requests:/);
+      expect(section).not.toContain("> I posted a four-step plan");
+      expect(section).not.toContain("(The summary was cut short.)");
+      expect(section).toContain("From you, Nov 24, 17:40:\n\n> Posted a short plan for the Light/Dark/System switch");
+      expect(renderClaudeWakeParts(withHistory({ lastRun: commented() }), fresh).find((part) => part.id === "wake.last_run")?.text)
+        .toBe("\n\nYour last run on TES-45 (Nov 24, 17:40) ended with its comment, quoted below.");
+      // Any one of its comments quoted is enough.
+      expect(renderClaudeWake(withHistory({ lastRun: commented({ commentIds: ["c-gone", "c-plan"] }) }), fresh))
+        .toContain("Your last run on TES-45 (Nov 24, 17:40) ended with its comment, quoted below.");
+    });
+
+    it("the other forms: failed, another agent's, no time", () => {
+      expect(renderClaudeWake(withHistory({ lastRun: commented({ status: "failed" }) }), fresh))
+        .toContain("Your last run on TES-45 (Nov 24, 17:40) failed, and ended with its comment, quoted below.");
+      expect(renderClaudeWake(withHistory({ lastRun: commented({ finishedAt: "" }) }), fresh))
+        .toContain("Your last run on TES-45 ended with its comment, quoted below.");
+      // A handed-over task: the previous assignee's run, and its comment.
+      const coderComment = { ...tes45Messages[0]!, id: "c-coder", authorId: CODER, body: "Handing over: the switch is half built." };
+      const handedOver = withHistory(
+        { lastRun: commented({ agentId: CODER, ownRun: false, commentIds: ["c-coder"] }) },
+        { executionContinuation: continuation({ issueId: historyFixtures.tes45.issue.id, messages: [...tes45Messages, coderComment] }) },
+      );
+      const text = renderClaudeWake(handedOver, fresh);
+      expect(text).toContain("The agent Coder's last run on TES-45 (Nov 24, 17:40) ended with its comment, quoted below.");
+      expect(text).toContain("From the agent Coder, Nov 24, 17:37:\n\n> Handing over: the switch is half built.");
+      expect(text).not.toContain("> I posted a four-step plan");
+      const otherNoTime = renderClaudeWake({ ...handedOver, history: { ...handedOver.history, lastRun: commented({ agentId: CODER, ownRun: false, commentIds: ["c-coder"], finishedAt: "" }) } }, fresh);
+      expect(otherNoTime).toContain("The agent Coder's last run on TES-45 ended with its comment, quoted below.");
+    });
+
+    it("no comments, a comment not in the history, or a deleted one: the summary as today", () => {
+      const summary = "Your last run on TES-45 (Nov 24, 17:40) ended with:\n\n> I posted a four-step plan";
+      for (const lastRun of [commented({ commentIds: [] }), commented({ commentIds: ["c-elsewhere"] }), tes45History.lastRun]) {
+        const text = renderClaudeWake(withHistory({ lastRun }), fresh);
+        expect(text).toContain(summary);
+        expect(text).not.toContain("its comment, quoted below");
+      }
+      const deleted = tes45Messages.map((message) => message.id === "c-short-plan" ? { ...message, deleted: true, body: "" } : message);
+      const text = renderClaudeWake(withHistory(
+        { lastRun: commented() },
+        { executionContinuation: continuation({ issueId: historyFixtures.tes45.issue.id, messages: deleted }) },
+      ), fresh);
+      expect(text).toContain(summary);
+      expect(text).not.toContain("its comment, quoted below");
+    });
+
+    it("the comment cut out of the budget: the summary stays", () => {
+      const long = (index: number) => ({
+        id: `h-${index}`, body: `Comment ${index}. ${"Padding text. ".repeat(80)}`, authorType: "user", authorId: BRIAN,
+        createdAt: new Date(Date.UTC(2026, 10, 1, 1, index)).toISOString(), updatedAt: new Date(Date.UTC(2026, 10, 1, 1, index)).toISOString(),
+        deleted: false, sourceTrust: "human",
+      });
+      const result = { ...long(0), id: "c-result", body: "Posted the plan.", authorType: "agent", authorId: SELF,
+        createdAt: "2026-11-01T00:30:00.000Z", updatedAt: "2026-11-01T00:30:00.000Z" };
+      const original = { ...long(0), id: "c-original", body: "Please plan the switch.", createdAt: "2026-11-01T00:00:00.000Z", updatedAt: "2026-11-01T00:00:00.000Z" };
+      const messages = [original, result, ...Array.from({ length: 40 }, (_, index) => long(index + 1))];
+      const payload = withHistory(
+        { lastRun: commented({ commentIds: ["c-result"] }) },
+        { executionContinuation: continuation({ issueId: historyFixtures.tes45.issue.id, messages }) },
+      );
+      const section = where(renderClaudeWake(payload, fresh));
+      expect(section).not.toContain("> Posted the plan.");
+      expect(section).toContain("Your last run on TES-45 (Nov 24, 17:40) ended with:\n\n> I posted a four-step plan");
+      expect(section).not.toContain("its comment, quoted below");
+      expect(section.length).toBeLessThan(12_000);
+      // With room for it, the same comment is quoted and the summary goes.
+      const roomy = where(renderClaudeWake(withHistory(
+        { lastRun: commented({ commentIds: ["c-result"] }) },
+        { executionContinuation: continuation({ issueId: historyFixtures.tes45.issue.id, messages: [original, result, long(1)] }) },
+      ), fresh));
+      expect(roomy).toContain("> Posted the plan.");
+      expect(roomy).toContain("Your last run on TES-45 (Nov 24, 17:40) ended with its comment, quoted below.");
+    });
+
+    it("the normalizer keeps the comment ids, and older payloads have none", () => {
+      const normalized = normalizePaperclipWakePayload(withHistory({ lastRun: commented({ commentIds: ["c-1", " c-2 ", "c-1", 7, ""] }) }))!;
+      expect(normalized.history?.lastRun?.commentIds).toEqual(["c-1", "c-2"]);
+      expect(normalizePaperclipWakePayload(historyFixtures.tes45)!.history?.lastRun?.commentIds).toEqual([]);
+      expect(normalizePaperclipWakePayload(withHistory({ lastRun: commented({ commentIds: "c-1" }) }))!.history?.lastRun?.commentIds).toEqual([]);
+    });
+  });
+
   it("an Other answer shows the typed text", () => {
     const question = { ...answeredQuestion, answers: [{ questionId: "q-where", optionIds: ["paperclip_custom_answer"], otherText: "Both, please" }] };
     const text = renderClaudeWake(withHistory({ answered: [question] }), fresh);
@@ -1358,6 +1448,16 @@ describe("renderClaudeWake: the task's history (step 5 phase 2, the handoff)", (
     expect(plain).toContain("Documents on this task: notes. Read them with `paperclip_read_document`.");
     const briefOnly = renderClaudeWake(withHistory({ documents: [{ key: "plan", title: "Plan", inBrief: true }] }), fresh);
     expect(briefOnly).toContain("Documents on this task: plan (in the brief below).\n");
+  });
+
+  it("a document in the brief has one bracket, title and pointer together (bug 97)", () => {
+    const titled = renderClaudeWake(withHistory({ documents: [
+      { key: "plan", title: "Compact mode plan", inBrief: true }, { key: "notes", title: "Meeting notes", inBrief: false },
+    ] }), fresh);
+    expect(titled).toContain("Documents on this task: plan (\"Compact mode plan\", in the brief below), notes (\"Meeting notes\"). Read the rest with `paperclip_read_document`.");
+    expect(titled).not.toContain(") (");
+    const untitled = renderClaudeWake(withHistory({ documents: [{ key: "plan", title: null, inBrief: true }] }), fresh);
+    expect(untitled).toContain("Documents on this task: plan (in the brief below).\n");
   });
 
   it("only an open question, no comments", () => {
@@ -1733,7 +1833,7 @@ Your session continues`);
 
   it("the TES-45 history with the task's facts: the plan is under \"The task\"", () => {
     const text = renderClaudeWake(historyFixtures.tes45, withTask(fresh, tes45RunTask));
-    expect(text).toContain("Documents on this task: plan (under \"The task\" below), notes. Read the rest with `paperclip_read_document`.");
+    expect(text).toContain("Documents on this task: plan (quoted under \"The task\" below), notes. Read the rest with `paperclip_read_document`.");
     expect(heading(text, "The task")).toBe(`## The task
 
 TES-45 "M7 test wake: dark mode notes" · in progress · already checked out to you
@@ -1751,6 +1851,18 @@ ${PLAN_QUOTE}`);
     // No plan in the facts: the plan is one of the documents to read.
     expect(renderClaudeWake(historyFixtures.tes45, withTask(fresh, { ...tes45RunTask, plan: null })))
       .toContain("Documents on this task: plan, notes. Read them with `paperclip_read_document`.");
+  });
+
+  it("the plan under \"The task\" has one bracket, title and pointer together (bug 97)", () => {
+    const documents = (list: Array<Record<string, unknown>>) =>
+      ({ ...historyFixtures.tes45, history: { ...tes45History, documents: list } });
+    const titled = renderClaudeWake(documents([
+      { key: "plan", title: "Compact mode plan", inBrief: false }, { key: "notes", title: "Meeting notes", inBrief: false },
+    ]), withTask(fresh, tes45RunTask));
+    expect(titled).toContain("Documents on this task: plan (\"Compact mode plan\", quoted under \"The task\" below), notes (\"Meeting notes\"). Read the rest with `paperclip_read_document`.");
+    expect(titled).not.toContain(") (");
+    const untitled = renderClaudeWake(documents([{ key: "plan", title: null, inBrief: false }]), withTask(fresh, tes45RunTask));
+    expect(untitled).toContain("Documents on this task: plan (quoted under \"The task\" below).\n");
   });
 
   it("parts join to the text, with the facts", () => {

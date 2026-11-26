@@ -65,6 +65,7 @@ import {
   isClaudeImageProcessingError,
   isClaudeModelNotFoundError,
 } from "./parse.js";
+import { createClaudeCompactionLog } from "./compaction-event.js";
 import { composeClaudeCliPrompt, resolveClaudePromptTemplate } from "./legacy-prompt.js";
 import { buildClaudePromptRecord, PROMPT_SECTIONS_MISMATCH_NOTE, readRunPromptPlan } from "./prompt-record.js";
 import {
@@ -912,6 +913,8 @@ async function executeClaudeCli(
       };
     };
 
+    // Compaction boundaries already reported in this run, so a retried attempt doesn't repeat one.
+    const reportedCompactions = new Set<string>();
     const runAttempt = async (resumeSessionId: string | null, freshReason: ClaudeFreshSessionReason) => {
       await hydrateFreshSessionHandoff(ctx, { resumedSession: Boolean(resumeSessionId) });
       const { prompt, promptMetrics } = composeClaudeCliPrompt({
@@ -982,7 +985,8 @@ async function executeClaudeCli(
       }
 
       const consumeAccounting = createClaudeStreamParser();
-      const accountingLog = createUsageCheckpointLog(onLog, ctx.onUsage, stdout => {
+      const compactionLog = createClaudeCompactionLog(onLog, ctx.onEvent, { sessionId: resumeSessionId, seen: reportedCompactions });
+      const accountingLog = createUsageCheckpointLog(compactionLog, ctx.onUsage, stdout => {
         const parsed = consumeAccounting(stdout);
         return { usage: parsed.usage ?? undefined, usageBasis: "per_run", costUsd: parsed.costUsd,
           provider: "anthropic", biller: isBedrockAuth(effectiveEnv) ? "aws_bedrock" : "anthropic",

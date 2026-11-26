@@ -120,6 +120,8 @@ End every task run with exactly one of:
 - \`paperclip_block\` when work can't go on until a named owner does a concrete thing, or other tasks finish (\`blockedByTaskIds\`). Always give the \`owner\` and the exact \`unblockAction\`.
 - \`paperclip_report_progress\` with \`continue: true\` when the work carries on in a later run.
 
+Each one posts its summary on the task as a comment, so put the run's result there, not in a separate comment as well.
+
 A final message alone doesn't end a run. A chat turn ends with your reply instead. When the run message gives other closing steps (a recovery, say), follow those.`;
 
 const WORKING_COPY = `## Working in Paperclip
@@ -150,6 +152,15 @@ describe("WORKING_IN_PAPERCLIP", () => {
   it("is the spec's text, with the ending rules as their own export", () => {
     expect(WORKING_IN_PAPERCLIP_ENDING).toBe(ENDING_COPY);
     expect(WORKING_IN_PAPERCLIP).toBe(WORKING_COPY);
+  });
+
+  it("says the ending tool's summary is the run's result comment, after the three endings (bug 98)", () => {
+    const sentence = "Each one posts its summary on the task as a comment, so put the run's result there, not in a separate comment as well.";
+    const paragraphs = WORKING_IN_PAPERCLIP_ENDING.split("\n\n");
+    const at = paragraphs.indexOf(sentence);
+    expect(at).toBeGreaterThan(0);
+    expect(paragraphs[at - 1]).toMatch(/^- `paperclip_finish`[\s\S]*\n- `paperclip_block`[\s\S]*\n- `paperclip_report_progress`/);
+    expect(paragraphs[at + 1]).toMatch(/^A final message alone doesn't end a run\./);
   });
 });
 

@@ -403,7 +403,7 @@ const kinds: RunKind[] = [
   },
   {
     name: "fresh session with history and the task's facts",
-    shows: ["## Where things stand", "Documents on this task: plan (under \"The task\" below), notes.", "The plan (revision 1):"],
+    shows: ["## Where things stand", "Documents on this task: plan (quoted under \"The task\" below), notes.", "The plan (revision 1):"],
     input: () => {
       const fixture = createPromptContextFixture();
       const comments = fixture.paperclipWake.comments.map(({ id, body }) => ({ id, body }));

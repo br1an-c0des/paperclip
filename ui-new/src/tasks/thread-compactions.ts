@@ -9,15 +9,15 @@ import { compactionDetail, contextSignal, createCompactionTracker, type ContextS
  * Compaction dividers in the task thread (U58, upstream #19273, #19378): where a finished run's
  * agent compacted its context, a "Context compacted · 230k → 38k tokens" line divides the thread,
  * at the time it happened. The thread itself doesn't read run events, so the compactions come from
- * each finished runner run's conversation view (`GET /heartbeat-runs/:id/events?view=conversation`),
+ * each finished runner or `claude_local` run's conversation view (`GET /heartbeat-runs/:id/events?view=conversation`),
  * which since #19378 keeps `context.compacted` events and, for runs that compacted, the context
  * readings around them. A finished run's events don't change, so each run is read once.
  *
- * Reading every run would cost a request per run, and the API has no way to ask which runs
- * compacted. So the runs are read only while the task's context reading counts compactions in the
- * assignee's session, plus any run a Compact now request names (`issue.context_compaction_requested`
- * activity, `details.compactionRunId`). Compactions in an earlier session of a task whose reading no
- * longer counts any are missed.
+ * Reading every run would cost a request per run. So a run is read when the task's run list marks
+ * it `compacted` (it recorded a `context.compacted` event, bug 96; `claude_local` runs record no
+ * context readings, so this is how theirs are found), and otherwise, as before, while the task's
+ * context reading counts compactions in the assignee's session, plus any run a Compact now request
+ * names (`issue.context_compaction_requested` activity, `details.compactionRunId`).
  */
 
 export type Compaction = ContextSizes & {
@@ -32,8 +32,11 @@ export { compactionDetail };
 type JsonRecord = Record<string, unknown>;
 const record = (value: unknown): JsonRecord | null => (value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : null);
 
-/** Only runner runs report compactions. */
-const RUNNER_ADAPTER = "paperclip_runner";
+/**
+ * The runs that report compactions: runner runs, and `claude_local` runs (CLI and ACP, since bug 96),
+ * which record the same `context.compacted` event without context readings around it.
+ */
+const COMPACTING_ADAPTERS: ReadonlySet<string> = new Set(["paperclip_runner", "claude_local"]);
 
 /** Events per page, the server's most; a run with more pages than this many is read no further. */
 const PAGE = 1000;
@@ -77,9 +80,18 @@ export function compactionRunIds(events: readonly Pick<ActivityEvent, "action" |
 
 const ACTIVE = new Set(["queued", "running", "scheduled_retry"]);
 
-/** Which of the shown runs to read: finished runner runs, all of them while the session counts compactions. */
-export function runsToRead(runs: readonly Pick<RunForIssue, "runId" | "status" | "adapterType">[], options: { sessionCompacted: boolean; requested: ReadonlySet<string> }) {
-  return runs.filter((run) => !ACTIVE.has(run.status) && run.adapterType === RUNNER_ADAPTER && (options.sessionCompacted || options.requested.has(run.runId))).map((run) => run.runId);
+/**
+ * Which of the shown runs to read: finished runs the run list marks `compacted`, and finished runner
+ * and `claude_local` runs, all of them while the session counts compactions.
+ */
+export function runsToRead(
+  runs: readonly Pick<RunForIssue, "runId" | "status" | "adapterType" | "compacted">[],
+  options: { sessionCompacted: boolean; requested: ReadonlySet<string> },
+) {
+  return runs
+    .filter((run) => !ACTIVE.has(run.status) && (run.compacted === true
+      || (COMPACTING_ADAPTERS.has(run.adapterType) && (options.sessionCompacted || options.requested.has(run.runId)))))
+    .map((run) => run.runId);
 }
 
 async function readRun(runId: string, signal: AbortSignal) {

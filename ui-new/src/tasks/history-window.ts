@@ -178,13 +178,17 @@ const itemTime = (item: ThreadItem) => (item.kind === "lines" ? item.lines[0]!.a
 export function windowThread(input: Omit<Parameters<typeof buildThread>[0], "moreComments"> & { from: number | null }): WindowItem[] {
   const { from, ...rest } = input;
   if (from === null) return buildThread(rest);
+  const runs = rest.runs.filter((run) => time(runAt(run)) >= from);
+  // A run sits where it ended, so its compactions come before it: one whose end starts the window
+  // (the older of the latest two runs) would lose them. They go with their run.
+  const shownRuns = new Set(runs.map((run) => run.runId));
   const items: WindowItem[] = buildThread({
     ...rest,
     events: rest.events.filter((event) => time(event.createdAt) >= from),
-    runs: rest.runs.filter((run) => time(runAt(run)) >= from),
+    runs,
     requests: rest.requests?.filter((request) => request.state !== "settled" || request.createdAt.getTime() >= from),
     tasks: rest.tasks?.filter((made) => made.at.getTime() >= from),
-    compactions: rest.compactions?.filter((compaction) => compaction.at.getTime() >= from),
+    compactions: rest.compactions?.filter((compaction) => compaction.at.getTime() >= from || shownRuns.has(compaction.runId)),
   });
   const at = items.findIndex((item) => itemTime(item as ThreadItem) >= from);
   items.splice(at === -1 ? items.length : at, 0, { kind: "gap", key: "gap" });

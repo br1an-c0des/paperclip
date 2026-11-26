@@ -1804,6 +1804,63 @@ describe("shared ACPX engine runtime behavior", () => {
     expect(result.billingType).toBe("unknown");
   });
 
+  // Bug 96: the patched claude-agent-acp marks the usage_update it sends at a compact_boundary.
+  const compactionMarker = { paperclip: { compacted: { trigger: "auto", preTokens: 150000, postTokens: 20000, compactionId: "c-9" } } };
+  it.each([
+    { name: "records a marked usage_update as one context.compacted event, even when repeated", updates: [
+      { _meta: compactionMarker }, { _meta: compactionMarker }, {},
+    ], expected: 1 },
+    { name: "records nothing for usage_updates without the marker", updates: [{}, { _meta: { usage: { input_tokens: 1 } } }], expected: 0 },
+    // A `/compact` with nothing to compact: the agent's status banners, no boundary, no marker.
+    { name: "records nothing for a /compact's banners alone", banners: ["Compacting...", "\n\nCompacting completed."], updates: [{}], expected: 0 },
+  ] as { name: string; banners?: string[]; updates: Record<string, unknown>[]; expected: number }[])("$name", async ({ banners, updates, expected }) => {
+    const root = await makeTempRoot();
+    const onEvent = vi.fn(async () => {});
+    const execute = createAcpxEngineExecutor({
+      createRuntime: () => ({
+        ensureSession: async () => ({
+          backendSessionId: "backend-session",
+          agentSessionId: "agent-session",
+          runtimeSessionName: "runtime-session",
+        }),
+        startTurn: () => ({
+          events: (async function* () {
+            for (const text of banners ?? []) yield { type: "text_delta", text, stream: "output", tag: "agent_message_chunk" };
+            for (const update of updates) yield { type: "status", text: "usage", tag: "usage_update", used: 0, size: 200000, ...update };
+            yield { type: "done", stopReason: "end_turn" };
+          })(),
+          result: Promise.resolve({ status: "completed", stopReason: "end_turn" }),
+          cancel: async () => {},
+        }),
+        close: async () => {},
+      }) as never,
+    });
+    const result = await execute({
+      runId: "run-compaction-marker",
+      agent: { id: "agent-1", companyId: "company-1" },
+      runtime: {},
+      config: { agent: "custom", agentCommand: "node ./fake-acp.js", stateDir: path.join(root, "state") },
+      context: {},
+      onLog: async () => {},
+      onMeta: async () => {},
+      onEvent,
+    } as never);
+    expect(result.exitCode).toBe(0);
+    const compactions = onEvent.mock.calls
+      .map((call) => (call as unknown[])[0] as { eventType: string; payload?: { prpEvent?: Record<string, unknown> } })
+      .filter((event) => event.eventType === "context.compacted");
+    expect(compactions).toHaveLength(expected);
+    if (expected > 0) {
+      expect(compactions[0]!.payload?.prpEvent).toMatchObject({
+        schema: "paperclip.prp.event.v1",
+        eventType: "context.compacted",
+        sourceKind: "claude_local",
+        normalizedSessionId: "backend-session",
+        payload: { schema: "paperclip.context.compacted.v1", compactionId: "c-9", reason: "auto", preTokens: 150000, postTokens: 20000, sameSession: true },
+      });
+    }
+  });
+
   it.each(["failed", "cancelled"] as const)("keeps %s in-stream usage provisional without a final receipt", async (status) => {
     const root = await makeTempRoot();
     const stateDir = path.join(root, "state");

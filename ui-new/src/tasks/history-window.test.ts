@@ -1,7 +1,9 @@
-import type { ActivityEvent, IssueComment } from "@paperclipai/shared";
+import type { ActivityEvent, HeartbeatRunEvent, IssueComment } from "@paperclipai/shared";
 import { describe, expect, it, vi } from "vitest";
 import type { RunForIssue } from "@/api/issues";
+import savedCompactionEvents from "./__fixtures__/claude-local-compaction-events.json";
 import { commentInputs } from "./activity-format";
+import { runCompactions } from "./thread-compactions";
 import {
   catchUpComments,
   historyFrom,
@@ -175,6 +177,40 @@ describe("windowThread", () => {
     expect(items.map((item) => item.kind)).toEqual(["comment", "gap", "lines", "comment", "comment"]);
     const lines = items.find((item) => item.kind === "lines");
     expect(lines?.kind === "lines" && lines.lines.map((line) => line.key)).toEqual(["run:r-new", "event:new"]);
+  });
+
+  it("keeps a shown run's compactions, which happened before the run ended and so before the window starts", async () => {
+    // TES-50 on the dev instance: the older of the two recent runs compacted twice and ended at
+    // 01:01:04, which is where the run window starts; its compactions came at 01:00:46 and 01:01:00.
+    const compacted = { runId: "b273640f-cdc1-4b38-94ef-40ae51eb074c", status: "succeeded", agentId: "a2", adapterType: "claude_local",
+      startedAt: "2026-11-26T01:00:29.463Z", finishedAt: "2026-11-26T01:01:04.524Z", createdAt: "2026-11-26T01:00:29.000Z", compacted: true } as RunForIssue;
+    const later = { ...compacted, runId: "0ca5e0c5", startedAt: "2026-11-26T01:01:26.228Z", finishedAt: "2026-11-26T01:01:31.942Z",
+      createdAt: "2026-11-26T01:01:26.000Z", compacted: false } as RunForIssue;
+    const window = await mergeRuns(undefined, [later, compacted], async () => []);
+    expect(window.from).toBe(compacted.finishedAt);
+    const compactions = runCompactions(compacted.runId, savedCompactionEvents as unknown as HeartbeatRunEvent[]);
+    expect(compactions).toHaveLength(2);
+    const items = windowThread({
+      comments: [{ ...comment("c1", 0), createdAt: new Date("2026-11-26T01:00:30.000Z") }],
+      events: [],
+      runs: window.runs,
+      compactions,
+      names,
+      from: historyFrom(window.from),
+    });
+    expect(items.map((item) => item.kind)).toEqual(["comment", "compaction", "compaction", "gap", "lines"]);
+  });
+
+  it("still holds back a compaction of a run from before the window", () => {
+    const items = windowThread({
+      comments: [],
+      events: [],
+      runs: [run("r-old", "succeeded", 2)],
+      compactions: [{ key: "k", runId: "r-old", at: new Date(at(2)), preTokens: null, postTokens: null }],
+      names,
+      from: new Date(at(5)).getTime(),
+    });
+    expect(items.map((item) => item.kind)).toEqual(["gap"]);
   });
 
   it("puts the gap first when nothing comes before it, and leaves it out for a whole history", () => {
