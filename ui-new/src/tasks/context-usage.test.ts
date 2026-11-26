@@ -107,6 +107,16 @@ describe("compaction dividers", () => {
     ];
     expect(runsToRead(runs, { sessionCompacted: true, requested: new Set() })).toEqual(["r1", "r4", "r5"]);
     expect(runsToRead(runs, { sessionCompacted: false, requested: new Set(["r4"]) })).toEqual(["r4"]);
+    // The run list marks the runs that compacted (bug 96): those are read whatever the session's
+    // reading says, once they've finished.
+    const marked = [
+      { runId: "c1", status: "succeeded", adapterType: "claude_local", compacted: true },
+      { runId: "c2", status: "running", adapterType: "claude_local", compacted: true },
+      { runId: "c3", status: "succeeded", adapterType: "claude_local", compacted: false },
+      { runId: "c4", status: "failed", adapterType: "claude_local" },
+    ];
+    expect(runsToRead(marked, { sessionCompacted: false, requested: new Set() })).toEqual(["c1"]);
+    expect(runsToRead(marked, { sessionCompacted: true, requested: new Set() })).toEqual(["c1", "c3", "c4"]);
     expect([...compactionRunIds([{ action: "issue.context_compaction_requested", details: { compactionRunId: "r4" } }, { action: "issue.updated", details: {} }])]).toEqual(["r4"]);
   });
 });

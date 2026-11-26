@@ -424,6 +424,8 @@ export type RunForIssue = {
   /** What the run is doing or waiting on now. Its `nextAction` replaces the run's own when present. */
   execution?: ExecutionProjection | null;
   nextAction?: string | null;
+  /** The run recorded a context compaction (since bug 96): the task thread reads its dividers. */
+  compacted?: boolean;
 };
 
 /** The URL path of a task, under the company prefix. */
