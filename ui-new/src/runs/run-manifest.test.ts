@@ -6,6 +6,7 @@ describe("the manifest's GitHub line", () => {
     expect(githubText({ mode: "connection", identitySource: "personal", login: "octocat" })).toBe("Connection: octocat (personal)");
     expect(githubText({ mode: "connection", identitySource: "dedicated", login: "builder-bot" })).toBe("Connection: builder-bot (dedicated)");
     expect(githubText({ mode: "connection", identitySource: "personal", login: null })).toBe("Connection: account not recorded (personal)");
+    expect(githubText({ mode: "connection", identitySource: "shared", login: null })).toBe("Connection: account not recorded (shared)");
   });
 
   it("names the server's login, or none", () => {

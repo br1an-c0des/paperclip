@@ -50,7 +50,7 @@ export type ClaudeFreshSessionReason =
  * without credentials).
  */
 export type ClaudeRunGitHub =
-  | { mode: "connection"; identitySource: "personal" | "dedicated"; login: string | null }
+  | { mode: "connection"; identitySource: "personal" | "dedicated" | "shared"; login: string | null }
   | { mode: "server_login" }
   | { mode: "none" };
 

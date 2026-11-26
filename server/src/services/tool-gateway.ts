@@ -51,7 +51,7 @@ import { runIdentityContexts } from "@paperclipai/db";
 import { executeSpekoVoiceTool, spekoToolsForSession } from "./voice/speko-agent-tools.js";
 import { captureRunIdentity } from "./run-identity.js";
 import { emitConnectionInvoked } from "./connector-telemetry.js";
-import { resolveManagedGitHubIdentitySelection } from "./git-credentials.js";
+import { githubIdentitySourceOfGrant, resolveManagedGitHubIdentitySelection } from "./git-credentials.js";
 import { extractRemoteMcpPending } from "./remote-mcp-pending.js";
 import {
   backgroundPollDelayMs,
@@ -4410,7 +4410,7 @@ export function createToolGatewayService(
             github: {
               status: "available",
               login: grant.providerTenant?.github?.login,
-              source: grant.kind === "agent" ? "dedicated" : "personal",
+              source: githubIdentitySourceOfGrant(grant),
               connectionId: connection.id,
               grantId: grant.id,
               authenticationMode: "managed",
@@ -4431,7 +4431,7 @@ export function createToolGatewayService(
             github: {
               status: "unavailable",
               reason: "GitHub authorization is unavailable",
-              source: grant.kind === "agent" ? "dedicated" : "personal",
+              source: githubIdentitySourceOfGrant(grant),
             },
           })
           .where(
