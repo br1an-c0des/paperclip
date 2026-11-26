@@ -254,6 +254,11 @@ describe.skipIf(!support.supported)("wake payload: the fields the new wake reads
       companyId: f.companyId, agentId: f.agentId, status: "succeeded", contextSnapshot: { issueId: f.issueId },
       finishedAt: new Date("2026-11-24T17:52:00Z"), runnerProfileJson: { sessionCheckpoint: { semanticResult: { summary: "Posted the plan." } } },
     }).returning();
+    // The run posted its result as a comment (bug 98: the message then leaves the summary out).
+    const [result] = await db.insert(issueComments).values({
+      companyId: f.companyId, issueId: f.issueId, authorType: "agent", authorAgentId: f.agentId, body: "Posted the plan.",
+      createdByRunId: run!.id,
+    }).returning();
     for (const key of ["plan", "continuation-summary"]) {
       const [doc] = await db.insert(documents).values({ companyId: f.companyId, title: null, latestBody: key }).returning();
       await db.insert(issueDocuments).values({ companyId: f.companyId, issueId: f.issueId, documentId: doc!.id, key });
@@ -262,7 +267,7 @@ describe.skipIf(!support.supported)("wake payload: the fields the new wake reads
       db, companyId: f.companyId, agentId: f.agentId, contextSnapshot: { wakeReason: "issue_assigned", issueId: f.issueId },
     });
     expect(payload?.history?.lastRun).toEqual({ runId: run!.id, agentId: f.agentId, ownRun: true, status: "succeeded",
-      finishedAt: "2026-11-24T17:52:00.000Z", body: "Posted the plan.", bodyTruncated: false });
+      finishedAt: "2026-11-24T17:52:00.000Z", body: "Posted the plan.", bodyTruncated: false, commentIds: [result!.id] });
     expect(payload?.history?.answered).toHaveLength(8);
     expect(payload?.history?.answered[0]).toMatchObject({ title: "Answered 9", decidedBy: { type: "user", id: brian },
       answers: [{ questionId: "where", optionIds: ["both"], otherText: null }] });
