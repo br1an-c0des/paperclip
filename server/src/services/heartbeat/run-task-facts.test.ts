@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { activityLog, agents, companies, createDb, documentRevisions, documents, heartbeatRuns, issueDocuments, issues } from "@paperclipai/db";
+import { activityLog, agents, companies, createDb, documentRevisions, documents, heartbeatRunEvents, heartbeatRuns, issueDocuments, issues } from "@paperclipai/db";
 import { REDACTED_EVENT_VALUE } from "../../redaction.js";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "../../__tests__/helpers/embedded-postgres.js";
 import { createRunSecretRedactionRegistry } from "../run-secret-redaction.js";
@@ -189,6 +189,40 @@ describePostgres("the task's facts for a run", () => {
     const missing = await facts(f, { previousRunId: randomUUID() });
     expect(missing.descriptionChangedSinceLastRun).toBe(false);
     expect(missing.plan?.changedSinceLastRun).toBe(false);
+  });
+
+  let eventSeq = 0;
+  async function compaction(f: { companyId: string; agentId: string }, runId: string, eventType = "context.compacted") {
+    await db.insert(heartbeatRunEvents).values({ companyId: f.companyId, runId, agentId: f.agentId, seq: ++eventSeq, eventType,
+      stream: "system", level: "info", message: "Context compacted",
+      payload: { prpEvent: { schema: "paperclip.prp.event.v1", schemaVersion: 1, eventType, sourceKind: "claude_local",
+        normalizedSessionId: "claude-session", emittedAt: at(20).toISOString(),
+        payload: { schema: "paperclip.context.compacted.v1", compactionId: randomUUID(), reason: "auto", preTokens: 150_000, postTokens: null, sameSession: true } } } });
+  }
+
+  it("compactedSinceLastRun: the previous run recorded a compaction", async () => {
+    const f = await seed();
+    const runId = await previousRun(f, at(10));
+    expect((await facts(f, { previousRunId: runId })).compactedSinceLastRun).toBe(false);
+    // Another event type on the previous run doesn't count.
+    await compaction(f, runId, "lifecycle");
+    expect((await facts(f, { previousRunId: runId })).compactedSinceLastRun).toBe(false);
+    await compaction(f, runId);
+    expect((await facts(f, { previousRunId: runId })).compactedSinceLastRun).toBe(true);
+  });
+
+  it("compactedSinceLastRun: only the previous run counts, not another run of the agent", async () => {
+    const f = await seed();
+    const older = await previousRun(f, at(5));
+    const otherTask = await previousRun(f, at(8));
+    const runId = await previousRun(f, at(10));
+    await compaction(f, older);
+    await compaction(f, otherTask);
+    expect((await facts(f, { previousRunId: runId })).compactedSinceLastRun).toBe(false);
+    expect((await facts(f)).compactedSinceLastRun).toBe(false);
+    // The same run in another company isn't this one's.
+    const other = await seed();
+    expect((await facts({ companyId: other.companyId, issueId: other.issueId }, { previousRunId: older })).compactedSinceLastRun).toBe(false);
   });
 
   it("rejectedPlan and acceptedPlan follow briefPlanState", async () => {

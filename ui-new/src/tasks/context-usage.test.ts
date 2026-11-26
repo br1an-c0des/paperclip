@@ -80,14 +80,32 @@ describe("compaction dividers", () => {
     expect(runCompactions("r1", [{ seq: 1, runId: "r1", eventType: "context.compacted", createdAt: new Date(), payload: { compactionId: "x" } }])).toEqual([]);
   });
 
-  it("reads finished runner runs: every one while the session has compacted, else those Compact now queued", () => {
+  it("reads a claude_local run's compaction, which has no run id or readings in its envelope", () => {
+    const event = {
+      seq: 7,
+      runId: "r5",
+      eventType: "context.compacted",
+      createdAt: new Date("2026-11-25T12:00:09Z"),
+      payload: { prpEvent: { schema: "paperclip.prp.event.v1", schemaVersion: 1, eventType: "context.compacted", sourceKind: "claude_local",
+        normalizedSessionId: "claude-session", emittedAt: "2026-11-25T12:00:08.000Z",
+        payload: { schema: "paperclip.context.compacted.v1", compactionId: "b1529e2c", reason: "manual", preTokens: 41_981, postTokens: null, sameSession: true } } },
+    };
+    const found = runCompactions("r5", [event]);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ runId: "r5", preTokens: 41_981, postTokens: null, at: new Date("2026-11-25T12:00:08.000Z") });
+    expect(compactionDetail(found[0]!)).toBe("from 42k tokens");
+  });
+
+  it("reads finished runner and claude_local runs: every one while the session has compacted, else those Compact now queued", () => {
     const runs = [
       { runId: "r1", status: "succeeded", adapterType: "paperclip_runner" },
       { runId: "r2", status: "running", adapterType: "paperclip_runner" },
-      { runId: "r3", status: "failed", adapterType: "claude_local" },
+      { runId: "r3", status: "failed", adapterType: "codex_local" },
       { runId: "r4", status: "succeeded", adapterType: "paperclip_runner" },
+      { runId: "r5", status: "succeeded", adapterType: "claude_local" },
+      { runId: "r6", status: "running", adapterType: "claude_local" },
     ];
-    expect(runsToRead(runs, { sessionCompacted: true, requested: new Set() })).toEqual(["r1", "r4"]);
+    expect(runsToRead(runs, { sessionCompacted: true, requested: new Set() })).toEqual(["r1", "r4", "r5"]);
     expect(runsToRead(runs, { sessionCompacted: false, requested: new Set(["r4"]) })).toEqual(["r4"]);
     expect([...compactionRunIds([{ action: "issue.context_compaction_requested", details: { compactionRunId: "r4" } }, { action: "issue.updated", details: {} }])]).toEqual(["r4"]);
   });
