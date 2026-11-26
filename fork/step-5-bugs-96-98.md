@@ -1,6 +1,6 @@
 # Step 5: bugs 96–98
 
-Status: **approved 2026-11-25**. The leftovers of step 5 phase 2's run message
+Status: **approved 2026-11-25, built and merged into `main` 2026-11-25** (`767dbbfad8`; [Built](#built)). The leftovers of step 5 phase 2's run message
 ([step-5-prompt-builder.md](step-5-prompt-builder.md)), from [upstream-fixes.md](upstream-fixes.md)
 entries 96, 97 and 98.
 
@@ -110,3 +110,42 @@ Two agents, no shared files:
 Then the usual: integrate on `feat/step-5-bugs`, the local checks, real runs on the desktop dev
 instance (one that compacts: a CLI run with `/compact` in a resumed session, or a small context),
 merge, record.
+
+## Built
+
+Merged into `main` as `767dbbfad8` (2026-11-25) from `feat/step-5-bugs`: Agent A
+(`step5-bugs/compactions`, bug 96) and Agent B (`step5-bugs/message`, bugs 97 and 98).
+
+**Changes from the design, decided while building:**
+
+- **The divider needed two more fixes** (approved 2026-11-25). ui-new read a run's compactions
+  only when the task's context reading counted some, and `claude_local` runs record no readings,
+  so `GET /issues/:id/runs` now marks each run `compacted` and the thread reads those runs. Then
+  the thread's window cut compactions dated before the window's start, which is where a shown
+  run's own compactions fall; `windowThread` now keeps the compactions of every run it shows.
+- **Sizes:** the event carries Claude's `post_tokens` too, and leaves `preTokens`/`postTokens`
+  out when unknown. The server's redactor lets token-count keys through only as numbers, so a
+  `null` was stored as `***REDACTED***` (seen in the real runs; two TES-50 events keep it).
+- **The event carries `schemaVersion: 1`,** which the redactor needs to keep a prp event type.
+- **The last-run line** says "ended with its comment, quoted below" only when one of that run's
+  comments is quoted under "Where things stand"; the part's label still says "Last run's summary".
+
+**Checks:** the local checks passed on `f89d990a51` (typecheck, test-runner, ui-new test, build and
+e2e, core 6,517 tests); six extended files for compaction, runs and run preparation passed (43
+tests). The CLI fixture is a real `compact_boundary` from Claude Code 2.1.325.
+
+**Real runs** on TES-50 (desktop dev instance, "M7 test sealed runner", CLI engine):
+
+| Run | What it showed |
+| --- | --- |
+| `23a2211c`, fresh session | "Your last run on TES-50 (Nov 25, 15:10) ended with its comment, quoted below."; `plan ("M7 test plan", quoted under "The task" below)`; one comment, from `paperclip_finish`. |
+| `40e17cbf`, `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=1` | Three compactions recorded; Claude then stopped the run ("Autocompact is thrashing"): 1% of the 1M window is under the system prompt and tools. |
+| `b273640f`, 3%, resumed | Two compactions recorded (`preTokens` 30,401 and 32,752); the run finished and the runs list marks it `compacted`. |
+| `0ca5e0c5`, resumed after it | "The task" sent again with the description and plan. |
+
+Every run after the change posted one comment (the two before it posted two each). The thread
+shows "Context compacted · from 30k tokens" and "from 33k tokens" for `b273640f`, checked with
+writes stubbed. Changing an agent's env changes its prompt bundle, so it starts a fresh session.
+
+**Not done:** the run modal's transcript has no divider for `claude_local` runs; no context meter
+for them; ACP runs weren't tried for real (the marker is covered by tests on the patched package).

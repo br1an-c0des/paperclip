@@ -134,9 +134,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 93 | [A run preview on a finished task fails with a server error](#93-a-run-preview-on-a-finished-task-fails-with-a-server-error) | candidate | | | 2026-11-24 | | |
 | 94 | [An "Other" answer shows its option id in the answer summary](#94-an-other-answer-shows-its-option-id-in-the-answer-summary) | candidate | | | 2026-11-24 | | |
 | 95 | [A comment an earlier run handled is sent again as new](#95-a-comment-an-earlier-run-handled-is-sent-again-as-new) | candidate | | | 2026-11-24 | | |
-| 96 | [Paperclip doesn't record when Claude compacts a CLI session](#96-paperclip-doesnt-record-when-claude-compacts-a-cli-session) | candidate | | | 2026-11-24 | | |
-| 97 | [Drop the double brackets on the run message's documents line](#97-drop-the-double-brackets-on-the-run-messages-documents-line) | candidate | | | 2026-11-25 | | |
-| 98 | [Don't repeat the last run's summary when the agent's comment says the same](#98-dont-repeat-the-last-runs-summary-when-the-agents-comment-says-the-same) | candidate | | | 2026-11-25 | | |
+| 96 | [Paperclip doesn't record when Claude compacts a CLI session](#96-paperclip-doesnt-record-when-claude-compacts-a-cli-session) | fixed (step 5, `767dbbfad8`) | | | 2026-11-24 | | |
+| 97 | [Drop the double brackets on the run message's documents line](#97-drop-the-double-brackets-on-the-run-messages-documents-line) | fixed (step 5, `767dbbfad8`) | | | 2026-11-25 | | |
+| 98 | [Don't repeat the last run's summary when the agent's comment says the same](#98-dont-repeat-the-last-runs-summary-when-the-agents-comment-says-the-same) | fixed (step 5, `767dbbfad8`) | | | 2026-11-25 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1702,7 +1702,7 @@ dev instance). Candidate.
 
 ### 96. Paperclip doesn't record when Claude compacts a CLI session
 
-Found 2026-11-24 by step 5's task-brief work (the Data agent, `step5-brief/data`). Candidate.
+Found 2026-11-24 by step 5's task-brief work (the Data agent, `step5-brief/data`). **Fixed** in step 5's bugs batch (merged as `767dbbfad8`, 2026-11-25, [step-5-bugs-96-98.md](step-5-bugs-96-98.md#built)): CLI runs record a `context.compacted` run event from `compact_boundary`, ACP runs from a marker our `claude-agent-acp` patch adds; the run after a compaction resends the description and plan, and the task thread shows the divider (the runs list marks compacted runs). Checked in real runs on TES-50.
 
 - **Problem:** the run transcript's compaction divider and `issue-context-usage.ts` read
   `context.compacted` run events, which only the Paperclip Runner writes. The `claude_local`
@@ -1717,7 +1717,7 @@ Found 2026-11-24 by step 5's task-brief work (the Data agent, `step5-brief/data`
 
 ### 97. Drop the double brackets on the run message's documents line
 
-Found 2026-11-24 in the task brief's real runs (TES-48, desktop dev instance). Candidate.
+Found 2026-11-24 in the task brief's real runs (TES-48, desktop dev instance). **Fixed** in step 5's bugs batch (merged as `767dbbfad8`, 2026-11-25, [step-5-bugs-96-98.md](step-5-bugs-96-98.md#built)): `plan ("Compact mode plan", quoted under "The task" below)`, and the brief's form the same way.
 
 - **Problem:** under "Where things stand", a document whose title differs from its key gets its
   title in brackets, and the plan, with the task's facts, gets a second bracket saying where it's
@@ -1729,7 +1729,7 @@ Found 2026-11-24 in the task brief's real runs (TES-48, desktop dev instance). C
 
 ### 98. Don't repeat the last run's summary when the agent's comment says the same
 
-Found 2026-11-24 in the task brief's real runs (TES-48, desktop dev instance). Candidate.
+Found 2026-11-24 in the task brief's real runs (TES-48, desktop dev instance). **Fixed** in step 5's bugs batch (merged as `767dbbfad8`, 2026-11-25, [step-5-bugs-96-98.md](step-5-bugs-96-98.md#built)): the ending rule says the ending tool's summary is the run's comment, and the next run's message gives one line instead of the summary when that run's comment is quoted below. In real runs each run then posted one comment instead of two.
 
 - **Problem:** "Where things stand" quotes the last run's summary (`history.lastRun`) and then the
   task's comments, which include the comment the agent posted in that run. An agent usually ends a
