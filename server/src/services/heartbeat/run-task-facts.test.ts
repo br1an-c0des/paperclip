@@ -197,7 +197,7 @@ describePostgres("the task's facts for a run", () => {
       stream: "system", level: "info", message: "Context compacted",
       payload: { prpEvent: { schema: "paperclip.prp.event.v1", schemaVersion: 1, eventType, sourceKind: "claude_local",
         normalizedSessionId: "claude-session", emittedAt: at(20).toISOString(),
-        payload: { schema: "paperclip.context.compacted.v1", compactionId: randomUUID(), reason: "auto", preTokens: 150_000, postTokens: null, sameSession: true } } } });
+        payload: { schema: "paperclip.context.compacted.v1", compactionId: randomUUID(), reason: "auto", preTokens: 150_000, postTokens: 20_000, sameSession: true } } } });
   }
 
   it("compactedSinceLastRun: the previous run recorded a compaction", async () => {

@@ -4,7 +4,7 @@ import { asString, parseJson, parseObject } from "@paperclipai/adapter-utils/ser
 /*
  * Compactions in a CLI run (bug 96). When Claude compacts its session (on its own, or for
  * `/compact`), its stream-json output has a `{"type":"system","subtype":"compact_boundary",
- * "compact_metadata":{"trigger","pre_tokens",…}}` line. The run records it as a
+ * "compact_metadata":{"trigger","pre_tokens","post_tokens",…}}` line. The run records it as a
  * `context.compacted` run event, which the next run's task facts read (`compactedSinceLastRun`)
  * and the compaction dividers show. A `/compact` with nothing to compact prints no boundary, so
  * it records nothing. The ACP engine reports the same event from the patched
@@ -27,6 +27,7 @@ export function claudeCompactionEvent(
     compactionId: asString(line.uuid, "") || `${session}:${emittedAt}`,
     trigger: asString(metadata.trigger, "") || null,
     preTokens: finiteCount(metadata.pre_tokens),
+    postTokens: finiteCount(metadata.post_tokens),
     sessionId: session,
     emittedAt,
     sourceKind: "claude_local",

@@ -88,12 +88,17 @@ describe("compaction dividers", () => {
       createdAt: new Date("2026-11-25T12:00:09Z"),
       payload: { prpEvent: { schema: "paperclip.prp.event.v1", schemaVersion: 1, eventType: "context.compacted", sourceKind: "claude_local",
         normalizedSessionId: "claude-session", emittedAt: "2026-11-25T12:00:08.000Z",
-        payload: { schema: "paperclip.context.compacted.v1", compactionId: "b1529e2c", reason: "manual", preTokens: 41_981, postTokens: null, sameSession: true } } },
+        payload: { schema: "paperclip.context.compacted.v1", compactionId: "b1529e2c", reason: "manual", preTokens: 41_981, postTokens: 10_166, sameSession: true } } },
     };
     const found = runCompactions("r5", [event]);
     expect(found).toHaveLength(1);
-    expect(found[0]).toMatchObject({ runId: "r5", preTokens: 41_981, postTokens: null, at: new Date("2026-11-25T12:00:08.000Z") });
-    expect(compactionDetail(found[0]!)).toBe("from 42k tokens");
+    expect(found[0]).toMatchObject({ runId: "r5", preTokens: 41_981, postTokens: 10_166, at: new Date("2026-11-25T12:00:08.000Z") });
+    expect(compactionDetail(found[0]!)).toBe("42k → 10k tokens");
+    // Without the sizes (left out, not null) the divider still shows, with no detail.
+    const bare = { ...event, payload: { prpEvent: { ...event.payload.prpEvent, payload: { schema: "paperclip.context.compacted.v1", compactionId: "c2", reason: "auto", sameSession: true } } } };
+    const unsized = runCompactions("r5", [bare]);
+    expect(unsized).toHaveLength(1);
+    expect(compactionDetail(unsized[0]!)).toBeNull();
   });
 
   it("reads finished runner and claude_local runs: every one while the session has compacted, else those Compact now queued", () => {
