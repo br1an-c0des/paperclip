@@ -38,6 +38,15 @@ export const WHERE_THINGS_STAND_PART_META: WakePartMeta = {
 };
 
 function renderHistory(ctx: Ctx, history: ClaudeWakeComment[], cap: number = CLAUDE_WAKE_HISTORY_CAP): string | null {
+  return renderHistoryQuoting(ctx, history, cap)?.text ?? null;
+}
+
+/** The comments under the cap, and the ids of the ones quoted. */
+function renderHistoryQuoting(
+  ctx: Ctx,
+  history: ClaudeWakeComment[],
+  cap: number,
+): { text: string; quotedIds: Set<string> } | null {
   if (history.length === 0) return null;
   const items = history.map((comment) => commentItem(ctx, comment));
   const total = items.reduce((sum, item) => sum + item.length + 2, 0);
@@ -65,7 +74,8 @@ function renderHistory(ctx: Ctx, history: ClaudeWakeComment[], cap: number = CLA
     if (gap > 0) blocks.push(gap === 1 ? WHERE_THINGS_STAND.historyCutOne : t(WHERE_THINGS_STAND.historyCut, { count: gap }));
     blocks.push(items[index]!);
   }
-  return lines(...blocks);
+  const quotedIds = new Set(kept.map((index) => history[index]!.id).filter((id): id is string => Boolean(id)));
+  return { text: lines(...blocks), quotedIds };
 }
 
 /**
@@ -101,9 +111,23 @@ const COMMENTS_SLACK = 200;
 type TaskHistory = NonNullable<PaperclipWakePayload["history"]>;
 type TaskRequest = TaskHistory["answered"][number];
 
+/**
+ * When the last run posted comments, first try its one line (no summary): the comments, with the
+ * room the summary would have used, keep it only if they quote one of the run's comments. If none
+ * is quoted (deleted, outside the record, or cut out of the budget), the summary as before (bug 98).
+ */
 function renderTaskHistory(ctx: Ctx, history: TaskHistory): WakeBlock[] {
+  const commentIds = history.lastRun?.commentIds ?? [];
+  if (commentIds.length > 0) {
+    const short = renderTaskHistoryWith(ctx, history, true);
+    if (commentIds.some((id) => short.quotedIds.has(id))) return short.blocks;
+  }
+  return renderTaskHistoryWith(ctx, history, false).blocks;
+}
+
+function renderTaskHistoryWith(ctx: Ctx, history: TaskHistory, commented: boolean): { blocks: WakeBlock[]; quotedIds: Set<string> } {
   const blocks: WakeBlock[] = [];
-  const lastRun = renderLastRun(ctx, history.lastRun);
+  const lastRun = renderLastRun(ctx, history.lastRun, commented);
   if (lastRun) blocks.push({ id: "wake.last_run", text: lastRun });
   if (history.answered.length > 0 || history.answeredOmitted > 0) {
     const more = history.answeredOmitted === 1
@@ -124,10 +148,11 @@ function renderTaskHistory(ctx: Ctx, history: TaskHistory): WakeBlock[] {
   if (documents) blocks.push({ id: "wake.documents", text: documents });
   // The comments fill what's left of the cap.
   const used = [HEADINGS.whereThingsStand, ...blocks.map((block) => block.text)].reduce((sum, text) => sum + text.length + 2, 0);
-  const comments = renderHistory(ctx, ctx.comments.history, CLAUDE_WAKE_HISTORY_CAP - used - COMMENTS_SLACK);
-  if (comments) blocks.push({ id: "wake.history_comments", text: comments });
-  if (blocks.length === 0) return [];
-  return [{ id: "wake.where_things_stand", text: HEADINGS.whereThingsStand }, ...blocks];
+  const comments = renderHistoryQuoting(ctx, ctx.comments.history, CLAUDE_WAKE_HISTORY_CAP - used - COMMENTS_SLACK);
+  if (comments) blocks.push({ id: "wake.history_comments", text: comments.text });
+  const quotedIds = comments?.quotedIds ?? new Set<string>();
+  if (blocks.length === 0) return { blocks: [], quotedIds };
+  return { blocks: [{ id: "wake.where_things_stand", text: HEADINGS.whereThingsStand }, ...blocks], quotedIds };
 }
 
 /** "you" -> "Your", "the agent Coder" -> "The agent Coder's", no one -> "". */
@@ -138,11 +163,17 @@ function whose(ctx: Ctx, ref: { type: string; id: string } | null, start: boolea
   return start ? capitalize(text) : text;
 }
 
-function renderLastRun(ctx: Ctx, run: TaskHistory["lastRun"]): string | null {
+/** `commented`: the run's comment is quoted below, so one line and no summary (bug 98). */
+function renderLastRun(ctx: Ctx, run: TaskHistory["lastRun"], commented = false): string | null {
   if (!run) return null;
   const when = time(ctx, run.finishedAt);
   const ended = runEndingWords(run.status);
   const data = { taskRef: ctx.taskRef, time: when, ended };
+  if (commented) {
+    return run.ownRun
+      ? t(when ? HISTORY.lastRunOwnCommented : HISTORY.lastRunOwnCommentedNoTime, data)
+      : t(when ? HISTORY.lastRunOtherCommented : HISTORY.lastRunOtherCommentedNoTime, { ...data, whose: whose(ctx, { type: "agent", id: run.agentId }, true) });
+  }
   const sentence = run.ownRun
     ? t(when ? HISTORY.lastRunOwn : HISTORY.lastRunOwnNoTime, data)
     : t(when ? HISTORY.lastRunOther : HISTORY.lastRunOtherNoTime, { ...data, whose: whose(ctx, { type: "agent", id: run.agentId }, true) });
@@ -234,12 +265,17 @@ function renderDocuments(ctx: Ctx, documents: TaskHistory["documents"]): string 
   const quoted = (document: TaskHistory["documents"][number]) => runTask
     ? document.key === "plan" && runTask.plan !== null
     : document.inBrief;
+  // The key, then one bracket with the title (when it differs) and the pointer (bug 97):
+  // plan ("Compact mode plan", quoted under "The task" below).
   const names = documents.map((document) => {
-    const name = document.title && !sameName(document.key, document.title)
-      ? `${inline(document.key, 100)} ("${inline(document.title, 100).replace(/"/g, "'")}")`
-      : inline(document.key, 100);
-    if (!quoted(document)) return name;
-    return t(runTask ? HISTORY.documentInTask : HISTORY.documentInBrief, { document: name });
+    const key = inline(document.key, 100);
+    const details = [
+      document.title && !sameName(document.key, document.title)
+        ? t(HISTORY.documentTitle, { title: inline(document.title, 100).replace(/"/g, "'") })
+        : null,
+      quoted(document) ? (runTask ? HISTORY.documentInTask : HISTORY.documentInBrief) : null,
+    ].filter((detail): detail is string => detail !== null);
+    return details.length > 0 ? t(HISTORY.documentNamed, { key, details: details.join(", ") }) : key;
   });
   const rest = documents.filter((document) => !quoted(document));
   const workflow = rest.some((document) => document.key === "workflow");
