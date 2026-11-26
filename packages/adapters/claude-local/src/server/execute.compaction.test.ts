@@ -88,7 +88,7 @@ describe("claude_local CLI runs record compactions", () => {
     expect(events[0]!.payload.prpEvent).toMatchObject({
       sourceKind: "claude_local",
       normalizedSessionId: "10632812-510b-4a83-a708-a5031e2982d7",
-      payload: { compactionId: "b1529e2c-c9de-468e-bb1e-89772abdfa45", reason: "manual", preTokens: 41981 },
+      payload: { compactionId: "b1529e2c-c9de-468e-bb1e-89772abdfa45", reason: "manual", preTokens: 41981, postTokens: 10166 },
     });
   });
 

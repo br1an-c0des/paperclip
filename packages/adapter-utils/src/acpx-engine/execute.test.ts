@@ -1805,7 +1805,7 @@ describe("shared ACPX engine runtime behavior", () => {
   });
 
   // Bug 96: the patched claude-agent-acp marks the usage_update it sends at a compact_boundary.
-  const compactionMarker = { paperclip: { compacted: { trigger: "auto", preTokens: 150000, compactionId: "c-9" } } };
+  const compactionMarker = { paperclip: { compacted: { trigger: "auto", preTokens: 150000, postTokens: 20000, compactionId: "c-9" } } };
   it.each([
     { name: "records a marked usage_update as one context.compacted event, even when repeated", updates: [
       { _meta: compactionMarker }, { _meta: compactionMarker }, {},
@@ -1856,7 +1856,7 @@ describe("shared ACPX engine runtime behavior", () => {
         eventType: "context.compacted",
         sourceKind: "claude_local",
         normalizedSessionId: "backend-session",
-        payload: { schema: "paperclip.context.compacted.v1", compactionId: "c-9", reason: "auto", preTokens: 150000, postTokens: null, sameSession: true },
+        payload: { schema: "paperclip.context.compacted.v1", compactionId: "c-9", reason: "auto", preTokens: 150000, postTokens: 20000, sameSession: true },
       });
     }
   });

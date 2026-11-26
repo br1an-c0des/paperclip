@@ -1,8 +1,8 @@
 diff --git a/dist/acp-agent.js b/dist/acp-agent.js
-index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf7b48b269 100644
+index 0214a509eb5e7b777a69e4e34637941c275d27b1..b5cbb4429fdd577d9d338bb7a1913c7dc66ee6a5 100644
 --- a/dist/acp-agent.js
 +++ b/dist/acp-agent.js
-@@ -2212,6 +2212,19 @@ export class ClaudeAcpAgent {
+@@ -2212,6 +2212,20 @@ export class ClaudeAcpAgent {
                                          sessionUpdate: "usage_update",
                                          used: lastAssistantTotalUsage,
                                          size: session.contextWindowSize,
@@ -15,6 +15,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
 +                                                compacted: {
 +                                                    trigger: message.compact_metadata?.trigger ?? null,
 +                                                    preTokens: message.compact_metadata?.pre_tokens ?? null,
++                                                    postTokens: message.compact_metadata?.post_tokens ?? null,
 +                                                    compactionId: message.uuid,
 +                                                },
 +                                            },
@@ -22,7 +23,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                                      },
                                  });
                                  break;
-@@ -2490,11 +2503,88 @@ export class ClaudeAcpAgent {
+@@ -2490,11 +2504,88 @@ export class ClaudeAcpAgent {
                                  break;
                              }
                              case "hook_started":
@@ -113,7 +114,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                                  await asyncTasks.taskProgress({
                                      task_id: message.task_id,
                                      description: message.description,
-@@ -2503,6 +2593,7 @@ export class ClaudeAcpAgent {
+@@ -2503,6 +2594,7 @@ export class ClaudeAcpAgent {
                                      usage: message.usage,
                                  });
                                  break;
@@ -121,7 +122,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                              case "task_started":
                                  // For subagent tasks `task_id` is the subagent's agent id (the
                                  // SDK keys its task registry by agent id) and `tool_use_id` is
-@@ -2550,6 +2641,7 @@ export class ClaudeAcpAgent {
+@@ -2550,6 +2642,7 @@ export class ClaudeAcpAgent {
                              case "task_notification":
                                  // The task settled — no further tool calls can originate
                                  // from it, so its registry entry can be dropped.
@@ -129,7 +130,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                                  await subagents.finishTask(message.task_id, message.status, sendUpdate, message.tool_use_id);
                                  await asyncTasks.taskNotification({
                                      task_id: message.task_id,
-@@ -2571,6 +2663,7 @@ export class ClaudeAcpAgent {
+@@ -2571,6 +2664,7 @@ export class ClaudeAcpAgent {
                                  if (message.patch.status === "completed" ||
                                      message.patch.status === "failed" ||
                                      message.patch.status === "killed") {
@@ -137,7 +138,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                                      await subagents.finishTask(message.task_id, message.patch.status, sendUpdate);
                                      session.liveBackgroundTasks.delete(message.task_id);
                                  }
-@@ -2794,7 +2887,9 @@ export class ClaudeAcpAgent {
+@@ -2794,7 +2888,9 @@ export class ClaudeAcpAgent {
                                      session.pendingGoalUpdate = undefined;
                                      const goalCommandFailed = message.is_error ||
                                          message.stop_reason === "refusal" ||
@@ -148,7 +149,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                                      if (goalCommandFailed) {
                                          await this.publishGoal(params.sessionId, pendingGoalUpdate.previous ?? null);
                                      }
-@@ -2922,9 +3017,19 @@ export class ClaudeAcpAgent {
+@@ -2922,9 +3018,19 @@ export class ClaudeAcpAgent {
                                              amount: message.total_cost_usd,
                                              currency: "USD",
                                          },
@@ -171,7 +172,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                                      },
                                  });
                              }
-@@ -3081,7 +3186,7 @@ export class ClaudeAcpAgent {
+@@ -3081,7 +3187,7 @@ export class ClaudeAcpAgent {
                              }
                              switch (message.subtype) {
                                  case "success": {
@@ -180,7 +181,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                                          await failActiveWithSessionFailure("auth_required", RequestError.authRequired(), message.result);
                                          break;
                                      }
-@@ -4506,6 +4611,48 @@ export class ClaudeAcpAgent {
+@@ -4506,6 +4612,48 @@ export class ClaudeAcpAgent {
       *  `$/cancel_request`, and our local abort race settles even if the client
       *  ignores it. A `cancelled` outcome, request rejection, and local abort all
       *  surface the same "Tool use aborted" the callers already expect. */
@@ -229,7 +230,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
      async requestPermissionFromClient(params, toolName, signal, parentToolUseId, ownerSessionId = params.sessionId) {
          if (signal.aborted)
              throw new Error("Tool use aborted");
-@@ -5311,14 +5458,24 @@ export class ClaudeAcpAgent {
+@@ -5311,14 +5459,24 @@ export class ClaudeAcpAgent {
              settingSources: ["user", "project", "local"],
              ...(thinking !== undefined && { thinking }),
              ...userProvidedOptions,
@@ -255,7 +256,7 @@ index 0214a509eb5e7b777a69e4e34637941c275d27b1..704b0082ab5a06b97c760861a76b9eaf
                  ...mcpServers,
                  ...(fileChangeAuditSupport
                      ? { [FILE_CHANGE_AUDIT_SERVER_NAME]: fileChangeAuditSupport.mcpServer }
-@@ -5329,6 +5486,16 @@ export class ClaudeAcpAgent {
+@@ -5329,6 +5487,16 @@ export class ClaudeAcpAgent {
              allowDangerouslySkipPermissions: ALLOW_BYPASS,
              permissionMode: initialPermissionMode,
              canUseTool: this.canUseTool(sessionId),

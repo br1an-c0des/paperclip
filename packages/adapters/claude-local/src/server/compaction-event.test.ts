@@ -30,7 +30,7 @@ describe("claudeCompactionEvent", () => {
       compactionId: "b1529e2c-c9de-468e-bb1e-89772abdfa45",
       reason: "manual",
       preTokens: 41981,
-      postTokens: null,
+      postTokens: 10166,
       sameSession: true,
     });
   });
@@ -41,8 +41,9 @@ describe("claudeCompactionEvent", () => {
     expect(envelope(event).payload).toMatchObject({
       compactionId: "s-1:2026-11-25T12:00:00.000Z",
       reason: "provider",
-      preTokens: null,
     });
+    expect(envelope(event).payload).not.toHaveProperty("preTokens");
+    expect(envelope(event).payload).not.toHaveProperty("postTokens");
   });
 
   it("gives null for other lines", () => {
@@ -75,6 +76,7 @@ describe("the patched claude-agent-acp (ACP engine)", () => {
     expect(boundary).toContain("sessionUpdate: \"usage_update\"");
     expect(boundary).toContain("trigger: message.compact_metadata?.trigger ?? null");
     expect(boundary).toContain("preTokens: message.compact_metadata?.pre_tokens ?? null");
+    expect(boundary).toContain("postTokens: message.compact_metadata?.post_tokens ?? null");
     expect(boundary).toContain("compactionId: message.uuid");
     const status = caseBlock("status");
     expect(status).toContain("compact_result");
