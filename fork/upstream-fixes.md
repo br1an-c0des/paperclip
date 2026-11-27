@@ -137,8 +137,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 96 | [Paperclip doesn't record when Claude compacts a CLI session](#96-paperclip-doesnt-record-when-claude-compacts-a-cli-session) | fixed (step 5, `767dbbfad8`) | | | 2026-11-24 | | |
 | 97 | [Drop the double brackets on the run message's documents line](#97-drop-the-double-brackets-on-the-run-messages-documents-line) | fixed (step 5, `767dbbfad8`) | | | 2026-11-25 | | |
 | 98 | [Don't repeat the last run's summary when the agent's comment says the same](#98-dont-repeat-the-last-runs-summary-when-the-agents-comment-says-the-same) | fixed (step 5, `767dbbfad8`) | | | 2026-11-25 | | |
-| 101 | [A task that has run can't be deleted](#101-a-task-that-has-run-cant-be-deleted) | fixed on the branch, not merged | `fix/task-delete-references` | | 2026-11-26 | | |
-| 102 | [An approved permission request that didn't run gives no sign of it](#102-an-approved-permission-request-that-didnt-run-gives-no-sign-of-it) | fixed on the branch, not merged | `fix/task-delete-references` | | 2026-11-26 | | |
+| 101 | [A task that has run can't be deleted](#101-a-task-that-has-run-cant-be-deleted) | fixed (`fec22ee0f7`, deployed 2026-11-26) | `fix/task-delete-references` | | 2026-11-26 | | 2026-11-26 |
+| 102 | [An approved permission request that didn't run gives no sign of it](#102-an-approved-permission-request-that-didnt-run-gives-no-sign-of-it) | fixed (`fec22ee0f7`, deployed 2026-11-26) | `fix/task-delete-references` | | 2026-11-26 | | 2026-11-26 |
+| 103 | [`paperclip_create_task` refuses a parent given as an identifier, with a bare "Validation error"](#103-paperclip_create_task-refuses-a-parent-given-as-an-identifier-with-a-bare-validation-error) | candidate | | | 2026-11-26 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1786,7 +1787,8 @@ Found 2026-11-26 on server1: deleting BRA-44 and BRA-45 (finished top-level task
 runs and comments) through `paperclip_delete_task` failed with "Issue cannot be deleted because
 another record still references it.", both after an approved permission request and directly
 after "Approve and always allow". The UI's "Delete task…" uses the same route
-(`DELETE /api/issues/:id`). Fixed on `fix/task-delete-references`.
+(`DELETE /api/issues/:id`). Fixed on `fix/task-delete-references`, merged as `fec22ee0f7` and
+deployed 2026-11-26; the 45 old tasks in the paperclip fork project then deleted cleanly.
 
 - **Problem:** every run on the native runtime (the default for `claude_local`) writes a
   completion contract, a result, an assessment, a status decision with its effects and a
@@ -1833,3 +1835,24 @@ on `fix/task-delete-references`.
   `ui-new/src/requests/RequestCard.tsx` ignored the approve response, which carries the result.
 - **Fix:** when the approve response's result isn't `done`, the card shows a toast, "Approved, but
   it didn't run", with the result line. Test in `ui-new/src/requests/RequestCard.test.tsx`.
+
+### 103. `paperclip_create_task` refuses a parent given as an identifier, with a bare "Validation error"
+
+Found 2026-11-26 on server1, creating subtasks through MCP with `parentId: "BRA-68"`: all 21
+calls failed with just "Validation error" and created nothing. The same calls with the parent's
+UUID worked.
+
+- **Problem, part 1:** `paperclip_create_task` (and `paperclip_update_task`'s `parentId`) take any
+  string (`z.string().min(1)` in `server/src/mcp/catalog/tasks.ts`) and pass it straight to
+  `POST /companies/:id/issues` / `PATCH /issues/:id`, whose validators want a UUID
+  (`parentId: z.string().guid()` in `packages/shared/src/validators/issue.ts`). Every other task
+  argument in the catalog (`taskId`) takes a UUID or an identifier such as `BRA-12`, and the
+  `paperclip` skill says to pass "your task" as the parent, so an agent will naturally pass the
+  identifier.
+- **Problem, part 2:** the route's 400 carries the Zod issues in `details`, naming the field, but
+  `errorFromResponse` in `server/src/mcp/dispatch.ts` keeps only the `error` string, so the caller
+  sees "Validation error" with no hint which argument is wrong.
+- **Likely fix:** resolve an identifier to the task's id in the tool before calling the route (as
+  `taskId` paths already allow), for both create and update; and have `errorFromResponse` add the
+  first validation issue's path and message to the tool error. A test for each in the MCP catalog
+  tests.
