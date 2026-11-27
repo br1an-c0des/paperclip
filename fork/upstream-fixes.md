@@ -37,6 +37,9 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 
 ## The list
 
+Open bugs are also tasks in the paperclip fork project, labelled `bug`, each titled with its number
+(added 2026-11-26). Bugs in code this setup doesn't use (15, 20, 21, 25, 27, 33, 38, 54) aren't.
+
 | # | Bug | Status | Branch | Pull request | Found | Submitted | Merged |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | [Clear the compact issue-list cache when an issue changes](#1-clear-the-compact-issue-list-cache-when-an-issue-changes) | fixed | `fix/issue-list-cache-invalidation` | [#17828](https://github.com/paperclipai/paperclip/pull/17828) | 2026-10-26 | 2026-10-26 | `0b7ce6b3a` (2026-11-17) |
@@ -77,7 +80,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 36 | [Stop the skill promising an unenforced CEO-strategy gate](#36-stop-the-skill-promising-an-unenforced-ceo-strategy-gate) | candidate | | | 2026-10-24 | | |
 | 37 | [Log participant changes for every review stage (optional)](#37-log-participant-changes-for-every-review-stage-optional) | candidate | | | 2026-10-24 | | |
 | 38 | [Report the review-stage bypass, with failing tests](#38-report-the-review-stage-bypass-with-failing-tests) | candidate | | | 2026-10-24 | | |
-| 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | candidate | | | 2026-10-24 | | |
+| 39 | [Turn off Claude Code's auto memory when an agent has `para-memory-files`](#39-turn-off-claude-codes-auto-memory-when-an-agent-has-para-memory-files) | fixed (step 4b, `b12b95be6f`) | | | 2026-10-24 | | |
 | 40 | [Find why 11 server tests fail on `main` (one file is core)](#40-find-why-11-server-tests-fail-on-main-one-file-is-core) | fixed | `test/bug40` | | 2026-11-18 | | `741e8c5231` (2026-11-18) |
 | 41 | [Give `para-memory-files` a recall tool that exists](#41-give-para-memory-files-a-recall-tool-that-exists) | fixed (`08749b9df`) | `fix/para-memory-recall` | | 2026-11-18 | | `f484c486b` (2026-11-20) |
 | 42 | [Fix or move the 8 test files that fail in a full run on `main`](#42-fix-or-move-the-8-test-files-that-fail-in-a-full-run-on-main) | fixed | `test/tiers` | | 2026-11-18 | | `b6e7076fae` (2026-11-18) |
@@ -94,7 +97,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 53 | [Stop the ACP engine tests writing settings into the repo](#53-stop-the-acp-engine-tests-writing-settings-into-the-repo) | fixed (`b30f07d57f`, `b4d5ecbe9e`) | | | 2026-11-18 | | |
 | 54 | [Check access on the other plugin-origin agent writes](#54-check-access-on-the-other-plugin-origin-agent-writes) | candidate | | | 2026-11-18 | | |
 | 55 | [Make the title route's access refusal requestable](#55-make-the-title-routes-access-refusal-requestable) | candidate | | | 2026-11-18 | | |
-| 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | candidate | | | 2026-11-18 | | |
+| 56 | [Decide whether catalog task creation needs a retry key](#56-decide-whether-catalog-task-creation-needs-a-retry-key) | fixed (every MCP write takes `requestId`) | | | 2026-11-18 | | |
 | 57 | [Make `attentionService.list` fast over many failed runs](#57-make-attentionservicelist-fast-over-many-failed-runs) | candidate | | | 2026-11-18 | | |
 | 58 | [Check the scope of a scoped `agents:configure` override](#58-check-the-scope-of-a-scoped-agentsconfigure-override) | fixed on `feat/step-4a` (`1c870f14d`) | | | 2026-11-19 | | |
 | 59 | [Keep provider `access_denied` errors apart from agent access refusals](#59-keep-provider-access_denied-errors-apart-from-agent-access-refusals) | fixed on `feat/step-4a` (`d162c3255`) | | | 2026-11-19 | | |
@@ -123,7 +126,7 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 82 | [Time test waits on the monotonic clock: the desktop's wall clock jumps](#82-time-test-waits-on-the-monotonic-clock-the-desktops-wall-clock-jumps) | candidate | | | 2026-11-22 | | |
 | 83 | [Stop the runtime service `workspace-runtime`'s sibling test leaves running](#83-stop-the-runtime-service-workspace-runtimes-sibling-test-leaves-running) | candidate | | | 2026-11-23 | | |
 | 84 | [Don't send the string "null" as a no-task run's task brief](#84-dont-send-the-string-null-as-a-no-task-runs-task-brief) | candidate | | | 2026-11-23 | | |
-| 85 | [Say which approval an approval wake is about](#85-say-which-approval-an-approval-wake-is-about) | candidate | | | 2026-11-23 | | |
+| 85 | [Say which approval an approval wake is about](#85-say-which-approval-an-approval-wake-is-about) | fixed for `claude_local` (step 5 wake) | | | 2026-11-23 | | |
 | 86 | [Send the chat directive once per chat session, not every turn](#86-send-the-chat-directive-once-per-chat-session-not-every-turn) | candidate | | | 2026-11-23 | | |
 | 87 | [Store a run's whole prompt, not the first 16,384 characters](#87-store-a-runs-whole-prompt-not-the-first-16384-characters) | fixed (step 5, `5c3cea6c21`) | | | 2026-11-23 | | |
 | 88 | [Give `claude_local` runs the instruction working-copy guidance](#88-give-claude_local-runs-the-instruction-working-copy-guidance) | fixed (step 5, `41427fffda`) | | | 2026-11-23 | | |
@@ -137,6 +140,8 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 96 | [Paperclip doesn't record when Claude compacts a CLI session](#96-paperclip-doesnt-record-when-claude-compacts-a-cli-session) | fixed (step 5, `767dbbfad8`) | | | 2026-11-24 | | |
 | 97 | [Drop the double brackets on the run message's documents line](#97-drop-the-double-brackets-on-the-run-messages-documents-line) | fixed (step 5, `767dbbfad8`) | | | 2026-11-25 | | |
 | 98 | [Don't repeat the last run's summary when the agent's comment says the same](#98-dont-repeat-the-last-runs-summary-when-the-agents-comment-says-the-same) | fixed (step 5, `767dbbfad8`) | | | 2026-11-25 | | |
+| 99 | [Agent runs on server1 can't reach Paperclip's MCP server or the GitHub broker](#99-agent-runs-on-server1-cant-reach-paperclips-mcp-server-or-the-github-broker) | fixed (`0a3f17b324`, deployed 2026-11-25) | | | 2026-11-25 | | 2026-11-25 |
+| 100 | [A GitHub connection's shared token never reaches runs](#100-a-github-connections-shared-token-never-reaches-runs) | fixed (`57eb4b0bc1`, deployed 2026-11-25) | `github-shared-token` | | 2026-11-25 | | 2026-11-25 |
 | 101 | [A task that has run can't be deleted](#101-a-task-that-has-run-cant-be-deleted) | fixed (`fec22ee0f7`, deployed 2026-11-26) | `fix/task-delete-references` | | 2026-11-26 | | 2026-11-26 |
 | 102 | [An approved permission request that didn't run gives no sign of it](#102-an-approved-permission-request-that-didnt-run-gives-no-sign-of-it) | fixed (`fec22ee0f7`, deployed 2026-11-26) | `fix/task-delete-references` | | 2026-11-26 | | 2026-11-26 |
 | 103 | [`paperclip_create_task` refuses a parent given as an identifier, with a bare "Validation error"](#103-paperclip_create_task-refuses-a-parent-given-as-an-identifier-with-a-bare-validation-error) | candidate | | | 2026-11-26 | | |
@@ -976,7 +981,9 @@ Found by the step 4a bug-fix agent (2026-11-18).
 
 ### 56. Decide whether catalog task creation needs a retry key
 
-Found by the step 4a bug-fix agent (2026-11-18).
+Found by the step 4a bug-fix agent (2026-11-18). **Settled** (checked 2026-11-26): every write tool on
+Paperclip's MCP server, `paperclip_create_task` included, now takes an optional `requestId` that a
+retry reuses (`server/src/services/public-mcp/catalog.ts`).
 
 - **What's wrong:** `paperclip_create_task` takes no idempotency key, so a retried call can create a
   duplicate task. The chat directive's REST sentences still mention one. The old project-tools
