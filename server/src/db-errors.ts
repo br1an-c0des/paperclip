@@ -42,11 +42,38 @@ export function isUniqueViolation(error: unknown, constraintName?: string): bool
  * the `cause` chain, the same way `isUniqueViolation` does.
  */
 export function isForeignKeyViolation(error: unknown): boolean {
+  return foreignKeyViolation(error) !== null;
+}
+
+/**
+ * The table and constraint of a foreign-key violation (SQLSTATE 23503), or
+ * null when the error is not one. For a blocked delete, `table` is the
+ * referencing table. postgres.js names the fields `table_name` and
+ * `constraint_name`, node-postgres `table` and `constraint`; either may be
+ * missing.
+ */
+export function foreignKeyViolation(
+  error: unknown,
+): { table: string | null; constraint: string | null } | null {
   let current: unknown = error;
   for (let depth = 0; depth < MAX_CAUSE_DEPTH && current && typeof current === "object"; depth += 1) {
-    const candidate = current as { code?: unknown; cause?: unknown };
-    if (candidate.code === FOREIGN_KEY_VIOLATION) return true;
+    const candidate = current as {
+      code?: unknown;
+      cause?: unknown;
+      table?: unknown;
+      table_name?: unknown;
+      constraint?: unknown;
+      constraint_name?: unknown;
+    };
+    if (candidate.code === FOREIGN_KEY_VIOLATION) {
+      const table = candidate.table_name ?? candidate.table;
+      const constraint = candidate.constraint_name ?? candidate.constraint;
+      return {
+        table: typeof table === "string" ? table : null,
+        constraint: typeof constraint === "string" ? constraint : null,
+      };
+    }
     current = candidate.cause;
   }
-  return false;
+  return null;
 }

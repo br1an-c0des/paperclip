@@ -137,6 +137,8 @@ Entries 8 and 10–13 were moved there on 2026-11-16; their numbers are kept.
 | 96 | [Paperclip doesn't record when Claude compacts a CLI session](#96-paperclip-doesnt-record-when-claude-compacts-a-cli-session) | fixed (step 5, `767dbbfad8`) | | | 2026-11-24 | | |
 | 97 | [Drop the double brackets on the run message's documents line](#97-drop-the-double-brackets-on-the-run-messages-documents-line) | fixed (step 5, `767dbbfad8`) | | | 2026-11-25 | | |
 | 98 | [Don't repeat the last run's summary when the agent's comment says the same](#98-dont-repeat-the-last-runs-summary-when-the-agents-comment-says-the-same) | fixed (step 5, `767dbbfad8`) | | | 2026-11-25 | | |
+| 101 | [A task that has run can't be deleted](#101-a-task-that-has-run-cant-be-deleted) | fixed on the branch, not merged | `fix/task-delete-references` | | 2026-11-26 | | |
+| 102 | [An approved permission request that didn't run gives no sign of it](#102-an-approved-permission-request-that-didnt-run-gives-no-sign-of-it) | fixed on the branch, not merged | `fix/task-delete-references` | | 2026-11-26 | | |
 
 Entries 34–39 were the build plan's stage 2a list until Nov 16, 2026 (2a-1 to 2a-6). Its 2a-7, the
 plugin SDK link on Windows, is entry 4.
@@ -1777,3 +1779,57 @@ signed in.
   the health check does. A token records no GitHub account, so the managed launchers make the agent
   the committer as well as the author, and the run manifest shows "account not recorded (shared)".
   Tests: `server/src/__tests__/github-shared-token.test.ts`.
+
+### 101. A task that has run can't be deleted
+
+Found 2026-11-26 on server1: deleting BRA-44 and BRA-45 (finished top-level tasks, each with agent
+runs and comments) through `paperclip_delete_task` failed with "Issue cannot be deleted because
+another record still references it.", both after an approved permission request and directly
+after "Approve and always allow". The UI's "Delete task…" uses the same route
+(`DELETE /api/issues/:id`). Fixed on `fix/task-delete-references`.
+
+- **Problem:** every run on the native runtime (the default for `claude_local`) writes a
+  completion contract, a result, an assessment, a status decision with its effects and a
+  finalization row: `completion_contracts`, `native_run_results`, `work_assessments`,
+  `status_decisions`, `status_decision_effects`, `native_run_finalizations` (migration 0227). Each
+  has a NOT NULL `issue_id` with two foreign keys to `issues` and no delete rule
+  (`<table>_issue_id_issues_id_fk` and `<table>_issue_company_fk`), so Postgres refused to delete
+  any task that had run. `issueService.remove` (`server/src/services/issues.ts`) relies on cascades
+  and turned the 23503 into the 409 without logging which constraint, so server1's logs had
+  nothing. On server1 those six tables were the only rows without a delete rule that referenced
+  the two tasks.
+- **Fix:** `remove` deletes those six tables' rows for the task, children first, in the delete's
+  transaction (`removeNativeRunRecords`). They're the run's verdict on that task and mean nothing
+  without it; they can't be detached (NOT NULL, and their foreign keys to each other and to
+  `heartbeat_runs` go through `issue_id`). The rest is unchanged: comments, documents, work
+  products, approvals links, read and inbox state cascade; runs, cost and finance events,
+  workspace operations and environment leases keep their rows with `issue_id` set to null;
+  activity rows stay (no foreign key). A run's `native_issue_id` keeps the deleted task's id, like
+  its context snapshot.
+  - **A run still finishing** (a finalization not in `committed`, `terminal_failure` or `applied`,
+    or holding a lease) makes the delete refuse with a 409 ("still finishing") rather than pull
+    the row from under its finalizer.
+  - **Deletes still blocked on purpose:** subtasks (`issues.parent_id`), decisions (the signed
+    ledger upstream kept restricted), a case's work task and hand-offs, a skill test run's task,
+    and the dormant chat and browser-session tables. The 409 now names the blocking table
+    ("… still references it (decisions).") and the server logs the constraint.
+  - **No migration**, so the deploy needs no rehearsal for this.
+- **Tests:** `server/src/__tests__/issue-remove-references.test.ts` (core): a finished task with a
+  native run, comments, a document, a work product, an approval, read and inbox state, cost and
+  activity rows deletes; a run still finishing refuses; a subtask's 409 names `issues`. Its guard
+  lists every foreign key to `issues.id` without a delete rule and fails on one that is neither
+  handled by `remove` nor listed as blocking on purpose.
+
+### 102. An approved permission request that didn't run gives no sign of it
+
+Found 2026-11-26 with bug 101: after approving the request to delete BRA-44, the user saw it
+approved and nothing else, though the replay's stored result was `refused` with the reason. Fixed
+on `fix/task-delete-references`.
+
+- **Problem:** the settled card does show the result ("Refused when it ran: …", from
+  `permissionResult` in `ui-new/src/requests/permission-model.ts`) and the task gets a comment
+  saying so, but approving takes the card out of the open list in the inbox and the requests page,
+  so the line is only seen by going to the settled request or the task. `ApprovalControls` in
+  `ui-new/src/requests/RequestCard.tsx` ignored the approve response, which carries the result.
+- **Fix:** when the approve response's result isn't `done`, the card shows a toast, "Approved, but
+  it didn't run", with the result line. Test in `ui-new/src/requests/RequestCard.test.tsx`.
