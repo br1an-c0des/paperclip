@@ -57,7 +57,7 @@ import { QuestionSetForm } from "./QuestionSetForm";
 import { WithdrawDialog } from "./WithdrawDialog";
 import { canWithdrawApproval } from "@/approvals/approval-model";
 import { alreadyClosed, alreadyClosedText } from "@/inbox/routing-model";
-import { argumentRows, connectionLabel, missingActionWords, permissionExpired, permissionRequestOf, toolWords } from "./permission-model";
+import { argumentRows, connectionLabel, missingActionWords, permissionExpired, permissionRequestOf, permissionResult, toolWords } from "./permission-model";
 import { answerRefusal, declineNote, documentLabel, documentReviewTarget, KIND_LABEL, planLabel, planReviewTarget, suggestedOwner, type Request, type RequestKind } from "./request-model";
 import "./RequestCard.css";
 
@@ -1191,8 +1191,15 @@ function ApprovalControls(props: { request: Request; people: TaskPeople; onDone:
       if (action === "reject") return approvalsApi.reject(approval().id, decisionNote);
       return approvalsApi.requestRevision(approval().id, decisionNote);
     },
-    onSuccess: () => {
+    onSuccess: (decided) => {
       setError(null);
+      // An approved permission request runs at once. When it didn't run, say so here: the card
+      // leaves the open list, so its settled line ("Refused when it ran: …") is easy to miss.
+      const ran = decided ? permissionRequestOf(decided) : null;
+      const outcome = ran ? permissionResult(ran) : null;
+      if (outcome && outcome.tone !== "ok") {
+        pushToast({ tone: outcome.tone === "bad" ? "error" : "warn", title: "Approved, but it didn't run", body: outcome.text });
+      }
       props.onDone();
     },
     onError: (failure: Error) => setError(failure.message),

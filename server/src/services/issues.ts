@@ -112,6 +112,7 @@ import {
   assets,
   companies,
   companyMemberships,
+  completionContracts,
   documentRevisions,
   documents,
   goals,
@@ -140,9 +141,14 @@ import {
   toolInvocations,
   issues,
   labels,
+  nativeRunFinalizations,
+  nativeRunResults,
   projectWorkspaces,
   projects,
+  statusDecisionEffects,
+  statusDecisions,
   toolConnections,
+  workAssessments,
   workspaceOperations,
 } from "@paperclipai/db";
 import type {
@@ -174,7 +180,7 @@ import {
   normalizeIssueIdentifier as normalizeIssueReferenceIdentifier,
 } from "@paperclipai/shared";
 import { conflict, forbidden, HttpError, notFound, unprocessable } from "../errors.js";
-import { isForeignKeyViolation } from "../db-errors.js";
+import { foreignKeyViolation } from "../db-errors.js";
 import { logger } from "../middleware/logger.js";
 import { parseObject } from "../adapters/utils.js";
 import {
@@ -7228,6 +7234,50 @@ export function provisionalTitleFromDescription(description: string) {
   }
 }
 
+/** Final `native_run_finalizations` phases; the same list as TERMINAL_PHASES in
+ * recovery/ownership-registry.ts. */
+const SETTLED_NATIVE_FINALIZATION_PHASES = ["committed", "terminal_failure", "applied"];
+
+/**
+ * Remove a task's native-run outcome records before the task row goes. Every
+ * run on the native runtime writes a completion contract, a result, an
+ * assessment, a status decision with its effects and a finalization row, each
+ * with a NOT NULL issue_id and a foreign key to issues that has no delete rule,
+ * so they blocked every delete of a task that had run (bug 101). They mean
+ * nothing without the task. The runs themselves stay: heartbeat_runs.issue_id is
+ * set to null by its foreign key, as are cost and workspace-operation rows.
+ *
+ * A finalization that has not settled belongs to a run still finishing, whose
+ * finalizer holds or will take that row, so the delete waits for it instead.
+ */
+async function removeNativeRunRecords(tx: DbTransaction, issueId: string) {
+  const [unsettled] = await tx
+    .select({ runId: nativeRunFinalizations.runId })
+    .from(nativeRunFinalizations)
+    .where(and(
+      eq(nativeRunFinalizations.issueId, issueId),
+      or(
+        notInArray(nativeRunFinalizations.phase, SETTLED_NATIVE_FINALIZATION_PHASES),
+        isNotNull(nativeRunFinalizations.leaseOwner),
+      ),
+    ))
+    .limit(1);
+  if (unsettled) {
+    throw conflict("Task cannot be deleted while a run on it is still finishing. Try again once the run has finished.", {
+      runId: unsettled.runId,
+    });
+  }
+  // Children before parents: the foreign keys among these tables have no delete
+  // rule either. A table's own `supersedes_*` references are removed in the same
+  // statement, which Postgres checks once at its end.
+  await tx.delete(statusDecisionEffects).where(eq(statusDecisionEffects.issueId, issueId));
+  await tx.delete(nativeRunFinalizations).where(eq(nativeRunFinalizations.issueId, issueId));
+  await tx.delete(statusDecisions).where(eq(statusDecisions.issueId, issueId));
+  await tx.delete(workAssessments).where(eq(workAssessments.issueId, issueId));
+  await tx.delete(nativeRunResults).where(eq(nativeRunResults.issueId, issueId));
+  await tx.delete(completionContracts).where(eq(completionContracts.issueId, issueId));
+}
+
 export function issueService(db: Db) {
   const instanceSettings = instanceSettingsService(db);
   const treeControlSvc = issueTreeControlService(db);
@@ -12749,6 +12799,7 @@ export function issueService(db: Db) {
           }
           await notifyDeliveryWork(tx, DELIVERY_QUEUES.agentTimers);
           await notifyRoutineExecutionStatus(tx, id);
+          await removeNativeRunRecords(tx, id);
           removedIssue = await tx
             .delete(issues)
             .where(eq(issues.id, id))
@@ -12758,10 +12809,19 @@ export function issueService(db: Db) {
           // A foreign key to issues.id without a delete policy blocks the delete
           // and raises SQLSTATE 23503. Map it to a clear 409 instead of a bare
           // 500. This also covers the decisions table, whose NOT NULL references
-          // to issues.id stay restricted on purpose.
-          if (isForeignKeyViolation(err)) {
+          // to issues.id stay restricted on purpose. The message names the
+          // referencing table, and the log its constraint, so the next one is
+          // found without a database session (bug 101 was not logged at all).
+          const violation = foreignKeyViolation(err);
+          if (violation) {
+            logger.warn(
+              { issueId: id, table: violation.table, constraint: violation.constraint },
+              "issue delete blocked by a foreign key",
+            );
             throw conflict(
-              "Issue cannot be deleted because another record still references it.",
+              `Issue cannot be deleted because another record still references it${
+                violation.table ? ` (${violation.table})` : ""}.`,
+              { table: violation.table, constraint: violation.constraint },
             );
           }
           throw err;

@@ -31,6 +31,8 @@ const approvals = vi.hoisted(() => ({
   cancel: vi.fn(async () => ({})),
 }));
 vi.mock("@/api/approvals", () => ({ approvalsApi: approvals }));
+const toast = vi.hoisted(() => vi.fn((..._args: unknown[]) => null));
+vi.mock("@/ui/Toast", async (original) => ({ ...(await original<typeof import("@/ui/Toast")>()), pushToast: toast }));
 
 const { RequestCard } = await import("./RequestCard");
 
@@ -363,6 +365,20 @@ describe("RequestCard: a permission request", () => {
     expect((screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Approve and always allow" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Deny" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("says at once when an approved request was refused as it ran", async () => {
+    const pending = permission();
+    approvals.approve.mockResolvedValueOnce({
+      ...pending,
+      status: "approved",
+      payload: { ...pending.payload, result: { status: "refused", detail: "Issue cannot be deleted", at: "2026-11-18T13:00:01Z" } },
+    } as never);
+    mountApproval(pending);
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith({ tone: "error", title: "Approved, but it didn't run", body: "Refused when it ran: Issue cannot be deleted" }),
+    );
   });
 
   it("shows what the replay did once decided", () => {
